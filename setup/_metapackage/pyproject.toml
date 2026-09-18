@@ -5,6 +5,7 @@ dependencies = [
     "odoo-addon-barcodes_generator_abstract==19.0.*",
     "odoo-addon-barcodes_generator_product==19.0.*",
     "odoo-addon-product_multi_barcode==19.0.*",
+    "odoo-addon-web_ir_actions_client_scan==19.0.*",
 ]
 classifiers=[
     "Programming Language :: Python",
