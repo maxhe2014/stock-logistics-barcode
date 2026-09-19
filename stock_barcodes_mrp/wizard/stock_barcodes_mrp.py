@@ -103,6 +103,10 @@ class WizStockBarcodesMrp(models.TransientModel):
     message_step = fields.Char(readonly=True)
     step = fields.Integer(default=1)
     visible_force_done = fields.Boolean()
+    visible_force_add = fields.Boolean(
+        string="Force Add",
+        help="Show the 'Force Add' button to consume a product not in the BOM",
+    )
     qty_available = fields.Float(
         string="Available", digits="Product Unit of Measure", readonly=True,
     )
@@ -169,7 +173,7 @@ class WizStockBarcodesMrp(models.TransientModel):
     # --- Barcode scanning entry point ---
     def on_barcode_scanned(self, barcode):
         self.barcode = barcode.strip() if barcode else ""
-        self._process_barcode(self.barcode)
+        return self._process_barcode(self.barcode)
 
     def _process_barcode(self, barcode):
         """Main barcode dispatch: try finished lot → location → product → lot."""
@@ -177,18 +181,20 @@ class WizStockBarcodesMrp(models.TransientModel):
             return
         # Try finished product lot first (if tracked and not yet scanned)
         if self._scan_finished_lot(barcode):
-            return
+            return True
         # Try location
         if self._scan_location(barcode):
-            return
+            return True
         # Try product
-        if self._scan_product(barcode):
-            return
+        res = self._scan_product(barcode)
+        if res:
+            return res
         # Try lot
         if self._scan_lot(barcode):
-            return
+            return True
         # Not found
         self._set_message("not_found", _("Barcode not found: %s") % barcode)
+        return True
 
     def _scan_finished_lot(self, barcode):
         """Scan a lot/serial barcode for the finished product.
@@ -252,18 +258,14 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.lot_name = False
         self.product_qty = 1.0
         self._compute_qty_available()
-        # Check if product is a component of this MO (error shown, but product stays set)
+        # Check if product is a component of this MO; if not, run the
+        # TODO-A1 three-tier fallback (other MO / finished product / force add).
         if self.production_id:
             component_moves = self.production_id.move_raw_ids.filtered(
                 lambda m: m.product_id == product and m.state != "cancel"
             )
             if not component_moves:
-                self._set_message(
-                    "error",
-                    _("Product %(name)s is not a component of this MO")
-                    % {"name": product.name},
-                )
-                return True
+                return self._scan_product_fallback(product)
         if product.tracking != "none":
             self._set_message("info", _("Product: %s. Scan lot.") % product.name)
             self.step = 3
@@ -281,14 +283,8 @@ class WizStockBarcodesMrp(models.TransientModel):
             lot_domain.append(("product_id", "=", self.product_id.id))
         lots = self.env["stock.lot"].search(lot_domain)
         if not lots:
-            # Maybe create lot if it's a new barcode
-            self.lot_name = barcode
-            self.lot_id = False
-            self.qty_available = 0.0
-            self._set_message("info", _("New lot: %s. Enter qty and confirm.") % barcode)
-            self.step = 4
-            self._set_message_step()
-            return True
+            # Not a lot of the current product -> TODO-A2 reverse lookup
+            return self._scan_lot_fallback(barcode)
         if len(lots) > 1:
             self._set_message("more_match", _("Multiple lots found"))
             return True
@@ -300,6 +296,213 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.step = 4
         self._set_message_step()
         return True
+
+    # --- TODO-A2: lot reverse lookup ---
+    def _scan_lot_fallback(self, barcode):
+        """The scanned barcode is not a lot of the current product.
+
+        Try to identify it before falling back to "create new lot":
+          1. Global lot name search (company-scoped).
+          2. Product barcode search (company-scoped).
+        If a product is identified, resolve whether it is a component or the
+        finished product of the current MO. If nothing matches, keep the
+        current behavior of creating a new lot.
+        """
+        self.ensure_one()
+        if not self.production_id or not self.company_id:
+            return self._create_new_lot_flow(barcode)
+        # Strategy 1: global lot name (company-scoped)
+        lots = self.env["stock.lot"].search([
+            ("name", "=", barcode),
+            ("company_id", "=", self.company_id.id),
+        ])
+        if len(lots) > 1:
+            self._set_message(
+                "more_match",
+                _("Multiple lots found for barcode: %s") % barcode,
+            )
+            return True
+        if len(lots) == 1:
+            return self._resolve_lot_owner(lots, lots.product_id)
+        # Strategy 2: product barcode (company-scoped, allow shared products)
+        products = self.env["product.product"].search([
+            ("barcode", "=", barcode),
+            ("company_id", "in", [self.company_id.id, False]),
+        ])
+        if len(products) > 1:
+            self._set_message(
+                "more_match",
+                _("Multiple products found for barcode: %s") % barcode,
+            )
+            return True
+        if len(products) == 1:
+            return self._resolve_lot_owner(self.env["stock.lot"], products)
+        # Neither lot nor product found -> keep current behavior
+        return self._create_new_lot_flow(barcode)
+
+    def _create_new_lot_flow(self, barcode):
+        """Treat an unknown barcode as a new lot for the current product."""
+        self.ensure_one()
+        # TODO: confirm with business whether unknown lots should auto-create
+        self.lot_name = barcode
+        self.lot_id = False
+        self.qty_available = 0.0
+        self._set_message("info", _("New lot: %s. Enter qty and confirm.") % barcode)
+        self.step = 4
+        self._set_message_step()
+        return True
+
+    def _resolve_lot_owner(self, lot, product):
+        """Identify whether `product` is a component or the finished product
+        of the current MO and handle accordingly.
+
+        - Finished product -> info prompt only (do NOT bind finished_lot_id).
+        - Component of this MO -> switch product_id and bind the lot.
+        - Unrelated product -> error.
+        """
+        self.ensure_one()
+        if not self.production_id:
+            self._set_message("error", _("No manufacturing order selected"))
+            return True
+        # Finished product -> prompt only, no binding, no step jump
+        if product == self.production_id.product_id:
+            self._set_message(
+                "info",
+                _("This is a finished product lot. "
+                  "Enter/scan it in the finished lot area."),
+            )
+            return True
+        # Component of this MO -> switch product and bind lot
+        component_moves = self.production_id.move_raw_ids.filtered(
+            lambda m: m.product_id == product and m.state != "cancel"
+        )
+        if component_moves:
+            self.product_id = product
+            self.product_uom_id = product.uom_id
+            if lot:
+                self.lot_id = lot
+                self.lot_name = lot.name
+                self._compute_qty_available()
+                self._set_message(
+                    "info", _("Lot: %s. Enter qty and confirm.") % lot.name
+                )
+                self.step = 4
+            else:
+                self.lot_id = False
+                self.lot_name = False
+                if product.tracking != "none":
+                    self._set_message(
+                        "info", _("Product: %s. Scan lot.") % product.name
+                    )
+                    self.step = 3
+                else:
+                    self._set_message(
+                        "info",
+                        _("Product: %s. Enter qty and confirm.") % product.name,
+                    )
+                    self.step = 4
+            self._set_message_step()
+            return True
+        # Unrelated product
+        self._set_message(
+            "error",
+            _("Lot belongs to product %(name)s which is not part of this MO")
+            % {"name": product.name},
+        )
+        return True
+
+    # --- TODO-A1: product fallback search ---
+    def _scan_product_fallback(self, product):
+        """Handle a scanned product that is NOT a component of the current MO.
+
+        Three-tier fallback (scan-first, no confirmation dialogs):
+          1. Product is a component of another active MO -> switch to it.
+          2. Product is the finished product of any MO -> error.
+          3. Otherwise -> offer to temporarily add & consume (non-tracked only).
+        """
+        self.ensure_one()
+        # Branch 1: belongs to another active MO -> switch (no confirm)
+        other_mos = self._find_other_mo_for_product(product)
+        if other_mos:
+            if len(other_mos) > 1:
+                self._set_message(
+                    "more_match",
+                    _("Product %(name)s belongs to multiple MOs")
+                    % {"name": product.name},
+                )
+                return True
+            self._switch_production(other_mos)
+            self._set_message(
+                "info",
+                _("Switched to MO %(mo)s") % {"mo": other_mos.name},
+            )
+            return True
+        # Branch 3: finished product of any MO -> cannot consume as component
+        if self._is_any_mo_finished_product(product):
+            self._set_message(
+                "error",
+                _("Product %(name)s is a finished product, cannot consume")
+                % {"name": product.name},
+            )
+            return True
+        # Branch 2: product exists but not reserved -> prompt to add
+        self.visible_force_add = True
+        self._set_message(
+            "more_match",
+            _("Product %(name)s is not in BOM. Force add to consume?")
+            % {"name": product.name},
+        )
+        return True
+
+    def _find_other_mo_for_product(self, product):
+        """Return active MOs (other than current) that consume `product`."""
+        self.ensure_one()
+        if not self.production_id:
+            return self.env["mrp.production"]
+        return self.env["mrp.production"].search([
+            ("id", "!=", self.production_id.id),
+            ("state", "in", ("confirmed", "progress", "to_close")),
+            ("move_raw_ids.product_id", "=", product.id),
+        ])
+
+    def _is_any_mo_finished_product(self, product):
+        """True if `product` is the finished product of any MO."""
+        return bool(self.env["mrp.production"].search_count(
+            [("product_id", "=", product.id)], limit=1
+        ))
+
+    def _switch_production(self, new_mo):
+        """Switch the wizard to `new_mo`, discarding all current scan progress.
+
+        Field reset is explicit (not relying on onchange) so no stale state
+        from the previous MO leaks into the new context. Progress persistence
+        is out of scope (TODO-B3).
+        """
+        self.ensure_one()
+        # --- MO context ---
+        self.production_id = new_mo
+        self.workorder_id = False
+        # --- Finished-lot scan state ---
+        self.finished_lot_id = False
+        self.finished_lot_name = False
+        self.finished_qty_producing = new_mo.product_qty
+        # --- Component scan state ---
+        self.product_id = False
+        self.product_uom_id = False
+        self.lot_id = False
+        self.lot_name = False
+        self.product_qty = 0.0
+        self.qty_available = 0.0
+        self.location_id = new_mo.location_src_id
+        # --- Flags & misc ---
+        self.visible_force_done = False
+        self.visible_force_add = False
+        self.manual_entry = False
+        self.barcode = False
+        self.res_model_id = self.env.ref("mrp.model_mrp_production").id
+        self.res_id = new_mo.id
+        # Re-derive step + message for the new MO
+        self._set_default_values()
 
     def _compute_qty_available(self):
         if not self.product_id or not self.location_id:
@@ -495,6 +698,57 @@ class WizStockBarcodesMrp(models.TransientModel):
     def action_force_done(self):
         return self.with_context(force_create_move=True).action_confirm()
 
+    def action_force_add(self):
+        """Temporarily add a non-BOM, non-tracked product as a raw material
+        and consume the scanned quantity.
+
+        Reuses `_process_stock_move_line` for the actual consumption logic.
+        Tracked products are out of scope (follow-up TODO).
+        """
+        self.ensure_one()
+        if not self.production_id or not self.product_id:
+            self._set_message("error", _("No product to add"))
+            return False
+        if self.product_id.tracking != "none":
+            self._set_message(
+                "error",
+                _("Force add only supports non-tracked products"),
+            )
+            return False
+        if not self.location_id:
+            self._set_message("error", _("No source location scanned"))
+            return False
+        if not self.product_qty or self.product_qty <= 0:
+            self._set_message("error", _("Quantity must be positive"))
+            return False
+        # Create the raw material move on the MO
+        dest_location = self.product_id.with_company(
+            self.production_id.company_id
+        ).property_stock_production
+        move = self.env["stock.move"].create({
+            "name": self.product_id.name,
+            "product_id": self.product_id.id,
+            "product_uom_qty": self.product_qty,
+            "product_uom": self.product_uom_id.id or self.product_id.uom_id.id,
+            "production_id": self.production_id.id,
+            "raw_material_production_id": self.production_id.id,
+            "location_id": self.location_id.id,
+            "location_dest_id": dest_location.id,
+        })
+        move._action_confirm()
+        # Consume via existing logic
+        move_dic = self._process_stock_move_line()
+        if move_dic:
+            self.visible_force_add = False
+            self._set_message(
+                "success",
+                _("Added & consumed: %(prod)s x%(qty)s")
+                % {"prod": self.product_id.name, "qty": self.product_qty},
+            )
+            self._clean_values()
+            return move_dic
+        return False
+
     def action_apply_finished_lot(self):
         """Apply the scanned finished lot and qty_producing to the MO."""
         if not self.production_id:
@@ -654,6 +908,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.lot_id = False
         self.lot_name = False
         self.product_qty = 0.0
+        self.visible_force_add = False
         self._set_message_step()
 
     def _clean_values(self):
@@ -663,6 +918,8 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.lot_name = False
         self.product_qty = 0.0
         self.qty_available = 0.0
+        self.visible_force_done = False
+        self.visible_force_add = False
         self.step = 2
         self._set_message_step()
 

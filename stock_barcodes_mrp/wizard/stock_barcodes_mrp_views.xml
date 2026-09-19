@@ -32,6 +32,7 @@
                         <field name="step" invisible="1" force_save="1" />
                         <field name="message_step" invisible="1" />
                         <field name="visible_force_done" invisible="1" force_save="1" />
+                        <field name="visible_force_add" invisible="1" force_save="1" />
                         <field name="production_id" invisible="1" />
                         <field name="production_state" invisible="1" />
                         <field name="workorder_id" invisible="1" />
@@ -142,6 +143,13 @@
                             string="Force Done"
                             class="btn btn-warning"
                             invisible="visible_force_done == False"
+                        />
+                        <button
+                            name="action_force_add"
+                            type="object"
+                            string="Force Add"
+                            class="btn btn-warning"
+                            invisible="visible_force_add == False"
                         />
                         <button
                             name="action_manual_entry"

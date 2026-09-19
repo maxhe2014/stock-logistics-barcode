@@ -385,10 +385,11 @@ class TestStockBarcodesMrp(TransactionCase):
     def test_12_workorder_barcode_scan(self):
         """Test launching barcode scan from a workorder."""
         # Create a workorder for the tracked production
+        workcenter = self.env["mrp.workcenter"].create({"name": "WC-TEST-001"})
         workorder = self.MrpWorkorder.create({
             "production_id": self.production_tracked.id,
             "name": "WO-TEST-001",
-            "workcenter_id": self.env["mrp.workcenter"].search([], limit=1).id,
+            "workcenter_id": workcenter.id,
         })
         wiz = self.WizScanMrp.create({
             "production_id": self.production_tracked.id,
@@ -819,3 +820,126 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(res.get("res_model"), "mrp.consumption.warning")
         self.assertEqual(tracked_move.move_line_ids.quantity, 2.0)
         self.assertEqual(tracked_move.move_line_ids.lot_id, self.component_lot)
+
+    # --- TODO-A1: product fallback search ---
+
+    def test_a1_branch1_jump_to_other_mo(self):
+        """Scanning a component that belongs to another MO switches to it."""
+        # Build a second MO with its own component
+        comp_other = self.Product.create({
+            "name": "Component Other MO",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-COMP-OTHER",
+        })
+        bom_other = self.MrpBom.create({
+            "product_id": self.finished_product.id,
+            "product_tmpl_id": self.finished_product.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": comp_other.id,
+                "product_qty": 1.0,
+                "product_uom_id": comp_other.uom_id.id,
+            })],
+        })
+        mo_other = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": bom_other.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo_other.action_confirm()
+        # Scan MO2's component from MO1's wizard
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "PROD-COMP-OTHER")
+        # Switched to the other MO
+        self.assertEqual(wiz.production_id, mo_other)
+        self.assertEqual(wiz.message_type, "info")
+        # Scan progress from MO1 is discarded
+        self.assertFalse(wiz.product_id)
+
+    def test_a1_branch2_prompt_force_add(self):
+        """A product not in any MO BOM prompts to force-add (non-tracked)."""
+        orphan = self.Product.create({
+            "name": "Orphan Product",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-ORPHAN",
+        })
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "PROD-ORPHAN")
+        self.assertEqual(wiz.product_id, orphan)
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_force_add)
+
+    def test_a1_branch3_finished_product_error(self):
+        """Scanning the finished product of any MO is rejected."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "PROD-FIN-A")
+        self.assertEqual(wiz.message_type, "error")
+
+    # --- TODO-A2: lot reverse lookup ---
+
+    def test_a2_lookup_component_lot(self):
+        """Scanning a lot of another tracked component switches product & binds lot."""
+        # Add a second tracked component to the MO (raw material move)
+        comp_b = self.Product.create({
+            "name": "Component B Tracked",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "lot",
+            "barcode": "PROD-COMP-B",
+        })
+        lot_b = self.StockProductionLot.create({
+            "name": "LOT-COMP-B-001",
+            "product_id": comp_b.id,
+            "company_id": self.company.id,
+        })
+        self.env["stock.move"].create({
+            "product_id": comp_b.id,
+            "product_uom_qty": 1.0,
+            "product_uom": comp_b.uom_id.id,
+            "raw_material_production_id": self.production.id,
+            "location_id": self.components_location.id,
+            "location_dest_id": comp_b.property_stock_production.id,
+            "date": "2026-09-19 00:00:00",
+            "company_id": self.company.id,
+            "procure_method": "make_to_order",
+        })
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        # Lock to the first tracked component
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        self.assertEqual(wiz.product_id, self.component_tracked)
+        # Scan comp_b's lot -> reverse lookup switches product & binds lot
+        self.action_barcode_scanned(wiz, "LOT-COMP-B-001")
+        self.assertEqual(wiz.product_id, comp_b)
+        self.assertEqual(wiz.lot_id, lot_b)
+        self.assertEqual(wiz.lot_name, "LOT-COMP-B-001")
+
+    def test_a2_lookup_failure_errors(self):
+        """Scanning a lot of an unrelated product errors, no new lot bound."""
+        unrelated = self.Product.create({
+            "name": "Unrelated Tracked Product",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "lot",
+            "barcode": "PROD-UNRELATED",
+        })
+        lot_unrelated = self.StockProductionLot.create({
+            "name": "LOT-UNRELATED-001",
+            "product_id": unrelated.id,
+            "company_id": self.company.id,
+        })
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        self.action_barcode_scanned(wiz, "LOT-UNRELATED-001")
+        self.assertEqual(wiz.message_type, "error")
+        # No lot bound to the wizard (not treated as a new lot)
+        self.assertFalse(wiz.lot_id)
+        # The unrelated lot is untouched in the DB
+        self.assertTrue(lot_unrelated.exists())
