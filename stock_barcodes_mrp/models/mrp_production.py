@@ -45,11 +45,8 @@ class MrpProduction(models.Model):
             else self.env["wiz.stock.barcodes.mrp"]
         )
         if wiz:
+            # _switch_production sets the banner: notice + next instruction.
             wiz._switch_production(self)
-            wiz._set_message(
-                "info",
-                self.env._("Switched to MO %s") % self.name,
-            )
             return True
         # No wizard in context (e.g. direct invocation) -> open a fresh one.
         return self.action_open_mrp_barcode()
