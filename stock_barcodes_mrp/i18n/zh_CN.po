@@ -1,0 +1,457 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* stock_barcodes_mrp
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-18 10:30+0800\n"
+"PO-Revision-Date: 2026-09-18 10:30+0800\n"
+"Last-Translator: OpenViking\n"
+"Language-Team: \n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__qty_available
+msgid "Available"
+msgstr "可用"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Back"
+msgstr "返回"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Barcode"
+msgstr "条码"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Barcode not found: %s"
+msgstr "未找到条码：%s"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Barcode reader"
+msgstr "条码扫描器"
+
+#. module: stock_barcodes_mrp
+#. openerp-web
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Barcode Scanner (MRP)"
+msgstr "条码扫描（制造）"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/__manifest__.py:0
+msgid "Barcode scanning for manufacturing orders and material traceability"
+msgstr "制造订单条码扫描与物料追溯"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Clean"
+msgstr "清除"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Clean Lot"
+msgstr "清除批次"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_id
+msgid "Component"
+msgstr "组件"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Component scanned: %(prod)s x%(qty)s"
+msgstr "组件已扫描：%(prod)s x%(qty)s"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_src_id
+msgid "Components Location"
+msgstr "组件库位"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Confirm"
+msgstr "确认"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__consumed_lot_count
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_lot_form_mrp_traceability
+msgid "Consumed Lots"
+msgstr "消耗批次"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__consumed_lot_ids
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Consumed Material Lots"
+msgstr "消耗的物料批次"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/models/stock_lot.py:0
+msgid "Consumed Material Lots for %s"
+msgstr "%s 消耗的物料批次"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__total_demand
+msgid "Demand"
+msgstr "需求"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__total_done
+msgid "Done"
+msgstr "完成"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__error
+msgid "Error"
+msgstr "错误"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Enter quantity and confirm"
+msgstr "输入数量并确认"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Finished lot: %s. Set qty and apply."
+msgstr "成品批次：%s。请设置数量并应用。"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Finished lot: %(lot)s, qty: %(qty)s applied to MO"
+msgstr "成品批次：%(lot)s，数量：%(qty)s 已应用到制造订单"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Finished lot required for tracked product"
+msgstr "跟踪产品需要成品批次"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_lot_id
+msgid "Finished Lot/Serial"
+msgstr "成品批次/序列号"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_lot_name
+msgid "Finished Lot Name"
+msgstr "成品批次名称"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_qty_producing
+msgid "Finished Qty"
+msgstr "成品数量"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Finished Product Lot"
+msgstr "成品批次"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_dest_id
+msgid "Finished Products Location"
+msgstr "成品库位"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Force Done"
+msgstr "强制完成"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__info
+msgid "Info"
+msgstr "信息"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Lot"
+msgstr "批次"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__lot_id
+msgid "Lot/Serial"
+msgstr "批次/序列号"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__lot_name
+msgid "Lot Name"
+msgstr "批次名称"
+
+#. module: stock_barcodes_mrp
+#. openerp-web
+#: model:ir.actions.report,name:stock_barcodes_mrp.report_stock_lot_traceability
+msgid "Lot Traceability"
+msgstr "批次追溯"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Lot Traceability Report"
+msgstr "批次追溯报告"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot: %s. Enter qty and confirm."
+msgstr "批次：%s。请输入数量并确认。"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot required for tracked product"
+msgstr "跟踪产品需要批次"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Location: %s. Scan component."
+msgstr "库位：%s。请扫描组件。"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/__manifest__.py:0
+msgid "Manufacturing"
+msgstr "制造"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_id
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Manufacturing Order"
+msgstr "制造订单"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__manual_entry
+msgid "Manual"
+msgstr "手动"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Manual Entry"
+msgstr "手动录入"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__manual_entry
+msgid "Manual entry mode"
+msgstr "手动录入模式"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO is %(state)s, cannot scan components"
+msgstr "制造订单状态为「%(state)s」，无法扫描组件"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MRP"
+msgstr "制造"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__move_line_ids
+msgid "Move Lines"
+msgstr "库存移动明细"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__more_match
+msgid "Multiple matches"
+msgstr "多个匹配"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple finished lots found"
+msgstr "找到多个成品批次"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple lots found"
+msgstr "找到多个批次"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple products found"
+msgstr "找到多个产品"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "N/A"
+msgstr "不适用"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "New lot: %s. Enter qty and confirm."
+msgstr "新批次：%s。请输入数量并确认。"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "No consumed material lots found."
+msgstr "未找到消耗的物料批次。"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No product scanned"
+msgstr "未扫描到产品"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "No produced finished lots found."
+msgstr "未找到产出的成品批次。"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No source location scanned"
+msgstr "未扫描到源库位"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__not_found
+msgid "Not found"
+msgstr "未找到"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Open MO"
+msgstr "打开制造订单"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Product"
+msgstr "产品"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product: %s. Enter qty and confirm."
+msgstr "产品：%s。请输入数量并确认。"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product: %s. Scan lot."
+msgstr "产品：%s。请扫描批次。"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product %(name)s is not a component of this MO"
+msgstr "产品 %(name)s 不是此制造订单的组件"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_product_id
+msgid "Product to Produce"
+msgstr "待生产产品"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__produced_lot_count
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_lot_form_mrp_traceability
+msgid "Produced Lots"
+msgstr "产出批次"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__produced_lot_ids
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Produced Finished Lots"
+msgstr "产出的成品批次"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/models/stock_lot.py:0
+msgid "Produced Finished Lots from %s"
+msgstr "由 %s 产出的成品批次"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Production done: %s"
+msgstr "生产完成：%s"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_qty
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Quantity"
+msgstr "数量"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Quantity exceeds demand (max: %s)"
+msgstr "数量超过需求（最大：%s）"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Quantity must be positive"
+msgstr "数量必须为正数"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Quantity to produce must be positive"
+msgstr "生产数量必须为正数"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_qty_producing
+msgid "Qty Producing"
+msgstr "当前生产数量"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_product_qty
+msgid "Qty to Produce"
+msgstr "计划生产数量"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Scanned Component"
+msgstr "已扫描组件"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_mrp_production_form_inherit_stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_mrp_workorder_form_barcode_scan
+msgid "Scan Barcode"
+msgstr "扫描条码"
+
+#. module: stock_barcodes_mrp
+#: model:ir.actions.act_window,name:stock_barcodes_mrp.action_stock_barcodes_mrp
+msgid "Scan Barcode (MRP)"
+msgstr "扫描条码（制造）"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Scan component product"
+msgstr "扫描组件产品"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Scan finished product lot"
+msgstr "扫描成品批次"
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Scan lot/serial"
+msgstr "扫描批次/序列号"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan source location (or scan component directly)"
+msgstr "扫描源库位（或直接扫描组件）"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__location_id
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Source Location"
+msgstr "源库位"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__success
+msgid "Success"
+msgstr "成功"
+
+#. module: stock_barcodes_mrp
+#: code:addons/stock_barcodes_mrp/__manifest__.py:0
+msgid "Stock Barcodes MRP"
+msgstr "库存条码制造"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_uom_id
+msgid "UoM"
+msgstr "计量单位"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__workorder_id
+msgid "Work Order"
+msgstr "工单"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model,name:stock_barcodes_mrp.model_wiz_stock_barcodes_mrp
+msgid "Wizard to read barcode on manufacturing orders"
+msgstr "制造订单条码扫描向导"

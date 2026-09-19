@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_stock_lot_form_mrp_traceability" model="ir.ui.view">
+        <field name="name">stock.lot.form.mrp.traceability</field>
+        <field name="model">stock.lot</field>
+        <field name="inherit_id" ref="stock.view_production_lot_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    name="action_open_consumed_lots"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-arrow-down"
+                    invisible="consumed_lot_count == 0"
+                >
+                    <field name="consumed_lot_count" widget="statinfo" string="Consumed Lots" />
+                </button>
+                <button
+                    name="action_open_produced_lots"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-arrow-up"
+                    invisible="produced_lot_count == 0"
+                >
+                    <field name="produced_lot_count" widget="statinfo" string="Produced Lots" />
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>

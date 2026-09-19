@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="report_stock_lot_traceability" model="ir.actions.report">
+        <field name="name">Lot Traceability</field>
+        <field name="model">stock.lot</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">stock_barcodes_mrp.report_lot_traceability</field>
+        <field name="report_file">stock_barcodes_mrp.report_lot_traceability</field>
+        <field name="print_report_name">'Lot Traceability - %s' % (object.display_name)</field>
+    </record>
+
+    <template id="report_lot_traceability">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Lot Traceability Report</h2>
+                        <table class="table table-condensed">
+                            <tr>
+                                <th>Lot</th>
+                                <td t-esc="doc.display_name" />
+                            </tr>
+                            <tr>
+                                <th>Product</th>
+                                <td t-esc="doc.product_id.display_name" />
+                            </tr>
+                        </table>
+                        <h3>Consumed Material Lots</h3>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Lot</th>
+                                    <th>Product</th>
+                                    <th>Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="doc.consumed_lot_ids" t-as="lot">
+                                    <td t-esc="lot.display_name" />
+                                    <td t-esc="lot.product_id.display_name" />
+                                    <td t-esc="lot.product_qty" />
+                                </tr>
+                                <tr t-if="not doc.consumed_lot_ids">
+                                    <td colspan="3">No consumed material lots found.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h3>Produced Finished Lots</h3>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Lot</th>
+                                    <th>Product</th>
+                                    <th>Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="doc.produced_lot_ids" t-as="lot">
+                                    <td t-esc="lot.display_name" />
+                                    <td t-esc="lot.product_id.display_name" />
+                                    <td t-esc="lot.product_qty" />
+                                </tr>
+                                <tr t-if="not doc.produced_lot_ids">
+                                    <td colspan="3">No produced finished lots found.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

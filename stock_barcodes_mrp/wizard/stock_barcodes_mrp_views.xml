@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_stock_barcodes_mrp_form" model="ir.ui.view">
+        <field name="name">stock.barcodes.mrp.form</field>
+        <field name="model">wiz.stock.barcodes.mrp</field>
+        <field name="arch" type="xml">
+            <form string="Barcode Scanner (MRP)" class="h-100">
+                <div class="d-flex flex-column h-100">
+                    <div class="flex-fill">
+                        <div name="info" class="text-center h3 mb-2">
+                            <div
+                                class="alert barcode-info text-white mb-0 d-flex"
+                                role="status"
+                            >
+                                <button
+                                    name="action_back"
+                                    type="object"
+                                    class="ms-auto oe_kanban_action_button btn-sm"
+                                    title="Back"
+                                >
+                                    <i class="fa fa-chevron-left fa-2x text-white" />
+                                </button>
+                                <field name="message" class="mt-3 h3 text-white" />
+                                <span
+                                    class="fa fa-barcode fa-2x mt-2 mx-3"
+                                    title="Barcode"
+                                />
+                            </div>
+                        </div>
+                        <field name="message_type" invisible="1" />
+                        <field name="barcode" invisible="1" force_save="1" />
+                        <field name="step" invisible="1" force_save="1" />
+                        <field name="message_step" invisible="1" />
+                        <field name="visible_force_done" invisible="1" force_save="1" />
+                        <field name="production_id" invisible="1" />
+                        <field name="production_state" invisible="1" />
+                        <field name="workorder_id" invisible="1" />
+                        <field name="workorder_state" invisible="1" />
+                        <field name="production_product_id" invisible="1" />
+                        <field name="company_id" invisible="1" />
+                        <field name="product_tracking" invisible="1" force_save="1" />
+                        <field name="finished_product_tracking" invisible="1" force_save="1" />
+                        <field name="finished_lot_id" invisible="1" force_save="1" />
+                        <field name="finished_lot_name" invisible="1" force_save="1" />
+                        <field
+                            name="_barcode_scanned"
+                            widget="barcode_handler"
+                            invisible="0"
+                        />
+                        <group class="bg-light scan_fields p-2">
+                            <group name="location" col="1">
+                                <div class="mt-1" colspan="2">
+                                    <strong class="d-none d-sm-block">
+                                        Source Location
+                                    </strong>
+                                    <field
+                                        name="location_id"
+                                        options="{'no_create': True, 'no_open': True}"
+                                        readonly="manual_entry == False"
+                                        force_save="1"
+                                        nolabel="1"
+                                        class="h5"
+                                    />
+                                </div>
+                            </group>
+                            <group name="production_info" string="Manufacturing Order">
+                                <field name="production_id" readonly="1" />
+                                <field name="production_product_id" readonly="1" />
+                                <field name="production_product_qty" readonly="1" />
+                                <field name="production_qty_producing" readonly="1" />
+                                <field name="production_location_src_id" readonly="1" />
+                                <field name="production_location_dest_id" readonly="1" />
+                            </group>
+                            <group
+                                name="finished_lot_info"
+                                string="Finished Product Lot"
+                                invisible="finished_product_tracking == 'none'"
+                            >
+                                <field
+                                    name="finished_lot_id"
+                                    options="{'no_create': True, 'no_open': True}"
+                                    readonly="manual_entry == False"
+                                    force_save="1"
+                                />
+                                <field name="finished_lot_name" />
+                                <field name="finished_qty_producing" />
+                            </group>
+                            <group name="scan_info" string="Scanned Component">
+                                <field
+                                    name="product_id"
+                                    options="{'no_create': True, 'no_open': True}"
+                                    readonly="manual_entry == False"
+                                    force_save="1"
+                                />
+                                <field
+                                    name="lot_id"
+                                    options="{'no_create': True, 'no_open': True}"
+                                    readonly="manual_entry == False"
+                                    force_save="1"
+                                    invisible="product_tracking == 'none'"
+                                />
+                                <field name="lot_name" invisible="product_tracking == 'none'" />
+                                <field name="product_qty" />
+                                <field name="qty_available" readonly="1" />
+                                <field name="total_demand" readonly="1" />
+                                <field name="total_done" readonly="1" />
+                            </group>
+                        </group>
+                    </div>
+                    <div name="actions" class="oe_stock_barcodes_actions bg-light p-2">
+                        <button
+                            name="action_apply_finished_lot"
+                            type="object"
+                            string="Apply Lot"
+                            class="btn btn-primary"
+                            invisible="finished_product_tracking == 'none' or (finished_lot_id == False and finished_lot_name == False)"
+                        />
+                        <button
+                            name="action_clean_finished_lot"
+                            type="object"
+                            string="Clean Lot"
+                            class="btn btn-secondary"
+                            invisible="finished_product_tracking == 'none' or (finished_lot_id == False and finished_lot_name == False)"
+                        />
+                        <button
+                            name="action_confirm"
+                            type="object"
+                            string="Confirm"
+                            class="btn btn-primary"
+                            invisible="product_id == False"
+                        />
+                        <button
+                            name="action_finish_production"
+                            type="object"
+                            string="Finish Production"
+                            class="btn btn-success"
+                            invisible="production_state in ('draft', 'done', 'cancel')"
+                        />
+                        <button
+                            name="action_force_done"
+                            type="object"
+                            string="Force Done"
+                            class="btn btn-warning"
+                            invisible="visible_force_done == False"
+                        />
+                        <button
+                            name="action_manual_entry"
+                            type="object"
+                            string="Manual Entry"
+                            class="btn btn-secondary"
+                        />
+                        <button
+                            name="action_clean_product"
+                            type="object"
+                            string="Clean"
+                            class="btn btn-secondary"
+                            invisible="product_id == False"
+                        />
+                        <button
+                            name="action_clean_lot"
+                            type="object"
+                            string="Clean Lot"
+                            class="btn btn-secondary"
+                            invisible="lot_id == False and lot_name == False"
+                        />
+                        <button
+                            name="action_open_production"
+                            type="object"
+                            string="Open MO"
+                            class="btn btn-info"
+                        />
+                    </div>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_stock_barcodes_mrp" model="ir.actions.act_window">
+        <field name="name">Scan Barcode (MRP)</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">wiz.stock.barcodes.mrp</field>
+        <field name="view_mode">form</field>
+        <field name="target">fullscreen</field>
+    </record>
+</odoo>
