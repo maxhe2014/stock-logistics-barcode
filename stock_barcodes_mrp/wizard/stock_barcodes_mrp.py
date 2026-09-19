@@ -367,8 +367,8 @@ class WizStockBarcodesMrp(models.TransientModel):
         if self.production_id == mo:
             self._set_message("info", _("Already on MO %s") % mo.name)
             return True
+        # _switch_production sets the banner: notice + next instruction.
         self._switch_production(mo)
-        self._set_message("info", _("Switched to MO %s") % mo.name)
         return True
 
     def _scan_location(self, barcode):
@@ -637,11 +637,8 @@ class WizStockBarcodesMrp(models.TransientModel):
                     % {"name": product.name},
                 )
                 return True
+            # _switch_production sets the banner: notice + next instruction.
             self._switch_production(other_mos)
-            self._set_message(
-                "info",
-                _("Switched to MO %(mo)s") % {"mo": other_mos.name},
-            )
             return True
         # Branch 3: finished product of any MO -> cannot consume as component
         if self._is_any_mo_finished_product(product):
@@ -753,6 +750,14 @@ class WizStockBarcodesMrp(models.TransientModel):
         # only fall back to plain defaults when nothing was stashed.
         if not self._restore_progress(new_mo):
             self._set_default_values()
+        # Single banner message: switch notice + next scan instruction.
+        # Callers must NOT overwrite it with their own "Switched" text,
+        # otherwise the restored/derived instruction would be lost.
+        self._set_message(
+            "info",
+            _("Switched to MO %(mo)s. %(next)s")
+            % {"mo": new_mo.name, "next": self.message},
+        )
 
     def _restore_progress(self, mo):
         """Restore uncommitted scan state stashed for `mo`.
@@ -1227,6 +1232,31 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.message_type = message_type
         self.message = message
 
+    def _get_step_message(self):
+        """Context-aware scan instruction for the current step (TODO-C2).
+
+        Always states WHAT to scan next and for which product/MO, so the
+        text stays meaningful after a progress restore (_restore_progress
+        re-runs _set_message_step and the banner reflects the restored
+        step automatically).
+        """
+        self.ensure_one()
+        if self.step == 0:
+            return _("Scan the finished product lot: %s") % (
+                self.production_product_id.display_name
+            )
+        if self.step == 1:
+            return _("MO %s: scan source location %s or scan a component") % (
+                self.production_id.name, self.location_id.name,
+            )
+        if self.step == 2:
+            return _("Scan a component of MO %s") % self.production_id.name
+        if self.step == 3:
+            return _("Scan the lot/serial of %s") % self.product_id.name
+        if self.step == 4:
+            return _("Enter the quantity for %s") % self.product_id.name
+        return ""
+
     def _set_message_step(self):
         steps = {
             0: _("Scan finished product lot"),
@@ -1235,10 +1265,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             3: _("Scan lot/serial"),
             4: _("Enter quantity and confirm"),
         }
+        # Static short hint kept verbatim (tests assert it exactly).
         self.message_step = steps.get(self.step, "")
-        if self.step == 0:
-            self._set_message("info", _("Scan finished product lot"))
-        elif self.step == 1:
-            self._set_message("info", _("Scan source location (or scan component directly)"))
-        elif self.step == 2:
-            self._set_message("info", _("Scan component product"))
+        # TODO-C2: dynamic instruction for the banner.
+        self._set_message("info", self._get_step_message())

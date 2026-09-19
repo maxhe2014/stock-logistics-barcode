@@ -1330,3 +1330,88 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.finished_qty_producing, 5.0)
         self.assertEqual(wiz.location_id, mo3.location_src_id)
         self.assertEqual(wiz.step, 1)
+
+    # --- TODO-C1/C2: step indicator + dynamic guidance ---
+
+    def test_c2_guided_flow_step_messages(self):
+        """Tracked-MO flow: the banner instruction follows step + context
+        (finished product at step 0, MO/location at 1, component at 3/4)."""
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.assertEqual(wiz.step, 0)
+        self.assertIn("finished product lot", wiz.message)
+        self.assertIn(self.finished_product_tracked.name, wiz.message)
+        # Scan finished lot -> still step 0 until it is applied
+        self.action_barcode_scanned(wiz, "LOT-FIN-001")
+        self.assertEqual(wiz.finished_lot_id, self.finished_lot)
+        self.assertEqual(wiz.step, 0)
+        # Apply -> step 1, banner names the MO and the source location
+        wiz.action_apply_finished_lot()
+        self.assertEqual(wiz.step, 1)
+        self.assertIn(self.production_tracked.name, wiz.message)
+        self.assertIn(self.components_location.name, wiz.message)
+        # Location scanned -> step 2
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.assertEqual(wiz.step, 2)
+        self.assertIn("component", wiz.message)
+        self.assertIn(self.production_tracked.name, wiz.message)
+        # Tracked component -> step 3 names the component
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        self.assertEqual(wiz.step, 3)
+        self.assertIn("lot/serial", wiz.message)
+        self.assertIn(self.component_tracked.name, wiz.message)
+        # Lot scanned -> step 4 asks for the quantity
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
+        self.assertEqual(wiz.step, 4)
+        self.assertIn("quantity", wiz.message)
+        self.assertIn(self.component_tracked.name, wiz.message)
+
+    def test_c2_untracked_shortcut_messages(self):
+        """Untracked finished MO starts at step 1; untracked components jump
+        straight to the quantity step; confirming returns to step 2."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.assertEqual(wiz.step, 1)
+        self.assertIn(self.production.name, wiz.message)
+        self.assertIn(self.components_location.name, wiz.message)
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.assertEqual(wiz.step, 2)
+        self.assertIn("component", wiz.message)
+        # Untracked component: no lot step, straight to quantity
+        self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        self.assertEqual(wiz.step, 4)
+        self.assertIn("quantity", wiz.message)
+        self.assertIn(self.component_simple.name, wiz.message)
+        # Confirm -> back to expecting the next component (step 2)
+        wiz.action_confirm()
+        self.assertEqual(wiz.step, 2)
+        self.assertIn("component", wiz.message)
+
+    def test_c2_restore_step_message(self):
+        """After a switch away/back, the banner shows the restored step's
+        dynamic instruction (B3 restore + C2 messaging combined)."""
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Drive to step 3 (component scanned, lot pending)
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        self.assertEqual(wiz.step, 3)
+        # Switch away and back
+        self.action_barcode_scanned(wiz, mo2.name)
+        self.assertEqual(wiz.production_id, mo2)
+        self.action_barcode_scanned(wiz, self.production.name)
+        self.assertEqual(wiz.production_id, self.production)
+        # Restored step 3 with its dynamic instruction
+        self.assertEqual(wiz.step, 3)
+        self.assertIn("lot/serial", wiz.message)
+        self.assertIn(self.component_tracked.name, wiz.message)
+        self.assertNotIn(
+            str(self.production.id), wiz.scan_progress_stash or {}
+        )
