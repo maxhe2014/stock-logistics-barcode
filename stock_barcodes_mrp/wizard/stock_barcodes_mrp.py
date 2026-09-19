@@ -119,6 +119,20 @@ class WizStockBarcodesMrp(models.TransientModel):
         compute="_compute_totals",
     )
 
+    # --- TODO-B1: work-order queue ---
+    queue_mode = fields.Selection(
+        [("my", "My Work Orders"), ("all", "All MO")],
+        string="Queue View",
+        default="my",
+    )
+    queue_filter_today = fields.Boolean(string="Due Today")
+    queue_filter_priority = fields.Boolean(string="High Priority")
+    queue_workorders_ids = fields.Many2many(
+        comodel_name="mrp.production",
+        string="Queue",
+        compute="_compute_queue_workorders",
+    )
+
     @api.depends("production_id.move_raw_ids", "product_id")
     def _compute_totals(self):
         for rec in self:
@@ -132,6 +146,66 @@ class WizStockBarcodesMrp(models.TransientModel):
             for move in moves:
                 rec.total_demand += move.product_uom_qty
                 rec.total_done += move.quantity
+
+    @api.depends("queue_mode", "queue_filter_today", "queue_filter_priority")
+    def _compute_queue_workorders(self):
+        """Return the list of MOs shown in the queue area.
+
+        Default (My Work Orders): MOs that have a workorder on a workcenter
+        assigned to the current user, in confirmed/progress state. All MO
+        mode drops the workcenter filter. Optional filters: due today,
+        high priority.
+
+        Note: mrp.production.workcenter_id is a non-stored, non-computed
+        placeholder field, so we filter via mrp.workorder.workcenter_id
+        and resolve back to productions.
+        """
+        for wiz in self:
+            domain = [("state", "in", ("confirmed", "progress"))]
+            if wiz.queue_mode == "my":
+                wc_ids = self.env.user.mrp_workcenter_ids.ids
+                workorders = self.env["mrp.workorder"].search([
+                    ("workcenter_id", "in", wc_ids),
+                    ("state", "not in", ("done", "cancel")),
+                ])
+                domain.append(("id", "in", workorders.mapped("production_id").ids))
+            if wiz.queue_filter_today:
+                today = fields.Date.context_today(self)
+                domain += [
+                    ("date_deadline", ">=", today),
+                    ("date_deadline", "<=", today),
+                ]
+            if wiz.queue_filter_priority:
+                domain.append(("priority", ">=", "2"))
+            wiz.queue_workorders_ids = self.env["mrp.production"].search(domain)
+
+    def action_switch_queue_mode(self):
+        """Toggle between My Work Orders and All MO."""
+        self.ensure_one()
+        self.queue_mode = "all" if self.queue_mode == "my" else "my"
+        return True
+
+    def action_toggle_queue_filter(self, filter_name):
+        """Toggle a queue quick filter (today / priority)."""
+        self.ensure_one()
+        if filter_name == "today":
+            self.queue_filter_today = not self.queue_filter_today
+        elif filter_name == "priority":
+            self.queue_filter_priority = not self.queue_filter_priority
+        return True
+
+    def action_open_queue_mo(self):
+        """Switch the active production to the MO clicked in the queue."""
+        self.ensure_one()
+        if not self.queue_workorders_ids:
+            return True
+        # The clicked MO is the last one in the selection (Odoo passes the
+        # clicked record through the queue_workorders_ids write).
+        target = self.queue_workorders_ids[-1]
+        if target and target != self.production_id:
+            self.production_id = target
+            self._set_default_values()
+        return True
 
     def _compute_display_name(self):
         for rec in self:
@@ -222,10 +296,9 @@ class WizStockBarcodesMrp(models.TransientModel):
             return True
         self.finished_lot_id = lots
         self.finished_lot_name = lots.name
-        self._set_message(
-            "info",
-            _("Finished lot: %s. Set qty and apply.") % lots.name,
-        )
+        # TODO-A3: scanned finished product lot -> auto-fill components too
+        # (consistent with scanning the finished product barcode).
+        self._auto_fill_components()
         self.step = 0
         self._set_message_step()
         return True
@@ -251,6 +324,10 @@ class WizStockBarcodesMrp(models.TransientModel):
             self._set_message("more_match", _("Multiple products found"))
             return True
         product = products
+        # TODO-A3: scanned the finished product of this MO -> auto-fill
+        # all components so the operator only needs to confirm qty.
+        if self.production_id and product == self.production_id.product_id:
+            return self._auto_fill_components()
         # Set scanned product on wizard so user can see it
         self.product_id = product
         self.product_uom_id = product.uom_id
@@ -273,6 +350,55 @@ class WizStockBarcodesMrp(models.TransientModel):
             self._set_message("info", _("Product: %s. Enter qty and confirm.") % product.name)
             self.step = 4
         self._set_message_step()
+        return True
+
+    # --- TODO-A3: auto-fill components from finished product scan ---
+    def _auto_fill_components(self):
+        """Scan-first behavior: scanning the finished product (or its lot)
+        auto-fills every component move line by its BOM-scaled demand and
+        marks the moves picked. The operator only needs to confirm quantity.
+
+        The MO's raw moves already have reserved move lines (created by core
+        action_assign). We scale those existing lines proportionally to the
+        demand, never exceeding the reserved quantity:
+          - demand <= reserved -> every line is scaled down so the total
+            equals demand (full fill).
+          - demand >  reserved -> lines are left untouched (scale = 1), so
+            only the reserved (available) quantity is filled (partial).
+        This respects FIFO/FEFO since we never reorder or re-reserve.
+        """
+        self.ensure_one()
+        production = self.production_id
+        if not production:
+            self._set_message("error", _("No manufacturing order selected"))
+            return True
+        qty = self.finished_qty_producing or production.product_qty
+        filled = 0
+        partial = 0
+        for move in production.move_raw_ids.filtered(
+            lambda m: m.state not in ("done", "cancel")
+        ):
+            demand = move.product_uom.round(move.unit_factor * qty)
+            move_lines = move.move_line_ids
+            total_reserved = sum(move_lines.mapped("quantity"))
+            if total_reserved and demand:
+                # Scale existing reserved lines; never exceed reserved qty.
+                scale = min(1.0, demand / total_reserved)
+                for line in move_lines:
+                    line.quantity = line.quantity * scale
+            if demand:
+                move.picked = True
+            consumed = sum(move_lines.mapped("quantity"))
+            if move.product_uom.compare(consumed, demand) >= 0:
+                filled += 1
+            else:
+                partial += 1
+        self._clean_values()
+        self._set_message(
+            "info",
+            _("Components auto-filled: %(filled)s full, %(partial)s partial.")
+            % {"filled": filled, "partial": partial},
+        )
         return True
 
     def _scan_lot(self, barcode):

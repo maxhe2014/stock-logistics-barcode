@@ -876,9 +876,34 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertTrue(wiz.visible_force_add)
 
     def test_a1_branch3_finished_product_error(self):
-        """Scanning the finished product of any MO is rejected."""
+        """Scanning another MO's finished product is rejected by A1 branch 3.
+
+        The current MO's own finished product is handled by A3 (auto-fill),
+        so this test verifies the "any MO finished product -> error" path
+        using a different MO's finished product.
+        """
+        other_finished = self.Product.create({
+            "name": "Other Finished Product",
+            "type": "consu",
+            "is_storable": True,
+            "barcode": "PROD-FIN-OTHER-A1",
+        })
+        other_bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": other_finished.product_tmpl_id.id,
+            "product_qty": 1.0,
+            "bom_line_ids": [(0, 0, {
+                "product_id": self.component_simple.id,
+                "product_qty": 1.0,
+            })],
+        })
+        other_mo = self.env["mrp.production"].create({
+            "product_id": other_finished.id,
+            "product_qty": 1.0,
+            "bom_id": other_bom.id,
+        })
+        other_mo.action_confirm()
         wiz = self.WizScanMrp.create({"production_id": self.production.id})
-        self.action_barcode_scanned(wiz, "PROD-FIN-A")
+        self.action_barcode_scanned(wiz, "PROD-FIN-OTHER-A1")
         self.assertEqual(wiz.message_type, "error")
 
     # --- TODO-A2: lot reverse lookup ---
@@ -943,3 +968,118 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertFalse(wiz.lot_id)
         # The unrelated lot is untouched in the DB
         self.assertTrue(lot_unrelated.exists())
+
+    # --- TODO-A3: auto-fill components from finished product scan ---
+
+    def test_a3_auto_fill_all_available(self):
+        """Scanning finished product fills all components to demand."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # finished_qty_producing defaults to 1.0 < product_qty 2.0, so
+        # demand <= reserved -> every component is fully filled.
+        self.action_barcode_scanned(wiz, "PROD-FIN-A")
+        self.assertEqual(wiz.message_type, "info")
+        for move in self.production.move_raw_ids:
+            self.assertTrue(move.picked)
+            demand = move.product_uom.round(
+                move.unit_factor * (wiz.finished_qty_producing or self.production.product_qty)
+            )
+            consumed = sum(move.move_line_ids.mapped("quantity"))
+            self.assertAlmostEqual(consumed, demand, places=4)
+
+    def test_a3_auto_fill_partial(self):
+        """When demand exceeds on-hand stock, only the available qty is consumed."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Demand far exceeds the 100 units in stock -> only available qty filled.
+        wiz.finished_qty_producing = 200.0
+        self.action_barcode_scanned(wiz, "PROD-FIN-A")
+        for move in self.production.move_raw_ids:
+            self.assertTrue(move.picked)
+            consumed = sum(move.move_line_ids.mapped("quantity"))
+            demand = move.product_uom.round(move.unit_factor * wiz.finished_qty_producing)
+            # Only the available stock was consumed (demand > on-hand).
+            self.assertLess(consumed, demand)
+
+    def test_a3_finished_barcode_other_mo_falls_to_a1(self):
+        """Scanning another MO's finished product falls through to A1 (error)."""
+        other_finished = self.Product.create({
+            "name": "Other Finished Product",
+            "type": "consu",
+            "is_storable": True,
+            "barcode": "PROD-FIN-OTHER",
+        })
+        other_bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": other_finished.product_tmpl_id.id,
+            "product_qty": 1.0,
+            "bom_line_ids": [(0, 0, {
+                "product_id": self.component_simple.id,
+                "product_qty": 1.0,
+            })],
+        })
+        other_mo = self.env["mrp.production"].create({
+            "product_id": other_finished.id,
+            "product_qty": 1.0,
+            "bom_id": other_bom.id,
+        })
+        other_mo.action_confirm()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "PROD-FIN-OTHER")
+        self.assertEqual(wiz.message_type, "error")
+
+    # --- TODO-B1: work-order queue ---
+
+    def _make_mo_with_workcenter(self, workcenter):
+        """Create a confirmed MO and attach a workorder on `workcenter`."""
+        mo = self.env["mrp.production"].create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+        })
+        mo.action_confirm()
+        self.env["mrp.workorder"].create({
+            "name": "Op",
+            "production_id": mo.id,
+            "workcenter_id": workcenter.id,
+            "state": "pending",
+        })
+        return mo
+
+    def test_b1_queue_loads(self):
+        """Default My Work Orders mode loads MOs on the user's workcenters."""
+        wc = self.env["mrp.workcenter"].create({"name": "WC"})
+        self.env.user.mrp_workcenter_ids = [(6, 0, [wc.id])]
+        mo = self._make_mo_with_workcenter(wc)
+        wiz = self.WizScanMrp.create({})
+        self.assertEqual(wiz.queue_mode, "my")
+        self.assertIn(mo, wiz.queue_workorders_ids)
+
+    def test_b1_queue_my_filter(self):
+        """My Work Orders excludes MOs on workcenters not assigned to user."""
+        wc1 = self.env["mrp.workcenter"].create({"name": "WC1"})
+        wc2 = self.env["mrp.workcenter"].create({"name": "WC2"})
+        self.env.user.mrp_workcenter_ids = [(6, 0, [wc1.id])]
+        mo1 = self._make_mo_with_workcenter(wc1)
+        mo2 = self._make_mo_with_workcenter(wc2)
+        wiz = self.WizScanMrp.create({})
+        self.assertIn(mo1, wiz.queue_workorders_ids)
+        self.assertNotIn(mo2, wiz.queue_workorders_ids)
+
+    def test_b1_queue_all_mode(self):
+        """All MO mode includes every confirmed/progress MO (e.g. base MO)."""
+        wiz = self.WizScanMrp.create({})
+        wiz.queue_mode = "all"
+        self.assertIn(self.production, wiz.queue_workorders_ids)
+
+    def test_b1_queue_filters(self):
+        """High-priority filter shows only priority >= 2 MOs."""
+        mo_high = self.env["mrp.production"].create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "priority": "2",
+        })
+        mo_high.action_confirm()
+        wiz = self.WizScanMrp.create({})
+        wiz.queue_mode = "all"
+        wiz.queue_filter_priority = True
+        self.assertIn(mo_high, wiz.queue_workorders_ids)
+        self.assertNotIn(self.production, wiz.queue_workorders_ids)

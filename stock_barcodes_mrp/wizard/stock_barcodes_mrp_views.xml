@@ -43,11 +43,44 @@
                         <field name="finished_product_tracking" invisible="1" force_save="1" />
                         <field name="finished_lot_id" invisible="1" force_save="1" />
                         <field name="finished_lot_name" invisible="1" force_save="1" />
+                        <field name="queue_mode" invisible="1" force_save="1" />
                         <field
                             name="_barcode_scanned"
                             widget="barcode_handler"
                             invisible="0"
                         />
+                        <!-- TODO-B1: work-order queue -->
+                        <group name="queue" string="Work Order Queue" class="bg-light p-2 mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div class="btn-group btn-group-sm">
+                                    <button name="action_switch_queue_mode" type="object"
+                                            class="btn btn-primary"
+                                            invisible="queue_mode == 'all'">My Work Orders</button>
+                                    <button name="action_switch_queue_mode" type="object"
+                                            class="btn btn-outline-primary"
+                                            invisible="queue_mode == 'my'">All MO</button>
+                                </div>
+                                <div class="form-check form-check-inline mb-0">
+                                    <field name="queue_filter_today" nolabel="1" class="form-check-input"/>
+                                    <label class="form-check-label small">Due Today</label>
+                                </div>
+                                <div class="form-check form-check-inline mb-0">
+                                    <field name="queue_filter_priority" nolabel="1" class="form-check-input"/>
+                                    <label class="form-check-label small">High Priority</label>
+                                </div>
+                            </div>
+                            <field name="queue_workorders_ids" nolabel="1">
+                                <tree>
+                                    <field name="name" />
+                                    <field name="product_id" />
+                                    <field name="product_qty" />
+                                    <field name="date_deadline" />
+                                    <field name="priority" />
+                                    <button name="action_open_queue_mo" type="object"
+                                            string="Open" class="btn-link" />
+                                </tree>
+                            </field>
+                        </group>
                         <group class="bg-light scan_fields p-2">
                             <group name="location" col="1">
                                 <div class="mt-1" colspan="2">
