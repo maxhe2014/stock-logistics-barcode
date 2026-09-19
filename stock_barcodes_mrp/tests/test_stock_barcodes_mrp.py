@@ -1241,3 +1241,92 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertFalse(wiz.finished_lot_id)
         self.assertFalse(wiz.visible_force_add)
         self.assertFalse(wiz.visible_force_done)
+
+    # --- TODO-B3: queued progress restore ---
+
+    def test_b3_restore_component_progress(self):
+        """Switching away and back restores the half-scanned component line
+        (product / lot / qty / location / step) and consumes the stash."""
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Half-scanned component line (not confirmed)
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
+        wiz.product_qty = 2.0
+        self.assertEqual(wiz.step, 4)
+        # Switch away -> stashed, screen cleared
+        self.action_barcode_scanned(wiz, mo2.name)
+        self.assertEqual(wiz.production_id, mo2)
+        self.assertFalse(wiz.product_id)
+        self.assertIn(str(self.production.id), wiz.scan_progress_stash)
+        # Switch back -> state identical to when we left
+        self.action_barcode_scanned(wiz, self.production.name)
+        self.assertEqual(wiz.production_id, self.production)
+        self.assertEqual(wiz.product_id, self.component_tracked)
+        self.assertEqual(wiz.product_uom_id, self.component_tracked.uom_id)
+        self.assertEqual(wiz.lot_id, self.component_lot)
+        self.assertEqual(wiz.lot_name, "LOT-COMP-001")
+        self.assertEqual(wiz.product_qty, 2.0)
+        self.assertEqual(wiz.location_id, self.components_location)
+        self.assertEqual(wiz.step, 4)
+        # Stash entry consumed by the restore
+        self.assertNotIn(str(self.production.id), wiz.scan_progress_stash or {})
+
+    def test_b3_restore_finished_lot_and_default_fallback(self):
+        """Finished-lot progress on a tracked MO is restored; arriving at an
+        MO that never had a stash falls back to plain defaults."""
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        mo3 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 5.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo3.action_confirm()
+        wiz = self.WizScanMrp.create(
+            {"production_id": self.production_tracked.id}
+        )
+        # Step 0: finished lot scanned, custom qty, not applied yet
+        self.assertEqual(wiz.step, 0)
+        wiz.finished_lot_id = self.finished_lot
+        wiz.finished_lot_name = self.finished_lot.name
+        wiz.finished_qty_producing = 3.0
+        # Switch to MO2 (untracked finished) -> stash + fresh defaults
+        self.action_barcode_scanned(wiz, mo2.name)
+        self.assertEqual(wiz.production_id, mo2)
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertEqual(wiz.step, 1)
+        # Back to the tracked MO -> finished lot state restored
+        self.action_barcode_scanned(wiz, self.production_tracked.name)
+        self.assertEqual(wiz.finished_lot_id, self.finished_lot)
+        self.assertEqual(wiz.finished_lot_name, "LOT-FIN-001")
+        self.assertEqual(wiz.finished_qty_producing, 3.0)
+        self.assertEqual(wiz.step, 0)
+        self.assertNotIn(
+            str(self.production_tracked.id), wiz.scan_progress_stash or {}
+        )
+        # Arrive at MO3, which never had any stash -> plain defaults,
+        # not the restored values from another MO.
+        self.action_barcode_scanned(wiz, mo3.name)
+        self.assertEqual(wiz.production_id, mo3)
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertFalse(wiz.finished_lot_name)
+        self.assertEqual(wiz.finished_qty_producing, 5.0)
+        self.assertEqual(wiz.location_id, mo3.location_src_id)
+        self.assertEqual(wiz.step, 1)

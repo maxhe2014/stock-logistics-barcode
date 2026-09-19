@@ -219,8 +219,9 @@ class WizStockBarcodesMrp(models.TransientModel):
         # clicked record through the queue_workorders_ids write).
         target = self.queue_workorders_ids[-1]
         if target and target != self.production_id:
-            self.production_id = target
-            self._set_default_values()
+            # Same path as scan-first switching: stashes current progress
+            # and restores any progress previously left on the target MO.
+            self._switch_production(target)
         return True
 
     def _compute_display_name(self):
@@ -685,9 +686,9 @@ class WizStockBarcodesMrp(models.TransientModel):
     def _stash_current_progress(self):
         """Snapshot the uncommitted scan state of the current MO.
 
-        B2 only stores the snapshot; restoring it when switching back is
-        TODO-B3. Only wizards with actual in-progress scans (a component
-        or a finished lot already scanned) are stashed.
+        Restored (and consumed) by _restore_progress when the operator
+        switches back to this MO. Only wizards with actual in-progress
+        scans (a component or a finished lot already scanned) are stashed.
         """
         self.ensure_one()
         mo = self.production_id
@@ -748,8 +749,49 @@ class WizStockBarcodesMrp(models.TransientModel):
         # Clear the ambiguous-MO selector so it does not linger on screen.
         self.pending_switch_production_ids = [(5, 0, 0)]
         self.visible_switch_selector = False
-        # Re-derive step + message for the new MO
-        self._set_default_values()
+        # Restore uncommitted scan state previously stashed for the new MO;
+        # only fall back to plain defaults when nothing was stashed.
+        if not self._restore_progress(new_mo):
+            self._set_default_values()
+
+    def _restore_progress(self, mo):
+        """Restore uncommitted scan state stashed for `mo`.
+
+        The stash entry is consumed (deleted) on restore, so a second
+        arrival without new scans starts from plain defaults. Returns True
+        when a snapshot was restored, False when there was none.
+        """
+        self.ensure_one()
+        stash = dict(self.scan_progress_stash or {})
+        snapshot = stash.pop(str(mo.id), None)
+        if not snapshot:
+            return False
+        self.scan_progress_stash = stash
+        # Finished-lot state
+        self.finished_lot_id = snapshot.get("finished_lot_id") or False
+        self.finished_lot_name = snapshot.get("finished_lot_name") or False
+        if snapshot.get("finished_qty_producing"):
+            self.finished_qty_producing = snapshot["finished_qty_producing"]
+        # Component scan state
+        self.product_id = snapshot.get("product_id") or False
+        self.product_uom_id = snapshot.get("product_uom_id") or False
+        self.lot_id = snapshot.get("lot_id") or False
+        self.lot_name = snapshot.get("lot_name") or False
+        self.product_qty = snapshot.get("product_qty") or 0.0
+        self.location_id = snapshot.get("location_id") or mo.location_src_id
+        # Visibility / mode flags
+        self.visible_force_done = bool(snapshot.get("visible_force_done"))
+        self.visible_force_add = bool(snapshot.get("visible_force_add"))
+        self.manual_entry = bool(snapshot.get("manual_entry"))
+        # NB: step 0 (finished-lot scan) is valid; do NOT use `or 1`,
+        # which would coerce a stored 0 back to 1.
+        step = snapshot.get("step")
+        self.step = step if step is not None else 1
+        # Recompute availability for the restored product/lot/location
+        if self.product_id:
+            self._compute_qty_available()
+        self._set_message_step()
+        return True
 
     def _compute_qty_available(self):
         if not self.product_id or not self.location_id:
