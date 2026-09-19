@@ -133,6 +133,22 @@ class WizStockBarcodesMrp(models.TransientModel):
         compute="_compute_queue_workorders",
     )
 
+    # --- TODO-B2: scan-first MO switching ---
+    pending_switch_production_ids = fields.Many2many(
+        comodel_name="mrp.production",
+        string="Candidate MOs",
+        help="MOs matching an ambiguous scan; the operator picks one to "
+        "switch to.",
+    )
+    visible_switch_selector = fields.Boolean(
+        string="Show MO Selector",
+        help="Display the ambiguous-MO selection list.",
+    )
+    # B2 stores per-MO scan snapshots when switching; B3 restores them.
+    scan_progress_stash = fields.Json(
+        string="Stashed Scan Progress",
+    )
+
     @api.depends("production_id.move_raw_ids", "product_id")
     def _compute_totals(self):
         for rec in self:
@@ -176,7 +192,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                     ("date_deadline", "<=", today),
                 ]
             if wiz.queue_filter_priority:
-                domain.append(("priority", ">=", "2"))
+                domain.append(("priority", ">=", "1"))
             wiz.queue_workorders_ids = self.env["mrp.production"].search(domain)
 
     def action_switch_queue_mode(self):
@@ -256,6 +272,9 @@ class WizStockBarcodesMrp(models.TransientModel):
         # Try finished product lot first (if tracked and not yet scanned)
         if self._scan_finished_lot(barcode):
             return True
+        # Try manufacturing order reference (scan-first MO switching)
+        if self._scan_production(barcode):
+            return True
         # Try location
         if self._scan_location(barcode):
             return True
@@ -303,6 +322,54 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._set_message_step()
         return True
 
+    def _scan_production(self, barcode):
+        """Scan-first MO switching by MO reference (mrp.production.name).
+
+        PRECONDITION: shop-floor MO barcodes are assumed to print the MO
+        reference (``name``, e.g. WH/MO/00001). Matches are exact. If the
+        printed barcode is not the reference, a dedicated barcode field on
+        mrp.production must be added later.
+
+        - Active MO matching      -> switch directly (no confirmation).
+        - Multiple active MOs     -> show the ambiguous selector.
+        - Inactive MO name (draft/done/cancel) -> error, do NOT fall through.
+        - No MO named like this   -> return False so the location/product/lot
+          scanners keep running (otherwise every normal scan is swallowed).
+        """
+        self.ensure_one()
+        active_states = ("confirmed", "progress", "to_close")
+        mos = self.env["mrp.production"].search([
+            ("name", "=", barcode),
+            ("state", "in", active_states),
+        ])
+        if not mos:
+            # The same reference exists but the MO is not active -> block,
+            # since this is clearly an MO barcode that cannot be handled.
+            if self.env["mrp.production"].search_count(
+                [("name", "=", barcode)], limit=1
+            ):
+                self._set_message(
+                    "error",
+                    _("MO %s is not active (draft/done/cancelled)") % barcode,
+                )
+                return True
+            return False
+        if len(mos) > 1:
+            self.pending_switch_production_ids = mos
+            self.visible_switch_selector = True
+            self._set_message(
+                "more_match",
+                _("Multiple MOs found for barcode: %s. Select one.") % barcode,
+            )
+            return True
+        mo = mos
+        if self.production_id == mo:
+            self._set_message("info", _("Already on MO %s") % mo.name)
+            return True
+        self._switch_production(mo)
+        self._set_message("info", _("Switched to MO %s") % mo.name)
+        return True
+
     def _scan_location(self, barcode):
         location = self.env["stock.location"].search(
             [("barcode", "=", barcode), ("usage", "=", "internal")], limit=1
@@ -328,21 +395,23 @@ class WizStockBarcodesMrp(models.TransientModel):
         # all components so the operator only needs to confirm qty.
         if self.production_id and product == self.production_id.product_id:
             return self._auto_fill_components()
-        # Set scanned product on wizard so user can see it
-        self.product_id = product
-        self.product_uom_id = product.uom_id
-        self.lot_id = False
-        self.lot_name = False
-        self.product_qty = 1.0
-        self._compute_qty_available()
-        # Check if product is a component of this MO; if not, run the
-        # TODO-A1 three-tier fallback (other MO / finished product / force add).
+        # If the product is NOT a component of the current MO, run the
+        # TODO-A1 fallback BEFORE overwriting the in-progress scan state:
+        # a MO switch must stash the *old* progress, not the product that
+        # triggered the switch.
         if self.production_id:
             component_moves = self.production_id.move_raw_ids.filtered(
                 lambda m: m.product_id == product and m.state != "cancel"
             )
             if not component_moves:
                 return self._scan_product_fallback(product)
+        # Normal component of this MO -> set scanned product on wizard
+        self.product_id = product
+        self.product_uom_id = product.uom_id
+        self.lot_id = False
+        self.lot_name = False
+        self.product_qty = 1.0
+        self._compute_qty_available()
         if product.tracking != "none":
             self._set_message("info", _("Product: %s. Scan lot.") % product.name)
             self.step = 3
@@ -551,9 +620,19 @@ class WizStockBarcodesMrp(models.TransientModel):
         other_mos = self._find_other_mo_for_product(product)
         if other_mos:
             if len(other_mos) > 1:
+                # Ambiguous: stash the current MO's in-progress scan, then
+                # let the operator pick the target MO in the UI.
+                self._stash_current_progress()
+                self.product_id = False
+                self.product_uom_id = False
+                self.lot_id = False
+                self.lot_name = False
+                self.product_qty = 0.0
+                self.pending_switch_production_ids = other_mos
+                self.visible_switch_selector = True
                 self._set_message(
                     "more_match",
-                    _("Product %(name)s belongs to multiple MOs")
+                    _("Product %(name)s belongs to multiple MOs. Select one.")
                     % {"name": product.name},
                 )
                 return True
@@ -572,6 +651,12 @@ class WizStockBarcodesMrp(models.TransientModel):
             )
             return True
         # Branch 2: product exists but not reserved -> prompt to add
+        self.product_id = product
+        self.product_uom_id = product.uom_id
+        self.lot_id = False
+        self.lot_name = False
+        self.product_qty = 1.0
+        self._compute_qty_available()
         self.visible_force_add = True
         self._set_message(
             "more_match",
@@ -597,14 +682,47 @@ class WizStockBarcodesMrp(models.TransientModel):
             [("product_id", "=", product.id)], limit=1
         ))
 
+    def _stash_current_progress(self):
+        """Snapshot the uncommitted scan state of the current MO.
+
+        B2 only stores the snapshot; restoring it when switching back is
+        TODO-B3. Only wizards with actual in-progress scans (a component
+        or a finished lot already scanned) are stashed.
+        """
+        self.ensure_one()
+        mo = self.production_id
+        if not mo or not (self.product_id or self.finished_lot_id):
+            return
+        stash = dict(self.scan_progress_stash or {})
+        stash[str(mo.id)] = {
+            "product_id": self.product_id.id,
+            "product_uom_id": self.product_uom_id.id,
+            "lot_id": self.lot_id.id,
+            "lot_name": self.lot_name,
+            "product_qty": self.product_qty,
+            "finished_lot_id": self.finished_lot_id.id,
+            "finished_lot_name": self.finished_lot_name,
+            "finished_qty_producing": self.finished_qty_producing,
+            "location_id": self.location_id.id,
+            "step": self.step,
+            "visible_force_done": self.visible_force_done,
+            "visible_force_add": self.visible_force_add,
+            "manual_entry": self.manual_entry,
+        }
+        self.scan_progress_stash = stash
+
     def _switch_production(self, new_mo):
         """Switch the wizard to `new_mo`, discarding all current scan progress.
 
-        Field reset is explicit (not relying on onchange) so no stale state
-        from the previous MO leaks into the new context. Progress persistence
-        is out of scope (TODO-B3).
+        Uncommitted scan state of the previous MO is stashed first
+        (TODO-B3 restores it on return). Field reset is explicit (not
+        relying on onchange) so no stale state from the previous MO leaks
+        into the new context. Any ambiguous-MO candidate list is cleared.
         """
         self.ensure_one()
+        # Stash before changing production_id (B3 restores on return).
+        if self.production_id and self.production_id != new_mo:
+            self._stash_current_progress()
         # --- MO context ---
         self.production_id = new_mo
         self.workorder_id = False
@@ -627,6 +745,9 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.barcode = False
         self.res_model_id = self.env.ref("mrp.model_mrp_production").id
         self.res_id = new_mo.id
+        # Clear the ambiguous-MO selector so it does not linger on screen.
+        self.pending_switch_production_ids = [(5, 0, 0)]
+        self.visible_switch_selector = False
         # Re-derive step + message for the new MO
         self._set_default_values()
 

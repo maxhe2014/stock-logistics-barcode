@@ -44,6 +44,8 @@
                         <field name="finished_lot_id" invisible="1" force_save="1" />
                         <field name="finished_lot_name" invisible="1" force_save="1" />
                         <field name="queue_mode" invisible="1" force_save="1" />
+                        <field name="visible_switch_selector" invisible="1" force_save="1" />
+                        <field name="scan_progress_stash" invisible="1" force_save="1" />
                         <field
                             name="_barcode_scanned"
                             widget="barcode_handler"
@@ -62,23 +64,23 @@
                                 </div>
                                 <div class="form-check form-check-inline mb-0">
                                     <field name="queue_filter_today" nolabel="1" class="form-check-input"/>
-                                    <label class="form-check-label small">Due Today</label>
+                                    <span class="form-check-label small">Due Today</span>
                                 </div>
                                 <div class="form-check form-check-inline mb-0">
                                     <field name="queue_filter_priority" nolabel="1" class="form-check-input"/>
-                                    <label class="form-check-label small">High Priority</label>
+                                    <span class="form-check-label small">High Priority</span>
                                 </div>
                             </div>
-                            <field name="queue_workorders_ids" nolabel="1">
-                                <tree>
-                                    <field name="name" />
-                                    <field name="product_id" />
-                                    <field name="product_qty" />
-                                    <field name="date_deadline" />
-                                    <field name="priority" />
-                                    <button name="action_open_queue_mo" type="object"
-                                            string="Open" class="btn-link" />
-                                </tree>
+                            <field name="queue_workorders_ids" nolabel="1"
+                                   context="{'tree_view_ref': 'stock_barcodes_mrp.view_mrp_production_queue_tree'}">
+                            </field>
+                        </group>
+                        <!-- TODO-B2: ambiguous-MO selection list -->
+                        <group name="switch_selector" string="Select Manufacturing Order"
+                               class="bg-warning-subtle p-2 mb-2"
+                               invisible="visible_switch_selector == False">
+                            <field name="pending_switch_production_ids" nolabel="1"
+                                   context="{'tree_view_ref': 'stock_barcodes_mrp.view_mrp_production_switch_tree', 'barcode_wizard_id': id}">
                             </field>
                         </group>
                         <group class="bg-light scan_fields p-2">
@@ -213,6 +215,38 @@
                     </div>
                 </div>
             </form>
+        </field>
+    </record>
+
+    <record id="view_mrp_production_queue_tree" model="ir.ui.view">
+        <field name="name">mrp.production.queue.tree</field>
+        <field name="model">mrp.production</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name" />
+                <field name="product_id" />
+                <field name="product_qty" />
+                <field name="date_deadline" />
+                <field name="priority" />
+                <button name="action_open_mrp_barcode" type="object"
+                        string="Open" class="btn-link" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mrp_production_switch_tree" model="ir.ui.view">
+        <field name="name">mrp.production.switch.tree</field>
+        <field name="model">mrp.production</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name" />
+                <field name="product_id" />
+                <field name="product_qty" />
+                <field name="date_deadline" />
+                <field name="priority" />
+                <button name="action_switch_to_in_barcode" type="object"
+                        string="Switch" class="btn-link" />
+            </list>
         </field>
     </record>
 

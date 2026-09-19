@@ -1039,7 +1039,6 @@ class TestStockBarcodesMrp(TransactionCase):
             "name": "Op",
             "production_id": mo.id,
             "workcenter_id": workcenter.id,
-            "state": "pending",
         })
         return mo
 
@@ -1075,7 +1074,7 @@ class TestStockBarcodesMrp(TransactionCase):
             "product_id": self.finished_product.id,
             "product_qty": 1.0,
             "bom_id": self.bom.id,
-            "priority": "2",
+            "priority": "1",
         })
         mo_high.action_confirm()
         wiz = self.WizScanMrp.create({})
@@ -1083,3 +1082,162 @@ class TestStockBarcodesMrp(TransactionCase):
         wiz.queue_filter_priority = True
         self.assertIn(mo_high, wiz.queue_workorders_ids)
         self.assertNotIn(self.production, wiz.queue_workorders_ids)
+
+    # --- TODO-B2: scan-first MO switching ---
+
+    def test_b2_scan_mo_barcode_switches(self):
+        """Scanning an MO reference switches directly; own MO is a no-op;
+        an unknown barcode falls through to not_found."""
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        self.assertNotEqual(mo2.name, "New")
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Scan MO2's reference -> direct switch, no confirmation
+        self.action_barcode_scanned(wiz, mo2.name)
+        self.assertEqual(wiz.production_id, mo2)
+        self.assertEqual(wiz.message_type, "info")
+        # Scanning the current MO's own reference does not switch
+        self.action_barcode_scanned(wiz, mo2.name)
+        self.assertEqual(wiz.production_id, mo2)
+        # Unknown barcode is not swallowed by the MO scanner
+        self.action_barcode_scanned(wiz, "NO-SUCH-MO-000999")
+        self.assertEqual(wiz.production_id, mo2)
+        self.assertEqual(wiz.message_type, "not_found")
+
+    def test_b2_scan_other_mo_component_switches(self):
+        """Scanning a component exclusive to another MO switches to it and
+        stashes the current uncommitted scan progress."""
+        comp_b2 = self.Product.create({
+            "name": "Component B2 Only",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-COMP-B2",
+        })
+        bom2 = self.MrpBom.create({
+            "product_id": self.finished_product.id,
+            "product_tmpl_id": self.finished_product.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": comp_b2.id,
+                "product_qty": 1.0,
+                "product_uom_id": comp_b2.uom_id.id,
+            })],
+        })
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": bom2.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Build uncommitted scan progress on MO1 (component scanned,
+        # quantity not yet confirmed).
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        self.assertEqual(wiz.product_id, self.component_simple)
+        # Scan MO2-exclusive component -> switch directly
+        self.action_barcode_scanned(wiz, "PROD-COMP-B2")
+        self.assertEqual(wiz.production_id, mo2)
+        self.assertEqual(wiz.message_type, "info")
+        # MO1 progress is discarded from the screen...
+        self.assertFalse(wiz.product_id)
+        # ...but stashed per MO (restored in TODO-B3)
+        stash = wiz.scan_progress_stash or {}
+        self.assertIn(str(self.production.id), stash)
+        self.assertEqual(
+            stash[str(self.production.id)]["product_id"],
+            self.component_simple.id,
+        )
+
+    def test_b2_ambiguous_component_shows_selector(self):
+        """A component belonging to several MOs shows the selection list;
+        picking a candidate switches and clears the selector."""
+        shared = self.Product.create({
+            "name": "Component Shared B2",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-SHARED-B2",
+        })
+        bom_shared = self.MrpBom.create({
+            "product_id": self.finished_product.id,
+            "product_tmpl_id": self.finished_product.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": shared.id,
+                "product_qty": 1.0,
+                "product_uom_id": shared.uom_id.id,
+            })],
+        })
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": bom_shared.id,
+        })
+        mo2.action_confirm()
+        mo3 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": bom_shared.id,
+        })
+        mo3.action_confirm()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "PROD-SHARED-B2")
+        # Ambiguous -> selector with both candidates
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_switch_selector)
+        self.assertEqual(
+            set(wiz.pending_switch_production_ids.ids),
+            {mo2.id, mo3.id},
+        )
+        self.assertEqual(wiz.production_id, self.production)
+        # Pick MO2 via the list button (wizard id passed explicitly,
+        # NOT active_id).
+        mo2.with_context(barcode_wizard_id=wiz.id).action_switch_to_in_barcode()
+        self.assertEqual(wiz.production_id, mo2)
+        # Selector is cleared after switching
+        self.assertFalse(wiz.visible_switch_selector)
+        self.assertFalse(wiz.pending_switch_production_ids)
+
+    def test_b2_switched_context_correct(self):
+        """After switching, all wizard context reflects the new MO."""
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Leave some stale scan state before switching
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        self.action_barcode_scanned(wiz, mo2.name)
+        # MO context
+        self.assertEqual(wiz.production_id, mo2)
+        self.assertEqual(wiz.res_id, mo2.id)
+        self.assertEqual(
+            wiz.res_model_id, self.env.ref("mrp.model_mrp_production")
+        )
+        # Locations / quantities re-derived from MO2
+        self.assertEqual(wiz.location_id, mo2.location_src_id)
+        self.assertEqual(wiz.finished_qty_producing, mo2.product_qty)
+        # Finished product is not tracked -> step starts at 1
+        self.assertEqual(wiz.step, 1)
+        # All previous scan state cleared
+        self.assertFalse(wiz.workorder_id)
+        self.assertFalse(wiz.product_id)
+        self.assertFalse(wiz.lot_id)
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertFalse(wiz.visible_force_add)
+        self.assertFalse(wiz.visible_force_done)

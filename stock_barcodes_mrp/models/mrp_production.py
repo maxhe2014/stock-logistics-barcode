@@ -18,3 +18,38 @@ class MrpProduction(models.Model):
         )
         action["res_id"] = wiz.id
         return action
+
+    def action_open_mrp_barcode(self):
+        """Open the MRP barcode scanning wizard for this production order.
+
+        Used by the work-order queue tree view inside the barcode wizard.
+        """
+        return self.action_barcode_scan()
+
+    def action_switch_to_in_barcode(self):
+        """Switch the *currently open* barcode wizard to this MO.
+
+        Called from the ambiguous-MO selection list embedded in the wizard
+        form. The wizard id is passed explicitly as ``barcode_wizard_id``
+        in the context — it must NOT use ``active_id``: inside a wizard
+        opened with target=new, active_id points at the parent record, not
+        at the wizard itself.
+        """
+        self.ensure_one()
+        wizard_id = self.env.context.get("barcode_wizard_id")
+        wiz = (
+            self.env["wiz.stock.barcodes.mrp"]
+            .browse(wizard_id)
+            .exists()
+            if wizard_id
+            else self.env["wiz.stock.barcodes.mrp"]
+        )
+        if wiz:
+            wiz._switch_production(self)
+            wiz._set_message(
+                "info",
+                self.env._("Switched to MO %s") % self.name,
+            )
+            return True
+        # No wizard in context (e.g. direct invocation) -> open a fresh one.
+        return self.action_open_mrp_barcode()
