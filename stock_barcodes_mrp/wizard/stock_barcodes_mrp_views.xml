@@ -6,27 +6,73 @@
         <field name="arch" type="xml">
             <form string="Barcode Scanner (MRP)" class="h-100">
                 <div class="d-flex flex-column h-100">
-                    <div class="flex-fill">
-                        <div name="info" class="text-center h3 mb-2">
-                            <div
-                                class="alert barcode-info text-white mb-0 d-flex"
-                                role="status"
+                    <!-- TODO-C1: 5-step progress bar.
+                         done = green + check / current = blue / pending = grey.
+                         NB: step 0 has no pending badge (step >= 0 is always
+                         true). Step 0 pill hides entirely when the finished
+                         product is untracked. Step 3 pill hides while the
+                         scanned component is untracked and reappears for
+                         tracked components — this dynamic show/hide is
+                         INTENDED behaviour, not a bug. -->
+                    <div name="step_bar" class="d-flex flex-wrap justify-content-center gap-1 mt-2 mb-1 px-2">
+                        <!-- Step 0: Finished Lot -->
+                        <span class="badge rounded-pill text-bg-success"
+                              invisible="step &lt;= 0 or finished_product_tracking == 'none'">
+                            <i class="fa fa-check me-1" role="img" title="Done" />Finished Lot
+                        </span>
+                        <span class="badge rounded-pill text-bg-primary"
+                              invisible="step != 0 or finished_product_tracking == 'none'">Finished Lot</span>
+                        <!-- Step 1: Location -->
+                        <span class="badge rounded-pill text-bg-success" invisible="step &lt;= 1">
+                            <i class="fa fa-check me-1" role="img" title="Done" />Location
+                        </span>
+                        <span class="badge rounded-pill text-bg-primary" invisible="step != 1">Location</span>
+                        <span class="badge rounded-pill text-bg-secondary opacity-50" invisible="step >= 1">Location</span>
+                        <!-- Step 2: Component -->
+                        <span class="badge rounded-pill text-bg-success" invisible="step &lt;= 2">
+                            <i class="fa fa-check me-1" role="img" title="Done" />Component
+                        </span>
+                        <span class="badge rounded-pill text-bg-primary" invisible="step != 2">Component</span>
+                        <span class="badge rounded-pill text-bg-secondary opacity-50" invisible="step >= 2">Component</span>
+                        <!-- Step 3: Lot / SN (hidden while component untracked — expected) -->
+                        <span class="badge rounded-pill text-bg-success"
+                              invisible="step &lt;= 3 or product_tracking == 'none'">
+                            <i class="fa fa-check me-1" role="img" title="Done" />Lot / SN
+                        </span>
+                        <span class="badge rounded-pill text-bg-primary"
+                              invisible="step != 3 or product_tracking == 'none'">Lot / SN</span>
+                        <span class="badge rounded-pill text-bg-secondary opacity-50"
+                              invisible="step >= 3 or product_tracking == 'none'">Lot / SN</span>
+                        <!-- Step 4: Qty -->
+                        <span class="badge rounded-pill text-bg-success" invisible="step &lt;= 4">
+                            <i class="fa fa-check me-1" role="img" title="Done" />Qty
+                        </span>
+                        <span class="badge rounded-pill text-bg-primary" invisible="step != 4">Qty</span>
+                        <span class="badge rounded-pill text-bg-secondary opacity-50" invisible="step >= 4">Qty</span>
+                    </div>
+                    <!-- TODO-C3: scan/status banner pinned below the step
+                         bar; only queues and scan fields scroll below. -->
+                    <div name="info" class="text-center h3 mb-2 px-2">
+                        <div
+                            class="alert barcode-info text-white mb-0 d-flex p-3"
+                            role="status"
+                        >
+                            <button
+                                name="action_back"
+                                type="object"
+                                class="ms-auto oe_kanban_action_button btn-sm"
+                                title="Back"
                             >
-                                <button
-                                    name="action_back"
-                                    type="object"
-                                    class="ms-auto oe_kanban_action_button btn-sm"
-                                    title="Back"
-                                >
-                                    <i class="fa fa-chevron-left fa-2x text-white" />
-                                </button>
-                                <field name="message" class="mt-3 h3 text-white" />
-                                <span
-                                    class="fa fa-barcode fa-2x mt-2 mx-3"
-                                    title="Barcode"
-                                />
-                            </div>
+                                <i class="fa fa-chevron-left fa-2x text-white" />
+                            </button>
+                            <field name="message" class="mt-3 h3 text-white" />
+                            <span
+                                class="fa fa-barcode fa-2x mt-2 mx-3"
+                                title="Barcode"
+                            />
                         </div>
+                    </div>
+                    <div class="flex-fill">
                         <field name="message_type" invisible="1" />
                         <field name="barcode" invisible="1" force_save="1" />
                         <field name="step" invisible="1" force_save="1" />
@@ -117,9 +163,10 @@
                                     options="{'no_create': True, 'no_open': True}"
                                     readonly="manual_entry == False"
                                     force_save="1"
+                                    class="fs-5"
                                 />
-                                <field name="finished_lot_name" />
-                                <field name="finished_qty_producing" />
+                                <field name="finished_lot_name" class="fs-5" />
+                                <field name="finished_qty_producing" class="fs-5" />
                             </group>
                             <group name="scan_info" string="Scanned Component">
                                 <field
@@ -127,6 +174,7 @@
                                     options="{'no_create': True, 'no_open': True}"
                                     readonly="manual_entry == False"
                                     force_save="1"
+                                    class="fs-5"
                                 />
                                 <field
                                     name="lot_id"
@@ -134,84 +182,110 @@
                                     readonly="manual_entry == False"
                                     force_save="1"
                                     invisible="product_tracking == 'none'"
+                                    class="fs-5"
                                 />
-                                <field name="lot_name" invisible="product_tracking == 'none'" />
-                                <field name="product_qty" />
-                                <field name="qty_available" readonly="1" />
-                                <field name="total_demand" readonly="1" />
-                                <field name="total_done" readonly="1" />
+                                <field name="lot_name" invisible="product_tracking == 'none'" class="fs-5" />
+                                <field name="product_qty" class="fs-5" />
+                                <field name="qty_available" readonly="1" class="fs-5" />
+                                <field name="total_demand" readonly="1" class="fs-5" />
+                                <field name="total_done" readonly="1" class="fs-5" />
                             </group>
                         </group>
                     </div>
+                    <!-- TODO-C3: thumb-zone action grid — 2 columns, large
+                         glove-friendly buttons (full width, >=18px).
+                         Primary actions first. -->
                     <div name="actions" class="oe_stock_barcodes_actions bg-light p-2">
-                        <button
-                            name="action_apply_finished_lot"
-                            type="object"
-                            string="Apply Lot"
-                            class="btn btn-primary"
-                            invisible="finished_product_tracking == 'none' or (finished_lot_id == False and finished_lot_name == False)"
-                        />
-                        <button
-                            name="action_clean_finished_lot"
-                            type="object"
-                            string="Clean Lot"
-                            class="btn btn-secondary"
-                            invisible="finished_product_tracking == 'none' or (finished_lot_id == False and finished_lot_name == False)"
-                        />
-                        <button
-                            name="action_confirm"
-                            type="object"
-                            string="Confirm"
-                            class="btn btn-primary"
-                            invisible="product_id == False"
-                        />
-                        <button
-                            name="action_finish_production"
-                            type="object"
-                            string="Finish Production"
-                            class="btn btn-success"
-                            invisible="production_state in ('draft', 'done', 'cancel')"
-                        />
-                        <button
-                            name="action_force_done"
-                            type="object"
-                            string="Force Done"
-                            class="btn btn-warning"
-                            invisible="visible_force_done == False"
-                        />
-                        <button
-                            name="action_force_add"
-                            type="object"
-                            string="Force Add"
-                            class="btn btn-warning"
-                            invisible="visible_force_add == False"
-                        />
-                        <button
-                            name="action_manual_entry"
-                            type="object"
-                            string="Manual Entry"
-                            class="btn btn-secondary"
-                        />
-                        <button
-                            name="action_clean_product"
-                            type="object"
-                            string="Clean"
-                            class="btn btn-secondary"
-                            invisible="product_id == False"
-                        />
-                        <button
-                            name="action_clean_lot"
-                            type="object"
-                            string="Clean Lot"
-                            class="btn btn-secondary"
-                            invisible="lot_id == False and lot_name == False"
-                        />
-                        <button
-                            name="action_open_production"
-                            type="object"
-                            string="Open MO"
-                            class="btn btn-info"
-                        />
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <button
+                                    name="action_apply_finished_lot"
+                                    type="object"
+                                    string="Apply Lot"
+                                    class="btn btn-primary btn-lg w-100 py-3 fs-4"
+                                    invisible="finished_product_tracking == 'none' or (finished_lot_id == False and finished_lot_name == False)"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_confirm"
+                                    type="object"
+                                    string="Confirm"
+                                    class="btn btn-primary btn-lg w-100 py-3 fs-4"
+                                    invisible="product_id == False"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_finish_production"
+                                    type="object"
+                                    string="Finish Production"
+                                    class="btn btn-success btn-lg w-100 py-3 fs-4"
+                                    invisible="production_state in ('draft', 'done', 'cancel')"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_clean_finished_lot"
+                                    type="object"
+                                    string="Clean Lot"
+                                    class="btn btn-secondary btn-lg w-100 py-3 fs-4"
+                                    invisible="finished_product_tracking == 'none' or (finished_lot_id == False and finished_lot_name == False)"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_force_done"
+                                    type="object"
+                                    string="Force Done"
+                                    class="btn btn-warning btn-lg w-100 py-3 fs-4"
+                                    invisible="visible_force_done == False"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_force_add"
+                                    type="object"
+                                    string="Force Add"
+                                    class="btn btn-warning btn-lg w-100 py-3 fs-4"
+                                    invisible="visible_force_add == False"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_manual_entry"
+                                    type="object"
+                                    string="Manual Entry"
+                                    class="btn btn-secondary btn-lg w-100 py-3 fs-4"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_clean_product"
+                                    type="object"
+                                    string="Clean"
+                                    class="btn btn-secondary btn-lg w-100 py-3 fs-4"
+                                    invisible="product_id == False"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_clean_lot"
+                                    type="object"
+                                    string="Clean Lot"
+                                    class="btn btn-secondary btn-lg w-100 py-3 fs-4"
+                                    invisible="lot_id == False and lot_name == False"
+                                />
+                            </div>
+                            <div class="col-6">
+                                <button
+                                    name="action_open_production"
+                                    type="object"
+                                    string="Open MO"
+                                    class="btn btn-info btn-lg w-100 py-3 fs-4"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </form>
