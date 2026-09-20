@@ -12,16 +12,19 @@ class WizStockBarcodesMrp(models.TransientModel):
     _transient_max_hours = 48
 
     # --- Production context ---
+    # NB: NOT field-level readonly. Readonly fields are dropped from the
+    # client save payload, so a hardware/manual scan landing on a *new*
+    # onchange RPC would browse a record with production_id=False and
+    # every cross-request scan step would fall through ("Barcode not
+    # found"). The form renders it read-only via invisible/plain fields.
     production_id = fields.Many2one(
         comodel_name="mrp.production",
         string="Manufacturing Order",
-        readonly=True,
     )
     production_state = fields.Selection(related="production_id.state")
     workorder_id = fields.Many2one(
         comodel_name="mrp.workorder",
         string="Work Order",
-        readonly=True,
     )
     workorder_state = fields.Selection(related="workorder_id.state")
     production_product_id = fields.Many2one(
@@ -56,7 +59,13 @@ class WizStockBarcodesMrp(models.TransientModel):
     finished_lot_id = fields.Many2one(
         comodel_name="stock.lot",
         string="Finished Lot/Serial",
-        domain="[('product_id', '=', production_product_id)]",
+        # NB: no field-level dynamic domain here. A model-level domain
+        # string referencing another field is evaluated client-side through
+        # the fallback path and produced an invalid stock.lot search_read
+        # domain ("Domain() invalid item in domain: <product id>") when the
+        # lot autocomplete/Search-More dialog used it. The product filter
+        # lives on the view node instead; action_apply_finished_lot() guards
+        # the chosen lot server-side.
     )
     finished_lot_name = fields.Char(string="Finished Lot Name")
     finished_qty_producing = fields.Float(
@@ -149,6 +158,41 @@ class WizStockBarcodesMrp(models.TransientModel):
         string="Stashed Scan Progress",
     )
 
+    # --- OE-aligned UI conventions (ent stock_barcode_mrp) ---
+    queue_visible = fields.Boolean(
+        string="Queue Visible",
+        default=False,
+        help="Show the work-order queue drawer below the scan zone. The "
+        "enterprise app keeps the queue off the scan screen; it only "
+        "appears when no MO is active or the operator opens it from Tools.",
+    )
+    show_tools = fields.Boolean(
+        string="Show Tools",
+        default=False,
+        help="Expand the Tools panel with secondary operations (manual "
+        "entry, force actions, MO details, queue). No <details> precedent "
+        "exists in core views, so visibility is toggled via this boolean.",
+    )
+    components_availability = fields.Char(
+        related="production_id.components_availability",
+        string="Component Status",
+    )
+    components_availability_state = fields.Selection(
+        related="production_id.components_availability_state",
+        string="Component Availability",
+    )
+    # OE scan-screen header shows scheduled date / source document / state.
+    # NB: mrp.production date field is `date_start` in Odoo 19 (was
+    # `date_planned_start` in 17.0).
+    production_date_planned = fields.Datetime(
+        related="production_id.date_start",
+        string="Scheduled Date",
+    )
+    production_origin = fields.Char(
+        related="production_id.origin",
+        string="Source Document",
+    )
+
     @api.depends("production_id.move_raw_ids", "product_id")
     def _compute_totals(self):
         for rec in self:
@@ -201,6 +245,25 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.queue_mode = "all" if self.queue_mode == "my" else "my"
         return True
 
+    def action_toggle_queue_visible(self):
+        """Show/hide the queue drawer; the scan zone stays first, as the
+        enterprise app keeps the queue off the scan screen. Opening the
+        queue from Tools also collapses the Tools panel so only one
+        auxiliary drawer is visible at a time."""
+        self.ensure_one()
+        self.queue_visible = not self.queue_visible
+        if self.queue_visible:
+            self.show_tools = False
+        return True
+
+    def action_toggle_show_tools(self):
+        """Expand/collapse the Tools panel with secondary operations."""
+        self.ensure_one()
+        self.show_tools = not self.show_tools
+        if self.show_tools:
+            self.queue_visible = False
+        return True
+
     def action_toggle_queue_filter(self, filter_name):
         """Toggle a queue quick filter (today / priority)."""
         self.ensure_one()
@@ -246,6 +309,10 @@ class WizStockBarcodesMrp(models.TransientModel):
 
     def _set_default_values(self):
         """Set default source location and qty from the MO."""
+        # OE-aligned queue behaviour: no active MO -> the queue is the
+        # entry screen; once a MO is active the queue collapses so the
+        # scan zone owns the screen.
+        self.queue_visible = not self.production_id
         if self.production_id:
             if not self.location_id:
                 self.location_id = self.production_id.location_src_id
@@ -263,8 +330,26 @@ class WizStockBarcodesMrp(models.TransientModel):
 
     # --- Barcode scanning entry point ---
     def on_barcode_scanned(self, barcode):
-        self.barcode = barcode.strip() if barcode else ""
-        return self._process_barcode(self.barcode)
+        """Hardware path: core barcode_handler widget writes
+        `_barcode_scanned` → core mixin onchange calls this. Processes
+        directly and deliberately does NOT write `barcode`, so the
+        client-side onchange chain can never double-fire the manual
+        entry handler below."""
+        return self._process_barcode(barcode.strip() if barcode else "")
+
+    @api.onchange("barcode")
+    def _onchange_barcode_scan(self):
+        """Manual scan box path: the visible `barcode` char field is
+        the scan entry for tablets/browsers without a hardware scanner
+        (the barcode_handler widget renders nothing). Clears the value
+        so the same code can be scanned twice in a row."""
+        if self.barcode:
+            barcode = self.barcode
+            self.barcode = False
+            self._barcode_scanned = False
+            self._process_barcode(barcode)
+        # NB: onchange methods must return None or a dict — returning
+        # True crashes the web client ('bool' object has no 'get').
 
     def _process_barcode(self, barcode):
         """Main barcode dispatch: try finished lot → location → product → lot."""
@@ -1059,6 +1144,19 @@ class WizStockBarcodesMrp(models.TransientModel):
             return False
         vals = {"qty_producing": self.finished_qty_producing}
         if lot:
+            # Guard: the m2o picker can no longer be domain-restricted
+            # client-side, so reject a lot belonging to another product.
+            if lot.product_id != self.production_id.product_id:
+                self._set_message(
+                    "error",
+                    _("Lot %(lot)s belongs to %(product)s, not to the "
+                      "finished product")
+                    % {
+                        "lot": lot.name,
+                        "product": lot.product_id.display_name,
+                    },
+                )
+                return False
             # Replace (not append): core constrains lot-tracked products to
             # max 1 lot in lot_producing_ids, re-applying a different lot
             # with (4, id) would raise "You cannot set more than 1 lot".

@@ -619,6 +619,27 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.message_type, "error")
         self.assertNotEqual(self.production_tracked.state, "done")
 
+    def test_21b_apply_wrong_product_lot_rejected(self):
+        """A finished lot belonging to another product is rejected.
+
+        The finished_lot_id picker cannot be domain-restricted client-side
+        (a field-level dynamic domain crashed stock.lot search_read), so the
+        server guard is the last line of defence.
+        """
+        wrong_lot = self.StockProductionLot.create({
+            "name": "LOT-WRONG-PRODUCT",
+            "product_id": self.component_tracked.id,
+            "company_id": self.company.id,
+        })
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        wiz.finished_lot_id = wrong_lot
+        wiz.finished_qty_producing = 1.0
+        self.assertFalse(wiz.action_apply_finished_lot())
+        self.assertEqual(wiz.message_type, "error")
+        self.assertFalse(self.production_tracked.lot_producing_ids)
+
     def test_22_finish_production_full_flow(self):
         """Scan components, apply finished lot, finish -> MO done."""
         wiz = self.WizScanMrp.create({

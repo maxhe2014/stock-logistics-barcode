@@ -1,0 +1,1046 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* stock_barcodes_mrp
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-20 23:35+0000\n"
+"PO-Revision-Date: 2026-09-20 23:35+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_state
+msgid ""
+" * Draft: The MO is not confirmed yet.\n"
+" * Confirmed: The MO is confirmed, the stock rules and the reordering of the components are trigerred.\n"
+" * In Progress: The production has started (on the MO or on the WO).\n"
+" * To Close: The production is done, the MO has to be closed.\n"
+" * Done: The MO is closed, the stock moves are posted. \n"
+" * Cancelled: The MO has been cancelled, can't be confirmed anymore."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.actions.report,print_report_name:stock_barcodes_mrp.report_stock_lot_traceability
+msgid "'Lot Traceability - %s' % (object.display_name)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "<i class=\"fa fa-angle-up me-1\" role=\"img\" title=\"Hide\"/>Hide Tools"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "<i class=\"fa fa-ellipsis-h me-1\" role=\"img\" title=\"Tools\"/>Tools"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid ""
+"<span class=\"badge rounded-pill text-bg-success\" invisible=\"step &lt;= 0 or finished_product_tracking == 'none'\">\n"
+"                            <i class=\"fa fa-check me-1\" role=\"img\" title=\"Done\"/>Finished Lot\n"
+"                        </span>\n"
+"                        <span class=\"badge rounded-pill text-bg-primary\" invisible=\"step != 0 or finished_product_tracking == 'none'\">Finished Lot</span>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid ""
+"<span class=\"badge rounded-pill text-bg-success\" invisible=\"step &lt;= 1\">\n"
+"                            <i class=\"fa fa-check me-1\" role=\"img\" title=\"Done\"/>Location\n"
+"                        </span>\n"
+"                        <span class=\"badge rounded-pill text-bg-primary\" invisible=\"step != 1\">Location</span>\n"
+"                        <span class=\"badge rounded-pill text-bg-secondary opacity-50\" invisible=\"step &gt;= 1\">Location</span>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid ""
+"<span class=\"badge rounded-pill text-bg-success\" invisible=\"step &lt;= 2\">\n"
+"                            <i class=\"fa fa-check me-1\" role=\"img\" title=\"Done\"/>Component\n"
+"                        </span>\n"
+"                        <span class=\"badge rounded-pill text-bg-primary\" invisible=\"step != 2\">Component</span>\n"
+"                        <span class=\"badge rounded-pill text-bg-secondary opacity-50\" invisible=\"step &gt;= 2\">Component</span>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid ""
+"<span class=\"badge rounded-pill text-bg-success\" invisible=\"step &lt;= 3 or product_tracking == 'none'\">\n"
+"                            <i class=\"fa fa-check me-1\" role=\"img\" title=\"Done\"/>Lot / SN\n"
+"                        </span>\n"
+"                        <span class=\"badge rounded-pill text-bg-primary\" invisible=\"step != 3 or product_tracking == 'none'\">Lot / SN</span>\n"
+"                        <span class=\"badge rounded-pill text-bg-secondary opacity-50\" invisible=\"step &gt;= 3 or product_tracking == 'none'\">Lot / SN</span>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid ""
+"<span class=\"badge rounded-pill text-bg-success\" invisible=\"step &lt;= 4\">\n"
+"                            <i class=\"fa fa-check me-1\" role=\"img\" title=\"Done\"/>Qty\n"
+"                        </span>\n"
+"                        <span class=\"badge rounded-pill text-bg-primary\" invisible=\"step != 4\">Qty</span>\n"
+"                        <span class=\"badge rounded-pill text-bg-secondary opacity-50\" invisible=\"step &gt;= 4\">Qty</span>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "<span class=\"fa fa-barcode fa-2x mt-2 mx-3\" title=\"Barcode\"/>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid ""
+"<span class=\"fa fa-barcode fa-2x text-primary ms-1\" role=\"img\" "
+"title=\"Scan\"/>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "<span class=\"form-check-label small\">Due Today</span>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "<span class=\"form-check-label small\">High Priority</span>"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Added & consumed: %(prod)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__queue_mode__all
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "All MO"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Already on MO %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Apply Lot"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__qty_available
+msgid "Available"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Back"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__barcode
+msgid "Barcode"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp___barcode_scanned
+msgid "Barcode Scanned"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Barcode Scanner (MRP)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Barcode not found: %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Barcode reader"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__pending_switch_production_ids
+msgid "Candidate MOs"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Clean Component"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Clean Finished Lot"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Clean Lot / SN"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__company_id
+msgid "Company"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_id
+msgid "Component"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__components_availability_state
+msgid "Component Availability"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__components_availability
+msgid "Component Status"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Component scanned: %(prod)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_src_id
+msgid "Components Location"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Components auto-filled: %(filled)s full, %(partial)s partial."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Confirm"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__consumed_lot_count
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_lot_form_mrp_traceability
+msgid "Consumed Lots"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__consumed_lot_ids
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Consumed Material Lots"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/models/stock_lot.py:0
+msgid "Consumed Material Lots for %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__create_uid
+msgid "Created by"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__create_date
+msgid "Created on"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_date_planned
+msgid ""
+"Date you plan to start production or date you actually started production."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__total_demand
+msgid "Demand"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_production__display_name
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_workorder__display_name
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_res_users__display_name
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__display_name
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__display_name
+msgid "Display Name"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__visible_switch_selector
+msgid "Display the ambiguous-MO selection list."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__total_done
+msgid "Done"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_filter_today
+msgid "Due Today"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_product_tracking
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_tracking
+msgid "Ensure the traceability of a storable product in your warehouse."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Enter quantity and confirm"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Enter the quantity for %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__error
+msgid "Error"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__show_tools
+msgid ""
+"Expand the Tools panel with secondary operations (manual entry, force "
+"actions, MO details, queue). No <details> precedent exists in core views, so"
+" visibility is toggled via this boolean."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Finish Production"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_lot_name
+msgid "Finished Lot Name"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_lot_id
+msgid "Finished Lot/Serial"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Finished Product Lot"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_dest_id
+msgid "Finished Products Location"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_qty_producing
+msgid "Finished Qty"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Finished lot required before finishing production"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Finished lot required for tracked product"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Finished lot: %(lot)s, qty: %(qty)s applied to MO"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__visible_force_add
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Force Add"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Force Done"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Force add only supports non-tracked products"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_filter_priority
+msgid "High Priority"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_production__id
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_workorder__id
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_res_users__id
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__id
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__id
+msgid "ID"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__info
+msgid "Info"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__write_uid
+msgid "Last Updated by"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__write_date
+msgid "Last Updated on"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__components_availability
+msgid ""
+"Latest component availability status for this MO. If green, then the MO's "
+"readiness status is ready, as per BOM configuration."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_src_id
+msgid "Location where the system will look for components."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_dest_id
+msgid "Location where the system will stock the finished products."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Location: %s. Scan component."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Lot"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot %(lot)s belongs to %(product)s, not to the finished product"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__lot_name
+msgid "Lot Name"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.actions.report,name:stock_barcodes_mrp.report_stock_lot_traceability
+msgid "Lot Traceability"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Lot Traceability Report"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot belongs to product %(name)s which is not part of this MO"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot required for tracked product"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model,name:stock_barcodes_mrp.model_stock_lot
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__lot_id
+msgid "Lot/Serial"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot: %s. Enter qty and confirm."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO %s is not active (draft/done/cancelled)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO %s: scan source location %s or scan a component"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "MO Details"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO is %(state)s, cannot finish production"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO is %(state)s, cannot scan components"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO is draft, confirm it before scanning"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__pending_switch_production_ids
+msgid "MOs matching an ambiguous scan; the operator picks one to switch to."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MRP"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__manual_entry
+msgid "Manual"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Manual Entry"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__manual_entry
+msgid "Manual entry mode"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model,name:stock_barcodes_mrp.model_mrp_production
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_id
+msgid "Manufacturing Order"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__message
+msgid "Message"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__message_step
+msgid "Message Step"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__message_type
+msgid "Message Type"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__move_line_ids
+msgid "Move Lines"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple MOs found for barcode: %s. Select one."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple finished lots found"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple lots found"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple lots found for barcode: %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__more_match
+msgid "Multiple matches"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple products found"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Multiple products found for barcode: %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__queue_mode__my
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "My Work Orders"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "N/A"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "New lot: %s. Enter qty and confirm."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "No consumed material lots found."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No manufacturing order"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No manufacturing order selected"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "No produced finished lots found."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No product scanned"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No product to add"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No source location scanned"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__not_found
+msgid "Not found"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_mrp_production_queue_tree
+msgid "Open"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Open MO"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__produced_lot_ids
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Produced Finished Lots"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/models/stock_lot.py:0
+msgid "Produced Finished Lots from %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__produced_lot_count
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_lot_form_mrp_traceability
+msgid "Produced Lots"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Product"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product %(name)s belongs to multiple MOs. Select one."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product %(name)s is a finished product, cannot consume"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product %(name)s is not a component of this MO"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product %(name)s is not in BOM. Force add to consume?"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_product_id
+msgid "Product to Produce"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product: %s. Enter qty and confirm."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Product: %s. Scan lot."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Production done: %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_qty_producing
+msgid "Qty Producing"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_product_qty
+msgid "Qty to Produce"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_qty
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
+msgid "Quantity"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Quantity exceeds demand (max: %s)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Quantity must be positive"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Quantity to produce must be positive"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_workorders_ids
+msgid "Queue"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_mode
+msgid "Queue View"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_visible
+msgid "Queue Visible"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_origin
+msgid ""
+"Reference of the document that generated this production order request."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__res_id
+msgid "Res"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__res_model_id
+msgid "Res Model"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.mrp_production_form_inherit_stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_mrp_workorder_form_barcode_scan
+msgid "Scan Barcode"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.actions.act_window,name:stock_barcodes_mrp.action_stock_barcodes_mrp
+msgid "Scan Barcode (MRP)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan a component of MO %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan component product"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan finished product lot"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan lot/serial"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Scan or type barcode, then press Enter"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan source location (or scan component directly)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan the finished product lot: %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan the lot/serial of %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Scanned Component"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_date_planned
+msgid "Scheduled Date"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Select Manufacturing Order"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__visible_switch_selector
+msgid "Show MO Selector"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__show_tools
+msgid "Show Tools"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__visible_force_add
+msgid "Show the 'Force Add' button to consume a product not in the BOM"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_visible
+msgid ""
+"Show the work-order queue drawer below the scan zone. The enterprise app "
+"keeps the queue off the scan screen; it only appears when no MO is active or"
+" the operator opens it from Tools."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_origin
+msgid "Source Document"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__location_id
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Source Location"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__scan_progress_stash
+msgid "Stashed Scan Progress"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_state
+msgid "State"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__workorder_state
+msgid "Status"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__step
+msgid "Step"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__success
+msgid "Success"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_mrp_production_switch_tree
+msgid "Switch"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Switch MO (Queue)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Switched to MO %(mo)s. %(next)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"This is a finished product lot. Enter/scan it in the finished lot area."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Tools"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__finished_product_tracking
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_tracking
+msgid "Tracking"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_uom_id
+msgid "UoM"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model,name:stock_barcodes_mrp.model_res_users
+msgid "User"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp___barcode_scanned
+msgid "Value of the last barcode scanned."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__visible_force_done
+msgid "Visible Force Done"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model,name:stock_barcodes_mrp.model_wiz_stock_barcodes_mrp
+msgid "Wizard to read barcode on manufacturing orders"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_res_users__mrp_workcenter_ids
+msgid "Work Centers"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model,name:stock_barcodes_mrp.model_mrp_workorder
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__workorder_id
+msgid "Work Order"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Work Order Queue"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_res_users__mrp_workcenter_ids
+msgid ""
+"Work centers this operator is assigned to. Used to filter the MRP barcode "
+"queue (My Work Orders)."
+msgstr ""
