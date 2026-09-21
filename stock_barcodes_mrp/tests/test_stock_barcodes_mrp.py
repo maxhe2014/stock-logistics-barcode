@@ -1020,6 +1020,80 @@ class TestStockBarcodesMrp(TransactionCase):
             # Only the available stock was consumed (demand > on-hand).
             self.assertLess(consumed, demand)
 
+    def test_a4_unreserved_component_auto_consumed_at_finish(self):
+        """Zero-reservation non-tracked components are auto-consumed at finish.
+
+        Regression: _auto_fill_components() marked unreserved raw moves as
+        picked without filling any quantity; _auto_consume_non_tracked_
+        components() then skipped them (not picked filter), so the component
+        was consumed as 0 and the raw move was cancelled after the operator
+        confirmed the Consumption Warning. Now finish returns True directly,
+        the component is consumed at full demand and the finished SN lands
+        on the finished move line.
+        """
+        comp = self.Product.create({
+            "name": "Unreserved Component",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-COMP-UNRES",
+        })
+        # Stock exists, but the MO is explicitly unreserved: the raw move
+        # has stock to draw from yet zero reservation move lines, which is
+        # the state that triggered the picked/qty=0 deadlock.
+        self.StockQuant.create({
+            "product_id": comp.id,
+            "location_id": self.components_location.id,
+            "quantity": 1.0,
+        })
+        finished = self.Product.create({
+            "name": "Serial Finished A4",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-FIN-SER-A4",
+        })
+        sn = self.StockProductionLot.create({
+            "name": "SN-A4-001",
+            "product_id": finished.id,
+            "company_id": self.company.id,
+        })
+        bom = self.MrpBom.create({
+            "product_id": finished.id,
+            "product_tmpl_id": finished.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": comp.id,
+                "product_qty": 1.0,
+                "product_uom_id": comp.uom_id.id,
+            })],
+        })
+        mo = self.MrpProduction.create({
+            "product_id": finished.id,
+            "product_qty": 1.0,
+            "bom_id": bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo.action_confirm()
+        raw = mo.move_raw_ids
+        raw._do_unreserve()
+        self.assertFalse(sum(raw.move_line_ids.mapped("quantity")))
+
+        wiz = self.WizScanMrp.create({"production_id": mo.id})
+        self.action_barcode_scanned(wiz, "SN-A4-001")
+        self.assertEqual(wiz.finished_lot_id, sn)
+        # Unreserved moves must NOT be marked picked at scan time.
+        self.assertFalse(raw.picked)
+
+        res = wiz.action_finish_production()
+        self.assertIs(res, True)  # no Consumption Warning wizard
+        self.assertEqual(mo.state, "done")
+        self.assertEqual(raw.state, "done")
+        self.assertAlmostEqual(raw.quantity, 1.0, places=4)
+        self.assertEqual(mo.lot_producing_ids, sn)
+        self.assertEqual(mo.move_finished_ids.move_line_ids.lot_id, sn)
+
     def test_a3_finished_barcode_other_mo_falls_to_a1(self):
         """Scanning another MO's finished product falls through to A1 (error)."""
         other_finished = self.Product.create({

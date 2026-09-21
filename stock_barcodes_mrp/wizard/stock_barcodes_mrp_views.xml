@@ -315,7 +315,7 @@
                                     <i class="fa fa-angle-up me-1" role="img" title="Hide" />Hide Tools
                                 </button>
                             </div>
-                            <div class="col-6" invisible="production_state in ('draft', 'done', 'cancel')">
+                            <div class="col-6" invisible="not production_id or production_state in ('draft', 'done', 'cancel')">
                                 <button
                                     name="action_finish_production"
                                     type="object"

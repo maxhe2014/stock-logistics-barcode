@@ -541,7 +541,13 @@ class WizStockBarcodesMrp(models.TransientModel):
                 scale = min(1.0, demand / total_reserved)
                 for line in move_lines:
                     line.quantity = line.quantity * scale
-            if demand:
+                # Only mark picked when we actually filled the reserved
+                # lines. With zero reservations (consumables / unreserved
+                # MTO moves) leaving picked=False lets
+                # _auto_consume_non_tracked_components() fill the full
+                # demand at finish; marking picked here with qty 0 would
+                # cause the component to be consumed as 0 (move cancelled
+                # after the Consumption Warning confirmation).
                 move.picked = True
             consumed = sum(move_lines.mapped("quantity"))
             if move.product_uom.compare(consumed, demand) >= 0:
