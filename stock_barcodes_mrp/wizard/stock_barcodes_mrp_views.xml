@@ -107,6 +107,19 @@
                             decoration-warning="components_availability_state in ('expected', 'late')"
                             decoration-danger="components_availability_state == 'unavailable'"
                         />
+                        <!-- Visible finished-lot/serial badge: surfaces
+                             what the operator just scanned so they can
+                             confirm the binding landed on the MO. The
+                             hidden field at L~140 keeps the value
+                             storable; this node is read-only display. -->
+                        <span
+                            class="badge text-bg-success fs-6"
+                            invisible="not finished_lot_id"
+                            title="Finished lot/serial bound to this MO"
+                        >
+                            <i class="fa fa-check-circle me-1" role="img" title="Bound" />
+                            <field name="finished_lot_id" readonly="1" nolabel="1" force_save="1" />
+                        </span>
                     </div>
                     <!-- TODO-UI: visible manual scan bar. The core
                          barcode_handler widget renders NOTHING (bus-only,
@@ -224,6 +237,16 @@
                             <field name="pending_switch_production_ids" nolabel="1"
                                    context="{'tree_view_ref': 'stock_barcodes_mrp.view_mrp_production_switch_tree', 'barcode_wizard_id': id}">
                             </field>
+                            <!-- C5: scan-first multi-match -> filtered list
+                                 button. ORM onchange cannot return an action
+                                 (only value/warning/domain), so the operator
+                                 clicks this type=object button to open the
+                                 candidate MO list as target='current'. -->
+                            <button name="action_open_candidate_list"
+                                    type="object"
+                                    string="View candidate MOs"
+                                    class="btn btn-warning btn-sm mt-2"
+                                    invisible="not visible_switch_selector" />
                         </group>
                         <!-- TODO-UI Tools drawer: secondary operations,
                              folded by default (OE keeps these off the main

@@ -22,6 +22,17 @@ class WizStockBarcodesMrp(models.TransientModel):
         string="Manufacturing Order",
     )
     production_state = fields.Selection(related="production_id.state")
+    # D3: stash flag set when action_finish_production returns a dialog
+    # action (consumption warning / backorder). _onchange_production_state
+    # consumes it after the dialog closes and the client reloads the
+    # record, flipping the placeholder info banner to a real "Production
+    # done" success banner.
+    pending_finish = fields.Boolean(
+        string="Pending finish",
+        help="Set by action_finish_production's dialog path; consumed by "
+             "_onchange_production_state once the MO actually goes done.",
+        default=False,
+    )
     workorder_id = fields.Many2one(
         comodel_name="mrp.workorder",
         string="Work Order",
@@ -314,6 +325,20 @@ class WizStockBarcodesMrp(models.TransientModel):
     def onchange_production_id(self):
         self._set_default_values()
 
+    @api.onchange("production_state")
+    def _onchange_production_state(self):
+        """D3: after a dialog-close reload, if the MO actually went done,
+        swap the placeholder 'Resolving consumption warning...' banner for
+        a real 'Production done' success banner. Consumes the
+        pending_finish flag so a later unrelated state change does not
+        re-trigger the success banner.
+        """
+        if self.pending_finish and self.production_state == "done":
+            self._set_message(
+                "success", _("Production done: %s") % self.production_id.name
+            )
+            self.pending_finish = False
+
     def _set_default_values(self):
         """Set default source location and qty from the MO."""
         # OE-aligned queue behaviour: no active MO -> the queue is the
@@ -341,8 +366,21 @@ class WizStockBarcodesMrp(models.TransientModel):
         `_barcode_scanned` → core mixin onchange calls this. Processes
         directly and deliberately does NOT write `barcode`, so the
         client-side onchange chain can never double-fire the manual
-        entry handler below."""
-        return self._process_barcode(barcode.strip() if barcode else "")
+        entry handler below.
+
+        NB: must NOT return _process_barcode's bool. The core
+        barcodes.barcode_events_mixin._on_barcode_scanned transparently
+        returns our value to the ORM onchange framework, and
+        orm/models.py._apply_onchange_methods does `if res.get('value'):`
+        (~L6996-6998) — a True return therefore reaches `True.get` and
+        crashes the web client with `AttributeError: 'bool' object has
+        no attribute 'get'`. B2's unit tests missed this because the
+        action_barcode_scanned helper calls _on_barcode_scanned()
+        directly without inspecting the return value; see
+        test_b2_on_barcode_scanned_returns_none_not_bool and
+        test_b2_onchange_browser_path_does_not_crash.
+        """
+        self._process_barcode(barcode.strip() if barcode else "")
 
     @api.onchange("barcode")
     def _onchange_barcode_scan(self):
@@ -359,9 +397,19 @@ class WizStockBarcodesMrp(models.TransientModel):
         # True crashes the web client ('bool' object has no 'get').
 
     def _process_barcode(self, barcode):
-        """Main barcode dispatch: try finished lot → location → product → lot."""
+        """Main barcode dispatch: try finished lot → location → product → lot.
+
+        C5: scan-first entry — when no MO is selected (production_id is
+        False), _scan_finished_lot_reverse runs BEFORE _scan_finished_lot
+        because the latter requires production_id to be set. The reverse
+        lookup matches the scanned barcode against MOs that have the SN
+        pre-assigned in lot_producing_ids.
+        """
         if not barcode:
             return
+        # C5: scan-first SN reverse lookup (only fires when no MO is set)
+        if self._scan_finished_lot_reverse(barcode):
+            return True
         # Try finished product lot first (if tracked and not yet scanned)
         if self._scan_finished_lot(barcode):
             return True
@@ -380,6 +428,85 @@ class WizStockBarcodesMrp(models.TransientModel):
             return True
         # Not found
         self._set_message("not_found", _("Barcode not found: %s") % barcode)
+        return True
+
+    def _scan_finished_lot_reverse(self, barcode):
+        """Scan-first entry: scan a finished product's SN to land on its MO.
+
+        Only active when no MO is selected (production_id is False); when
+        a MO is already set, the regular _scan_finished_lot handles SN
+        binding. Reverse lookup by lot_producing_ids — the M2m field where
+        the SN was pre-assigned to the MO (user-confirmed semantics).
+
+        Path:
+          1. Search stock.lot by name (company-scoped); 0 -> return False
+             so the SN can be tried as a component lot downstream.
+          2. Reverse search mrp.production where lot_producing_ids contains
+             the lot. 0 -> return False (SN is a component lot, not an
+             unbound SN error — fall through to the next scanner).
+          3. SN whose only MO is done -> 'MO already done' info, no switch.
+          4. 1 active MO -> _switch_production + bind finished_lot_id +
+             _auto_fill_components (consistent with scanning the finished
+             product barcode).
+          5. Multi active MOs -> set visible_switch_selector flag and
+             pending_switch_production_ids. ORM onchange cannot return an
+             action directly, so the operator clicks the 'View candidate
+             MOs' button (type=object) to open the filtered list.
+        """
+        self.ensure_one()
+        if self.production_id:
+            return False  # Regular _scan_finished_lot handles this case
+        lots = self.env["stock.lot"].search([
+            ("name", "=", barcode),
+            ("company_id", "in", [self.env.company.id, False]),
+        ])
+        if not lots:
+            return False  # Not a known lot -> fall through
+        if len(lots) > 1:
+            self._set_message(
+                "more_match",
+                _("Multiple lots found for %s — refine barcode.") % barcode,
+            )
+            return True
+        lot = lots
+        # Reverse lookup by lot_producing_ids — the field where the SN
+        # was pre-assigned to the MO (user-confirmed semantics).
+        assigned_mos = self.env["mrp.production"].search([
+            ("lot_producing_ids", "in", lot.id),
+        ])
+        if not assigned_mos:
+            # SN exists but is not assigned to any MO — probably a
+            # component lot; fall through so downstream scanners handle
+            # it (do NOT raise an 'unbound SN' error).
+            return False
+        done_mos = assigned_mos.filtered(lambda m: m.state == "done")
+        active_mos = assigned_mos.filtered(
+            lambda m: m.state in ("confirmed", "progress", "to_close")
+        )
+        if not active_mos:
+            self._set_message(
+                "info",
+                _("MO %s is already done") % done_mos[0].name,
+            )
+            return True
+        if len(active_mos) == 1:
+            self._switch_production(active_mos)
+            # Validate product match before binding lot
+            if self.production_id.product_id == lot.product_id:
+                self.finished_lot_id = lot
+                self.finished_lot_name = lot.name
+                # Consistent with scanning the finished product barcode:
+                # auto-fill components once the lot is bound.
+                self._auto_fill_components()
+            return True
+        # Multiple active MOs -> flag; operator clicks 'View candidate MOs'
+        self.pending_switch_production_ids = active_mos
+        self.visible_switch_selector = True
+        self._set_message(
+            "more_match",
+            _("Found %s MOs for SN %s — click 'View candidate MOs' to pick.")
+            % (len(active_mos), barcode),
+        )
         return True
 
     def _scan_finished_lot(self, barcode):
@@ -484,6 +611,42 @@ class WizStockBarcodesMrp(models.TransientModel):
             self._set_message("more_match", _("Multiple products found"))
             return True
         product = products
+        # C5: scan-first reverse lookup — only when no MO is selected.
+        # Tries to land on the unique active MO producing this product
+        # (single match -> switch + auto-fill); multi-match sets the
+        # visible_switch_selector flag because ORM onchange cannot
+        # return an action directly. The operator clicks the 'View
+        # candidate MOs' button (type=object) to open the filtered list.
+        # Existing tests stay valid because the branch is gated on
+        # `not self.production_id`; when a MO is already set, the
+        # original _auto_fill_components / _scan_product_fallback
+        # branches below run unchanged.
+        if not self.production_id:
+            active_mos = self.env["mrp.production"].search([
+                ("product_id", "=", product.id),
+                ("state", "in", ("confirmed", "progress", "to_close")),
+            ])
+            if len(active_mos) == 1:
+                self._switch_production(active_mos)
+                if self.production_id.product_id == product:
+                    return self._auto_fill_components()
+                return True
+            if len(active_mos) > 1:
+                self.pending_switch_production_ids = active_mos
+                self.visible_switch_selector = True
+                self._set_message(
+                    "more_match",
+                    _("Found %s MOs for %s — click 'View candidate MOs' "
+                      "to pick.") % (len(active_mos), product.name),
+                )
+                return True
+            # 0 active MO for this product -> clear error so the
+            # operator knows the MO is missing/inactive.
+            self._set_message(
+                "error",
+                _("No active MO for product %s") % product.name,
+            )
+            return True
         # TODO-A3: scanned the finished product of this MO -> auto-fill
         # all components so the operator only needs to confirm qty.
         if self.production_id and product == self.production_id.product_id:
@@ -513,6 +676,37 @@ class WizStockBarcodesMrp(models.TransientModel):
             self.step = 4
         self._set_message_step()
         return True
+
+    def action_open_candidate_list(self):
+        """Button-triggered path around the onchange-can't-return-action
+        limit.
+
+        Scanning a product or SN that matches multiple active MOs sets
+        visible_switch_selector in the onchange (called via
+        _onchange_barcode_scan / on_barcode_scanned). The operator then
+        clicks this button (a type=object button, NOT an onchange) to
+        open the filtered mrp.production list. The list replaces this
+        wizard (target='current'); the wizard remains in the breadcrumb
+        stack, so cancelling the list returns here.
+
+        Trade-off: operator must click an extra button. This is the ORM
+        onchange framework's hard constraint — onchange methods can only
+        return value/warning/domain dicts, not act_window actions. The
+        alternative (frontend JS component) is out of scope per the
+        'core barcodes/mrp/stock only' constraint.
+        """
+        self.ensure_one()
+        if not self.pending_switch_production_ids:
+            return False
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "mrp.production",
+            "view_mode": "list",
+            "name": _("Candidate MOs (%s)") % len(self.pending_switch_production_ids),
+            "domain": [("id", "in", self.pending_switch_production_ids.ids)],
+            "context": {"barcode_wizard_id": self.id},
+            "target": "current",
+        }
 
     # --- TODO-A3: auto-fill components from finished product scan ---
     def _auto_fill_components(self):
@@ -1266,6 +1460,18 @@ class WizStockBarcodesMrp(models.TransientModel):
         if result is True:
             self._set_message("success", _("Production done: %s") % self.production_id.name)
             return True
+        # D3: dialog path (consumption warning / backorder). Stash the
+        # pending_finish flag so _onchange_production_state can flip this
+        # placeholder to a real "Production done" success banner once
+        # the dialog closes and the client reloads the record. The
+        # placeholder banner stays visible while the user resolves the
+        # dialog; if the user cancels, the MO stays progress and the
+        # placeholder stays (still pointing to the unresolved dialog).
+        self.pending_finish = True
+        self._set_message(
+            "info",
+            _("Resolving consumption warning for %s...") % self.production_id.name,
+        )
         # Consumption / backorder wizard action: let the client open it
         return result
 

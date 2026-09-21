@@ -1337,6 +1337,84 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertFalse(wiz.visible_force_add)
         self.assertFalse(wiz.visible_force_done)
 
+    # --- TODO-B2: onchange contract regression (browser-path crash) ---
+    # The barcode_events_mixin._on_barcode_scanned transparently returns
+    # on_barcode_scanned's return value to the ORM onchange framework
+    # (orm/models.py _apply_onchange_methods ~L6996-6998):
+    #     if not res: continue
+    #     if res.get('value'): ...
+    # A bool True from on_barcode_scanned therefore reaches `True.get`
+    # and crashes the web client with AttributeError. on_barcode_scanned
+    # MUST return None (or a dict). The existing B2 unit tests use the
+    # action_barcode_scanned helper which calls _on_barcode_scanned()
+    # without inspecting the return value, so they passed while the
+    # browser crashed. These two cases assert the contract directly and
+    # through the onchange RPC surface the browser uses.
+
+    def test_b2_on_barcode_scanned_returns_none_not_bool(self):
+        """on_barcode_scanned must not return a truthy non-dict value.
+
+        _on_barcode_scanned in the mixin returns whatever we return here
+        to ORM onchange, which does `res.get('value')` on it. A True
+        return therefore raises AttributeError in the browser.
+        """
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        wiz._barcode_scanned = "LOC-COMP-001"
+        res = wiz._on_barcode_scanned()
+        self.assertFalse(
+            res,
+            msg="_on_barcode_scanned must return None/empty for the ORM "
+                "onchange contract, got %r" % (res,),
+        )
+        wiz._barcode_scanned = "PROD-COMP-S"
+        res = wiz._on_barcode_scanned()
+        self.assertFalse(
+            res and not isinstance(res, dict),
+            msg="on_barcode_scanned must return None/dict, got %r" % (res,),
+        )
+
+    def test_b2_onchange_browser_path_does_not_crash(self):
+        """Simulate the web client onchange RPC: model.onchange(values,
+        field_names, fields_spec). Regression for the browser-side
+        AttributeError that the direct-call unit tests missed.
+
+        NB: fields_spec mirrors the format the web client sends — a
+        dict[str, dict] where each value is a (possibly empty) sub-spec.
+        Passing field objects instead raises TypeError in web_read
+        (`'fields' not in field_spec`), masking the real bug.
+        """
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        field_names = ["_barcode_scanned"]
+        field_names_all = [
+            "_barcode_scanned", "barcode", "production_id",
+            "finished_lot_id", "product_id", "lot_id", "location_id",
+            "step", "message", "message_type",
+        ]
+        fields_spec = {name: {} for name in field_names_all}
+        values = {
+            "production_id": self.production.id,
+            "_barcode_scanned": "LOC-COMP-001",
+        }
+        result = self.WizScanMrp.with_context(__onchange=True).onchange(
+            values, field_names, fields_spec,
+        )
+        self.assertIsInstance(
+            result, dict,
+            msg="onchange must return a dict, got %r" % (result,),
+        )
+        # Second scan in the same RPC batch — exercises the second step
+        # of the flow (component product) where the bool return was
+        # previously True and crashed the ORM.
+        values = dict(result.get("value", {}))
+        values["_barcode_scanned"] = "PROD-COMP-S"
+        result = self.WizScanMrp.with_context(__onchange=True).onchange(
+            values, ["_barcode_scanned"], fields_spec,
+        )
+        self.assertIsInstance(
+            result, dict,
+            msg="onchange second scan must return a dict, got %r" % (result,),
+        )
+
     # --- TODO-B3: queued progress restore ---
 
     def test_b3_restore_component_progress(self):
@@ -1551,3 +1629,294 @@ class TestStockBarcodesMrp(TransactionCase):
             "move.picked is False after manual scan + confirm; "
             "_process_stock_move_line only sets move_line.picked",
         )
+
+    # --- TODO-D3: dialog-close banner refresh ---
+
+    def test_d3_onchange_sets_done_banner(self):
+        """After a dialog-close reload, production_state=done + the
+        pending_finish flag flips the placeholder info banner into a
+        real 'Production done' success banner; the flag is consumed."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Simulate the dialog path: action_finish_production returned a
+        # dialog action and stashed the flag with an info placeholder.
+        wiz.pending_finish = True
+        wiz._set_message(
+            "info",
+            "Resolving consumption warning for %s..." % self.production.name,
+        )
+        # Simulate the MO becoming done after the dialog closed.
+        self.production.state = "done"
+        # Trigger the onchange (client does this on reload when a tracked
+        # field changes).
+        wiz._onchange_production_state()
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("Production done", wiz.message)
+        self.assertIn(self.production.name, wiz.message)
+        # Flag consumed so a later unrelated state change does not
+        # re-trigger the success banner.
+        self.assertFalse(wiz.pending_finish)
+
+    def test_d3_onchange_noop_without_pending_flag(self):
+        """Without the pending_finish flag, _onchange_production_state
+        leaves the banner alone — even if the MO went done. This prevents
+        the banner from being clobbered when the user picks an
+        already-done MO from the queue."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # No pending_finish flag set; banner has the normal step message.
+        original_message = wiz.message
+        self.production.state = "done"
+        wiz._onchange_production_state()
+        self.assertEqual(wiz.message, original_message)
+        self.assertNotEqual(wiz.message_type, "success")
+
+    def test_d3_onchange_keeps_banner_if_still_progress(self):
+        """If the dialog closed but the MO is still progress (user
+        cancelled the consumption warning), the placeholder banner stays
+        and the flag stays set so a later reload can still flip it."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        wiz.pending_finish = True
+        wiz._set_message(
+            "info",
+            "Resolving consumption warning for %s..." % self.production.name,
+        )
+        placeholder = wiz.message
+        # MO stays progress (dialog cancelled, no mark done happened).
+        self.production.state = "progress"
+        wiz._onchange_production_state()
+        # Banner unchanged; flag stays set for a later reload to consume.
+        self.assertEqual(wiz.message, placeholder)
+        self.assertTrue(wiz.pending_finish)
+
+    # --- TODO-C5: scan-first MO switching from MO list ---
+
+    def test_scan_first_product_single_match(self):
+        """Scan-first: scanning a product barcode lands on the unique
+        active MO producing that product and auto-fills components."""
+        # Fresh product with exactly one active MO (avoids cls.production
+        # also matching the same finished_product barcode).
+        single_product = self.Product.create({
+            "name": "Single Match Product",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-SINGLE-MATCH",
+        })
+        single_bom = self.MrpBom.create({
+            "product_id": single_product.id,
+            "product_tmpl_id": single_product.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": self.component_simple.id,
+                "product_qty": 1.0,
+                "product_uom_id": self.component_simple.uom_id.id,
+            })],
+        })
+        single_mo = self.MrpProduction.create({
+            "product_id": single_product.id,
+            "product_qty": 1.0,
+            "bom_id": single_bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        single_mo.action_confirm()
+        # Reserve stock so _auto_fill_components has move lines to scale.
+        single_mo.action_assign()
+        # Wizard with no MO starting point (scan-first mode)
+        wiz = self.WizScanMrp.create({})
+        self.action_barcode_scanned(wiz, "PROD-SINGLE-MATCH")
+        # Single active MO -> switch directly + auto-fill
+        self.assertEqual(wiz.production_id, single_mo)
+        self.assertEqual(wiz.message_type, "info")
+        move = single_mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_simple
+        )
+        self.assertTrue(move.picked)
+
+    def test_scan_first_product_multi_match_sets_flag(self):
+        """Scan-first: ambiguous product barcode (multiple active MOs)
+        sets the selector flag — operator must click 'View candidate MOs'
+        button to open the filtered list (onchange cannot return action)."""
+        # cls.production + a second MO both producing finished_product
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        wiz = self.WizScanMrp.create({})
+        self.action_barcode_scanned(wiz, "PROD-FIN-A")
+        # Ambiguous -> flag set, button visible, no auto-switch
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_switch_selector)
+        self.assertEqual(
+            set(wiz.pending_switch_production_ids.ids),
+            {self.production.id, mo2.id},
+        )
+        self.assertFalse(wiz.production_id)
+
+    def test_scan_first_product_no_active_mo_errors(self):
+        """Scan-first: a product barcode with no active MO producing it
+        errors (operator should be told the MO is missing/inactive)."""
+        orphan_product = self.Product.create({
+            "name": "Orphan Product",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-ORPHAN",
+        })
+        # No MO created for orphan_product
+        wiz = self.WizScanMrp.create({})
+        self.action_barcode_scanned(wiz, "PROD-ORPHAN")
+        self.assertEqual(wiz.message_type, "error")
+        self.assertFalse(wiz.production_id)
+
+    def test_scan_first_sn_single_match(self):
+        """Scan-first: scanning a SN pre-assigned to a MO's
+        lot_producing_ids switches to that MO and binds finished_lot_id."""
+        sn = self.StockProductionLot.create({
+            "name": "SN-PREASSIGN-001",
+            "product_id": self.finished_product_tracked.id,
+            "company_id": self.company.id,
+        })
+        mo_with_sn = self.MrpProduction.create({
+            "product_id": self.finished_product_tracked.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_tracked.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo_with_sn.action_confirm()
+        # Pre-assign the SN to the MO (user-confirmed: SN lives in
+        # lot_producing_ids, NOT in a generic product search).
+        mo_with_sn.lot_producing_ids = [(6, 0, [sn.id])]
+        wiz = self.WizScanMrp.create({})
+        self.action_barcode_scanned(wiz, "SN-PREASSIGN-001")
+        # SN -> MO single match -> switch + bind finished_lot_id
+        self.assertEqual(wiz.production_id, mo_with_sn)
+        self.assertEqual(wiz.finished_lot_id, sn)
+        self.assertEqual(wiz.message_type, "info")
+
+    def test_scan_first_sn_multi_match_sets_flag(self):
+        """Scan-first: a SN assigned to multiple active MOs sets the
+        selector flag (same flag as the product multi-match path)."""
+        shared_sn = self.StockProductionLot.create({
+            "name": "SN-SHARED-MULTI",
+            "product_id": self.finished_product_tracked.id,
+            "company_id": self.company.id,
+        })
+        mo_a = self.MrpProduction.create({
+            "product_id": self.finished_product_tracked.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_tracked.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo_a.action_confirm()
+        mo_b = self.MrpProduction.create({
+            "product_id": self.finished_product_tracked.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_tracked.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo_b.action_confirm()
+        # Same SN pre-assigned to both MOs (lot_producing_ids is M2m,
+        # so a lot can technically be linked to several MOs).
+        mo_a.lot_producing_ids = [(6, 0, [shared_sn.id])]
+        mo_b.lot_producing_ids = [(6, 0, [shared_sn.id])]
+        wiz = self.WizScanMrp.create({})
+        self.action_barcode_scanned(wiz, "SN-SHARED-MULTI")
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_switch_selector)
+        self.assertEqual(
+            set(wiz.pending_switch_production_ids.ids),
+            {mo_a.id, mo_b.id},
+        )
+        self.assertFalse(wiz.production_id)
+        # finished_lot_id not bound yet — must wait for operator pick
+        self.assertFalse(wiz.finished_lot_id)
+
+    def test_scan_first_sn_done_mo_message(self):
+        """Scan-first: a SN whose only MO is already done shows a
+        friendly 'MO already done' message, no switch."""
+        done_sn = self.StockProductionLot.create({
+            "name": "SN-DONE-001",
+            "product_id": self.finished_product_tracked.id,
+            "company_id": self.company.id,
+        })
+        done_mo = self.MrpProduction.create({
+            "product_id": self.finished_product_tracked.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_tracked.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        done_mo.action_confirm()
+        done_mo.lot_producing_ids = [(6, 0, [done_sn.id])]
+        # Mark MO done (state=done) — bypass the full finish flow
+        done_mo.state = "done"
+        wiz = self.WizScanMrp.create({})
+        self.action_barcode_scanned(wiz, "SN-DONE-001")
+        self.assertEqual(wiz.message_type, "info")
+        self.assertIn("already done", wiz.message.lower())
+        self.assertFalse(wiz.production_id)
+
+    def test_scan_first_sn_unassigned_falls_through(self):
+        """Scan-first: a SN that exists but is not assigned to any MO
+        (e.g. a component lot consumed elsewhere) makes
+        _scan_finished_lot_reverse return False — does NOT raise an
+        'unbound SN' error. Downstream scanners then handle it (or
+        report not_found, which is acceptable)."""
+        # cls.component_lot is a component lot (LOT-COMP-001), not in
+        # any MO's lot_producing_ids.
+        wiz = self.WizScanMrp.create({})
+        # Direct call to the new method — must return False, NOT set
+        # an 'unbound SN' error message on the wizard.
+        res = wiz._scan_finished_lot_reverse("LOT-COMP-001")
+        self.assertFalse(res)
+        self.assertFalse(wiz.production_id, "Unassigned SN must not switch MO")
+        self.assertFalse(wiz.finished_lot_id, "Unassigned SN must not bind finished_lot_id")
+
+    def test_action_open_candidate_list_returns_act_window(self):
+        """Button method (not onchange) returns a target='current'
+        act_window for the filtered list — onchange cannot return an
+        action, so the operator clicks this button after a multi-match
+        scan sets the flag."""
+        mo1 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo1.action_confirm()
+        mo2 = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo2.action_confirm()
+        wiz = self.WizScanMrp.create({})
+        self.action_barcode_scanned(wiz, "PROD-FIN-A")
+        # Flag is set
+        self.assertTrue(wiz.visible_switch_selector)
+        candidate_ids = set(wiz.pending_switch_production_ids.ids)
+        # Button method (type=object, not onchange) returns an action
+        action = wiz.action_open_candidate_list()
+        self.assertEqual(action["type"], "ir.actions.act_window")
+        self.assertEqual(action["res_model"], "mrp.production")
+        self.assertEqual(action["view_mode"], "list")
+        self.assertEqual(action["target"], "current")
+        # Domain restricts to the candidate MOs. The "in" operator
+        # carries the ids as a list-valued third tuple element.
+        domain_ids = set()
+        for d in action["domain"]:
+            if d[0] == "id" and d[1] == "in":
+                domain_ids.update(d[2])
+        self.assertEqual(domain_ids, candidate_ids)
+        # barcode_wizard_id passed so row buttons can switch the wizard
+        self.assertEqual(action.get("context", {}).get("barcode_wizard_id"), wiz.id)

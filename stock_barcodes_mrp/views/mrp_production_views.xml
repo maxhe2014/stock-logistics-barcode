@@ -16,4 +16,40 @@
             </xpath>
         </field>
     </record>
+
+    <!-- C5: scan-first MO entry from list view.
+         - Header button: opens the wizard with NO MO preselected
+           (scan-first mode); the operator scans a product barcode or
+           SN and the wizard reverse-looks-up the matching active MO.
+         - Row-level button: opens the wizard directly on that row's MO,
+           bypassing the MO form (consistent with the per-MO form button).
+         NB: done/cancel MOs hide both buttons (state-conditional). -->
+    <record id="mrp_production_list_inherit_stock_barcodes_mrp" model="ir.ui.view">
+        <field name="name">mrp.production.list.stock.barcodes.mrp</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_tree_view" />
+        <field name="arch" type="xml">
+            <!-- Header button: scan-first entry, no preselected MO -->
+            <xpath expr="//list/header" position="inside">
+                <button name="action_open_scan_wizard"
+                        type="object"
+                        string="Scan"
+                        class="oe_highlight" />
+            </xpath>
+            <!-- Row-level shortcut: per-MO scan entry without going
+                 through the MO form. List row buttons render as
+                 td.o_list_button in Odoo 19 (see
+                 web/static/tests/views/list/list_view.test.js for the
+                 supported <button name="..." type="object" icon="..."/>
+                 inside <list>). -->
+            <xpath expr="//list/field[@name='priority']" position="before">
+                <button name="action_barcode_scan"
+                        type="object"
+                        string="Scan"
+                        icon="fa-barcode"
+                        class="btn btn-primary btn-sm"
+                        invisible="state not in ('confirmed', 'progress', 'to_close')" />
+            </xpath>
+        </field>
+    </record>
 </odoo>

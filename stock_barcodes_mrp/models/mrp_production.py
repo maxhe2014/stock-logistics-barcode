@@ -19,6 +19,33 @@ class MrpProduction(models.Model):
         action["res_id"] = wiz.id
         return action
 
+    def action_open_scan_wizard(self):
+        """Scan-first entry from the MO list header button.
+
+        Opens the barcode wizard WITHOUT a preselected MO — the operator
+        scans a product barcode or SN first, and the wizard reverse-
+        looks-up the matching active MO (single match -> switch directly;
+        multi-match -> sets the visible_switch_selector flag and the
+        operator clicks the 'View candidate MOs' button to open the
+        filtered list).
+
+        NB: only one record (or none) is expected on entry — the header
+        button doesn't require a selection. The 'Scan' row button on
+        each MO row uses action_barcode_scan (the existing per-MO entry)
+        instead.
+        """
+        # `self` may be empty when invoked from the header button without
+        # a selected row — that's the scan-first case.
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            # production_id 留空 — scan-first 模式
+        })
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "stock_barcodes_mrp.action_stock_barcodes_mrp"
+        )
+        action["res_id"] = wiz.id
+        return action
+
     def action_open_mrp_barcode(self):
         """Open the MRP barcode scanning wizard for this production order.
 
