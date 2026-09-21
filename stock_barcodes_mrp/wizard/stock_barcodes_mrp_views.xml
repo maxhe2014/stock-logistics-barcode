@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
+    <record id="view_move_component_checklist_tree" model="ir.ui.view">
+        <field name="name">stock.move.component.checklist.tree</field>
+        <field name="model">stock.move</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="not picked and state not in ('done', 'cancel')">
+                <field name="product_id" string="Component" />
+                <field name="product_uom_qty" string="Demand" />
+                <field name="quantity" string="Scanned" />
+                <field name="picked" column_invisible="1" />
+                <field name="state" column_invisible="1" invisible="state == 'cancel'" />
+            </list>
+        </field>
+    </record>
     <record id="view_stock_barcodes_mrp_form" model="ir.ui.view">
         <field name="name">stock.barcodes.mrp.form</field>
         <field name="model">wiz.stock.barcodes.mrp</field>
@@ -173,6 +186,12 @@
                             />
                             <field name="finished_lot_name" class="fs-5" />
                             <field name="finished_qty_producing" class="fs-5" />
+                        </group>
+                        <group name="component_checklist" string="Component Checklist"
+                               class="bg-light p-2 mb-2"
+                               invisible="not production_id">
+                            <field name="component_move_ids" nolabel="1" readonly="1"
+                                   context="{'tree_view_ref': 'stock_barcodes_mrp.view_move_component_checklist_tree'}" />
                         </group>
                         <group name="scan_info" string="Scanned Component"
                                class="bg-light p-2 mb-2"

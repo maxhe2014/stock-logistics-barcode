@@ -128,6 +128,13 @@ class WizStockBarcodesMrp(models.TransientModel):
         compute="_compute_totals",
     )
 
+    # --- TODO-C4: component checklist ---
+    component_move_ids = fields.One2many(
+        related="production_id.move_raw_ids",
+        string="Component Checklist",
+        readonly=True,
+    )
+
     # --- TODO-B1: work-order queue ---
     queue_mode = fields.Selection(
         [("my", "My Work Orders"), ("all", "All MO")],

@@ -1510,3 +1510,44 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertNotIn(
             str(self.production.id), wiz.scan_progress_stash or {}
         )
+
+    # --- TODO-C4: component checklist ---
+
+    def test_c4_checklist_data(self):
+        """Component checklist shows all MO raw moves with correct data."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        moves = wiz.component_move_ids
+        self.assertEqual(len(moves), 2)
+        products = moves.mapped("product_id")
+        self.assertIn(self.component_tracked, products)
+        self.assertIn(self.component_simple, products)
+        # Initial state: no moves picked
+        self.assertFalse(any(m.picked for m in moves))
+
+    def test_c4_checklist_after_auto_fill(self):
+        """After scanning finished product, checklist reflects picked status."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Initial: all not picked
+        self.assertFalse(any(m.picked for m in wiz.component_move_ids))
+        # Scan finished product -> auto-fill picks all stocked components
+        self.action_barcode_scanned(wiz, "PROD-FIN-A")
+        # Both components have stock -> both picked
+        self.assertTrue(all(m.picked for m in wiz.component_move_ids))
+
+    def test_c4_checklist_single_component_scan(self):
+        """Checklist picked status after scanning components one by one."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Scan location then component, then confirm
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        wiz.action_confirm()
+        # Check if move.picked reflects the manual scan
+        simple_move = wiz.component_move_ids.filtered(
+            lambda m: m.product_id == self.component_simple
+        )
+        self.assertTrue(simple_move, "Component simple move not found")
+        self.assertTrue(
+            simple_move.picked,
+            "move.picked is False after manual scan + confirm; "
+            "_process_stock_move_line only sets move_line.picked",
+        )
