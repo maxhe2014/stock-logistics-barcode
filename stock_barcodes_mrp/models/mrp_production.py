@@ -20,31 +20,31 @@ class MrpProduction(models.Model):
         return action
 
     def action_open_scan_wizard(self):
-        """Scan-first entry from the MO list header button.
+        """Open the MRP scan client action from the list view.
 
-        Opens the barcode wizard WITHOUT a preselected MO — the operator
-        scans a product barcode or SN first, and the wizard reverse-
-        looks-up the matching active MO (single match -> switch directly;
-        multi-match -> sets the visible_switch_selector flag and the
-        operator clicks the 'View candidate MOs' button to open the
-        filtered list).
+        Handles two entry shapes from the MO list:
+        - Header button (0 selected): scan-first mode — ``production_id``
+          left empty; the operator scans a product barcode or SN first
+          and the wizard reverse-looks-up the matching active MO (single
+          match → switch directly; multi-match → flag is set and the
+          client action auto-opens the filtered list via doAction).
+        - Row button (1 selected): per-MO mode — ``production_id`` set
+          to the row's MO, scan-first step is skipped.
 
-        NB: only one record (or none) is expected on entry — the header
-        button doesn't require a selection. The 'Scan' row button on
-        each MO row uses action_barcode_scan (the existing per-MO entry)
-        instead.
+        Returns an ``ir.actions.client`` pointing at the OWL
+        ``MrpScanApp`` component (fullscreen).
         """
-        # `self` may be empty when invoked from the header button without
-        # a selected row — that's the scan-first case.
+        production_id = self.id if len(self) == 1 else False
         wiz = self.env["wiz.stock.barcodes.mrp"].create({
             "res_model_id": self.env.ref("mrp.model_mrp_production").id,
-            # production_id 留空 — scan-first 模式
+            "production_id": production_id,
         })
-        action = self.env["ir.actions.actions"]._for_xml_id(
-            "stock_barcodes_mrp.action_stock_barcodes_mrp"
-        )
-        action["res_id"] = wiz.id
-        return action
+        return {
+            "type": "ir.actions.client",
+            "tag": "stock_barcodes_mrp_scan_app",
+            "params": {"wiz_id": wiz.id},
+            "target": "fullscreen",
+        }
 
     def action_open_mrp_barcode(self):
         """Open the MRP barcode scanning wizard for this production order.

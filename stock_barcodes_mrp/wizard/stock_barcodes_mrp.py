@@ -430,6 +430,77 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._set_message("not_found", _("Barcode not found: %s") % barcode)
         return True
 
+    def process_barcode_and_dispatch(self, barcode):
+        """One-shot RPC entry for the OWL MrpScanApp client action.
+
+        Runs the existing _process_barcode(barcode) logic, then:
+        - if visible_switch_selector is set (multi-match), also calls
+          action_open_candidate_list() to fetch the act_window dict so
+          the client can action.doAction(result.action) into the
+          filtered mrp.production list in one round-trip (no extra
+          button click — the onchange-can't-return-action trade-off
+          is eliminated by the client-action route).
+        - returns {action, state} where action is None or an
+          act_window dict, and state is a JSON-serializable snapshot
+          of the wizard fields needed by the client UI.
+
+        Unlike _onchange_barcode_scan / on_barcode_scanned, this is a
+        direct method call (no onchange framework), so it CAN embed an
+        act_window action in the response.
+        """
+        self.ensure_one()
+        self._process_barcode(barcode)
+        action = None
+        if self.visible_switch_selector and self.pending_switch_production_ids:
+            action = self.action_open_candidate_list()
+        return {
+            "action": action,
+            "state": self.get_scan_state(),
+        }
+
+    def get_scan_state(self):
+        """JSON-serializable snapshot of the wizard state for the OWL
+        client action to render.
+
+        Includes: wiz_id, step, message/message_type/message_step,
+        MO + product + location + lot display names,
+        finished_qty_producing, visible_switch_selector, and
+        component_move_ids as a list of dicts (id, product_name,
+        demand, reserved quantity, picked, state).
+        """
+        self.ensure_one()
+        production = self.production_id
+        components = []
+        for mv in self.component_move_ids.filtered(
+            lambda m: m.state not in ("done", "cancel")
+        ):
+            move_lines = mv.move_line_ids
+            picked_all = bool(move_lines) and all(l.picked for l in move_lines)
+            components.append({
+                "id": mv.id,
+                "product_name": mv.product_id.display_name or "",
+                "demand": mv.product_uom_qty,
+                "quantity": sum(move_lines.mapped("quantity")),
+                "picked": picked_all,
+                "state": mv.state,
+            })
+        return {
+            "wiz_id": self.id,
+            "step": self.step,
+            "message": self.message or "",
+            "message_type": self.message_type or "info",
+            "message_step": self.message_step or "",
+            "production_id": production.id,
+            "production_name": production.name or "",
+            "production_product_name": self.production_product_id.display_name or "",
+            "location_name": self.location_id.display_name or "",
+            "product_name": self.product_id.display_name or "",
+            "lot_name": self.lot_id.display_name or "",
+            "finished_qty_producing": self.finished_qty_producing or 0.0,
+            "visible_switch_selector": bool(self.visible_switch_selector),
+            "components": components,
+        }
+
     def _scan_finished_lot_reverse(self, barcode):
         """Scan-first entry: scan a finished product's SN to land on its MO.
 
@@ -702,6 +773,12 @@ class WizStockBarcodesMrp(models.TransientModel):
             "type": "ir.actions.act_window",
             "res_model": "mrp.production",
             "view_mode": "list",
+            # ``views`` is required by the web client's
+            # _preprocessAction when the dict is consumed directly via
+            # action.doAction (the B1 client-action RPC path bypasses
+            # the /web/dataset/call_button endpoint, whose
+            # clean_action() would otherwise generate this key).
+            "views": [(False, "list"), (False, "form")],
             "name": _("Candidate MOs (%s)") % len(self.pending_switch_production_ids),
             "domain": [("id", "in", self.pending_switch_production_ids.ids)],
             "context": {"barcode_wizard_id": self.id},

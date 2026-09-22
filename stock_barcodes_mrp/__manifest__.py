@@ -17,5 +17,14 @@
         "report/stock_lot_traceability_report.xml",
         "views/stock_lot_views.xml",
     ],
+    "assets": {
+        "web.assets_web": [
+            "stock_barcodes_mrp/static/src/mrp_scan_app.esm.js",
+            "stock_barcodes_mrp/static/src/mrp_scan_app.xml",
+        ],
+        "web.assets_tests": [
+            "stock_barcodes_mrp/static/src/tours/mrp_scan_app_tour.js",
+        ],
+    },
     "installable": True,
 }

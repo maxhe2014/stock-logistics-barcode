@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2026 OpenViking
+  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+
+  Template for the MrpScanApp client action (OWL).
+  Renders a touch-friendly scan flow:
+    - manual input box (Enter to submit; also driven by global
+      barcode_service keyboard listener)
+    - status message bar (info/success/warning/error)
+    - MO info strip (production name + finished product + qty)
+    - step indicator (de-emphasized)
+    - component checklist (per move: name, demand, picked)
+    - action buttons (fixed at bottom for shop-floor scanning)
+-->
+<templates id="template" xml:space="preserve">
+    <t t-name="stock_barcodes_mrp.MrpScanApp">
+        <div class="o_mrp_scan_app d-flex flex-column h-100">
+            <!-- Header: manual scan input + step indicator -->
+            <div class="o_mrp_scan_header p-3 border-bottom">
+                <div class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <input
+                            type="text"
+                            class="form-control form-control-lg o_mrp_scan_input"
+                            placeholder="Scan or type barcode…"
+                            t-att-disabled="state.scanning ? 'disabled' : ''"
+                            t-on-keydown="onManualScanEnter"
+                        />
+                    </div>
+                    <div class="col-auto text-muted small">
+                        Step <t t-out="state.step || 0" />: <t t-out="state.message_step" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status message bar -->
+            <div t-if="state.message" class="o_mrp_scan_message m-3">
+                <div t-att-class="'alert ' + alertClass + ' mb-0'">
+                    <t t-out="state.message" />
+                </div>
+            </div>
+
+            <!-- MO info strip (only when an MO is selected) -->
+            <div t-if="state.production_id" class="o_mrp_scan_mo_info m-3 p-2 border rounded">
+                <div class="d-flex flex-wrap gap-3">
+                    <span><strong>MO:</strong> <t t-out="state.production_name" /></span>
+                    <span><strong>Product:</strong> <t t-out="state.production_product_name" /></span>
+                    <span t-if="state.location_name"><strong>Location:</strong> <t t-out="state.location_name" /></span>
+                    <span><strong>Qty producing:</strong> <t t-out="state.finished_qty_producing" /></span>
+                </div>
+            </div>
+
+            <!-- Component checklist -->
+            <div class="o_mrp_scan_components flex-grow-1 overflow-auto p-3">
+                <div t-if="!state.components.length" class="text-muted">
+                    No components to display. Scan a finished product / MO first.
+                </div>
+                <table t-else="" class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th class="text-end">Demand</th>
+                            <th class="text-end">Reserved</th>
+                            <th class="text-center">Picked</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="state.components" t-as="comp" t-key="comp.id">
+                            <tr t-att-class="!comp.picked ? 'table-danger' : 'table-success'">
+                                <td><t t-out="comp.product_name" /></td>
+                                <td class="text-end"><t t-out="comp.demand" /></td>
+                                <td class="text-end"><t t-out="comp.quantity" /></td>
+                                <td class="text-center">
+                                    <span t-if="comp.picked" class="badge bg-success">✓</span>
+                                    <span t-else="" class="badge bg-danger">✗</span>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Action buttons (fixed at bottom for shop-floor scanning) -->
+            <div class="o_mrp_scan_actions p-3 border-top d-flex gap-2 flex-wrap justify-content-between">
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-lg o_mrp_scan_back"
+                    t-on-click="onBack"
+                >Back</button>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <button
+                        t-if="state.visible_switch_selector"
+                        type="button"
+                        class="btn btn-warning btn-lg o_mrp_scan_candidates"
+                        t-on-click="onViewCandidates"
+                    >View candidate MOs</button>
+
+                    <button
+                        t-if="state.production_id"
+                        type="button"
+                        class="btn btn-primary btn-lg o_mrp_scan_confirm"
+                        t-on-click="onConfirm"
+                    >Confirm</button>
+
+                    <button
+                        t-if="state.production_id"
+                        type="button"
+                        class="btn btn-danger btn-lg o_mrp_scan_force_done"
+                        t-on-click="onForceDone"
+                    >Force Done</button>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

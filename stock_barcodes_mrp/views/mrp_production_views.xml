@@ -29,21 +29,26 @@
         <field name="model">mrp.production</field>
         <field name="inherit_id" ref="mrp.mrp_production_tree_view" />
         <field name="arch" type="xml">
-            <!-- Header button: scan-first entry, no preselected MO -->
+            <!-- Header button: scan-first entry, no preselected MO.
+                 display="always" keeps it visible in the control panel
+                 without selecting a record (Odoo 19 list header buttons
+                 otherwise only appear in the selection action bar). -->
             <xpath expr="//list/header" position="inside">
                 <button name="action_open_scan_wizard"
                         type="object"
                         string="Scan"
-                        class="oe_highlight" />
+                        class="oe_highlight"
+                        display="always" />
             </xpath>
-            <!-- Row-level shortcut: per-MO scan entry without going
-                 through the MO form. List row buttons render as
-                 td.o_list_button in Odoo 19 (see
-                 web/static/tests/views/list/list_view.test.js for the
-                 supported <button name="..." type="object" icon="..."/>
+            <!-- Row-level shortcut: per-MO scan entry via the client
+                 action (len(self)==1 -> production_id set on the
+                 wizard). List row buttons render as td.o_list_button
+                 in Odoo 19 (see web/static/tests/views/list/list_view
+                 .test.js for the supported
+                 <button name="..." type="object" icon="..."/>
                  inside <list>). -->
             <xpath expr="//list/field[@name='priority']" position="before">
-                <button name="action_barcode_scan"
+                <button name="action_open_scan_wizard"
                         type="object"
                         string="Scan"
                         icon="fa-barcode"
