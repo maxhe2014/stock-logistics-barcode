@@ -2038,3 +2038,60 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.location_id, self.components_location)
         self.assertEqual(wiz.step, 2)
         self.assertEqual(wiz.message_type, "info")
+
+    # --- Task 3: auto-switch to next MO after finish ---
+
+    def test_t3_finish_auto_switches_to_next_mo(self):
+        """Finishing an MO auto-switches the wizard to another confirmed MO
+        in the queue (queue_mode='all' to bypass workcenter filtering)."""
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production.id,
+        })
+        wiz.queue_mode = "all"
+        # self.production is untracked → no finished lot needed.
+        res = wiz.action_finish_production()
+        self.assertTrue(res)
+        # The wizard must have jumped to a different confirmed MO.
+        self.assertNotEqual(wiz.production_id, self.production)
+        self.assertIn("Switched to", wiz.message)
+        self.assertEqual(wiz.message_type, "success")
+        # Original MO is done.
+        self.assertEqual(self.production.state, "done")
+
+    def test_t3_finish_no_next_mo_stays(self):
+        """When no MO remains in the queue, finish keeps the wizard on the
+        done MO with a 'No more MOs' success message.
+
+        Uses the default queue_mode='my': the test admin user has no
+        workcenters assigned, so the queue is empty and no switch occurs.
+        """
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production.id,
+        })
+        # Default queue_mode is 'my' → no workcenters → empty queue.
+        self.assertEqual(wiz.queue_mode, "my")
+        res = wiz.action_finish_production()
+        self.assertTrue(res)
+        # No switch → wizard stays on the done MO.
+        self.assertEqual(wiz.production_id, self.production)
+        self.assertIn("No more MOs", wiz.message)
+        self.assertEqual(self.production.state, "done")
+
+    def test_t3_finish_backorder_does_not_switch(self):
+        """When button_mark_done returns a backorder/consumption dialog,
+        the wizard does NOT auto-switch — the user must resolve the dialog."""
+        self._scan_component(
+            self.production, self.component_tracked,
+            "PROD-COMP-T", 0.8, lot_barcode="LOT-COMP-001",
+        )
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production.id,
+        })
+        wiz.queue_mode = "all"
+        wiz.finished_qty_producing = 0.4
+        res = wiz.action_finish_production()
+        # Backorder wizard returned → no switch.
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res.get("res_model"), "mrp.production.backorder")
+        self.assertEqual(wiz.production_id, self.production)
+        self.assertNotEqual(self.production.state, "done")

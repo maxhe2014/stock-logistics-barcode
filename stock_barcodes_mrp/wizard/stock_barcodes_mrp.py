@@ -1210,6 +1210,24 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._set_message_step()
         return True
 
+    def _get_next_mo_in_queue(self):
+        """Return the next MO to work on after finishing the current one.
+
+        Uses the same queue filters (mode / today / priority) so the jump
+        respects the operator's current queue view. The just-finished MO is
+        already 'done' and thus excluded by the queue domain.
+
+        Ordering: queue_workorders_ids uses mrp.production._order
+        (priority desc, date_start asc, id), matching the queue tree view.
+        """
+        self.ensure_one()
+        if not self.production_id:
+            return False
+        queue = self.queue_workorders_ids
+        if not queue:
+            return False
+        return queue[0]
+
     def _compute_qty_available(self):
         if not self.product_id or not self.location_id:
             self.qty_available = 0.0
@@ -1585,7 +1603,32 @@ class WizStockBarcodesMrp(models.TransientModel):
             skip_redirection=True
         ).button_mark_done()
         if result is True:
-            self._set_message("success", _("Production done: %s") % self.production_id.name)
+            done_name = self.production_id.name
+            next_mo = self._get_next_mo_in_queue()
+            if next_mo:
+                done_mo_id = self.production_id.id
+                self._switch_production(next_mo)
+                # Clean up the stash entry for the just-finished MO —
+                # production is committed, the stashed scan state can
+                # never be restored. Prevents unbounded stash growth.
+                if (
+                    self.scan_progress_stash
+                    and str(done_mo_id) in self.scan_progress_stash
+                ):
+                    stash = dict(self.scan_progress_stash)
+                    stash.pop(str(done_mo_id), None)
+                    self.scan_progress_stash = stash
+                self._set_message(
+                    "success",
+                    _("MO %(done)s done. Switched to MO %(next)s.")
+                    % {"done": done_name, "next": next_mo.name},
+                )
+            else:
+                self._set_message(
+                    "success",
+                    _("Production done: %(mo)s. No more MOs in queue.")
+                    % {"mo": done_name},
+                )
             return True
         # D3: dialog path (consumption warning / backorder). Stash the
         # pending_finish flag so _onchange_production_state can flip this
