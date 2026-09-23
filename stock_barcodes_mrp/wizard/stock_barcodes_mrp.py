@@ -938,6 +938,16 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.product_id = lot.product_id
         self.product_uom_id = lot.product_id.uom_id
         self._compute_qty_available()
+        # Task 5: one serial SN = one physical item. Auto-consume qty=1
+        # instead of forcing the operator to click Confirm. Lot-tracked and
+        # non-tracked products keep the manual qty + Confirm flow because a
+        # single lot may represent several units.
+        if self.product_tracking == "serial":
+            self.product_qty = 1.0
+            if not self.location_id:
+                self.location_id = self.production_id.location_src_id
+            self.action_confirm()
+            return True
         self._set_message("info", _("Lot: %s. Enter qty and confirm.") % lot.name)
         self.step = 4
         self._set_message_step()
@@ -1074,6 +1084,14 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.lot_id = lot
                 self.lot_name = lot.name
                 self._compute_qty_available()
+                # Task 5: auto-consume serial SNs (one SN = one unit).
+                if product.tracking == "serial":
+                    self.product_qty = 1.0
+                    if not self.location_id:
+                        self.location_id = self.production_id.location_src_id
+                    self.action_confirm()
+                    self._set_message_step()
+                    return True
                 self._set_message(
                     "info", _("Lot: %s. Enter qty and confirm.") % lot.name
                 )
@@ -1451,9 +1469,24 @@ class WizStockBarcodesMrp(models.TransientModel):
             # Redistribute demand from other lines so a lot substitution does
             # not silently double consumption (mirrors enterprise _find_quant
             # behaviour). Only the un-absorbable excess requires force.
+            #
+            # Task 5: for SERIAL products, one scanned SN is one physical
+            # item, so move lines that the operator has already picked
+            # (picked=True) MUST survive — absorbing them would silently eat
+            # a previously scanned SN. Lines with picked=False are reservation
+            # placeholders (created by _action_assign before any scan) and may
+            # be released/absorbed so the scanned SN replaces the reserved
+            # one. If the excess cannot be covered by unpicked placeholders,
+            # fall through to the Force Consume prompt. For lot-tracked /
+            # untracked products a lot may represent several units and lot
+            # substitution is expected, so the original behaviour (absorbing
+            # the reserved lot line) is preserved.
+            is_serial = self.product_id.tracking == "serial"
             excess = other_lines_qty + self.product_qty - total_demand
             if excess > 0:
                 for line in other_lines.sorted(key=lambda l: l.id):
+                    if is_serial and line.picked:
+                        continue
                     take = min(line.quantity, excess)
                     line.quantity = line.quantity - take
                     excess -= take

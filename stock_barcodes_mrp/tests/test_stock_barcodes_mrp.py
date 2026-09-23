@@ -2225,3 +2225,127 @@ class TestStockBarcodesMrp(TransactionCase):
         other_mo.action_confirm()
         wiz._switch_production(other_mo)
         self.assertFalse(wiz.active_move_id)
+
+    # ------------------------------------------------------------------
+    # Task 5: serial SN auto-consume (one SN = one physical unit)
+    # ------------------------------------------------------------------
+    def _t5_make_serial_component_mo(self, demand):
+        """Create an MO with a serial-tracked component at `demand`.
+
+        Returns (mo, component, [lot1, lot2, ...]). The component has stock
+        in self.components_location so the raw move is reserved.
+        """
+        comp = self.Product.create({
+            "name": "Serial Comp T5",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-COMP-SER-T5",
+        })
+        lots = []
+        for i in range(1, 4):
+            lot = self.StockProductionLot.create({
+                "name": "SN-T5-%03d" % i,
+                "product_id": comp.id,
+                "company_id": self.company.id,
+            })
+            self.StockQuant.create({
+                "product_id": comp.id,
+                "lot_id": lot.id,
+                "location_id": self.components_location.id,
+                "quantity": 1.0,
+            })
+            lots.append(lot)
+        finished = self.Product.create({
+            "name": "Serial Fin T5",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "none",
+            "barcode": "PROD-FIN-SER-T5",
+        })
+        bom = self.MrpBom.create({
+            "product_id": finished.id,
+            "product_tmpl_id": finished.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": comp.id,
+                "product_qty": demand,
+                "product_uom_id": comp.uom_id.id,
+            })],
+        })
+        mo = self.MrpProduction.create({
+            "product_id": finished.id,
+            "product_qty": 1.0,
+            "bom_id": bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo.action_confirm()
+        return mo, comp, lots
+
+    def test_t5_serial_auto_consume_on_scan(self):
+        """Scanning a serial SN auto-consumes qty=1 without manual Confirm.
+
+        After the scan the wizard is back to a clean state (step 2, no
+        product/lot) so the operator can scan the next component/SN.
+        """
+        mo, comp, lots = self._t5_make_serial_component_mo(demand=1.0)
+        wiz = self.WizScanMrp.create({"production_id": mo.id})
+        # Scan the component product barcode, then its SN
+        self.action_barcode_scanned(wiz, "PROD-COMP-SER-T5")
+        self.action_barcode_scanned(wiz, lots[0].name)
+        # Auto-consume happened: state is cleaned
+        self.assertFalse(wiz.product_id)
+        self.assertFalse(wiz.lot_id)
+        self.assertEqual(wiz.step, 2)
+        # The SN was consumed as a move line of qty 1
+        move = mo.move_raw_ids.filtered(lambda m: m.product_id == comp)
+        sn_line = move.move_line_ids.filtered(lambda l: l.lot_id == lots[0])
+        self.assertTrue(sn_line)
+        self.assertEqual(sn_line.quantity, 1.0)
+        self.assertTrue(sn_line.picked)
+
+    def test_t5_serial_two_sns_accumulate(self):
+        """Scanning two different serial SNs for demand=2 creates two lines.
+
+        Each SN is one physical unit; the second scan must add a new move
+        line, not overwrite the first one.
+        """
+        mo, comp, lots = self._t5_make_serial_component_mo(demand=2.0)
+        wiz = self.WizScanMrp.create({"production_id": mo.id})
+        # First SN: scan product then SN (auto-consume cleans state to step 2)
+        self.action_barcode_scanned(wiz, "PROD-COMP-SER-T5")
+        self.action_barcode_scanned(wiz, lots[0].name)
+        # Second SN: re-scan product barcode (state was cleaned), then SN
+        self.action_barcode_scanned(wiz, "PROD-COMP-SER-T5")
+        self.action_barcode_scanned(wiz, lots[1].name)
+        move = mo.move_raw_ids.filtered(lambda m: m.product_id == comp)
+        consumed = move.move_line_ids.filtered(lambda l: l.picked)
+        self.assertEqual(len(consumed), 2)
+        consumed_lots = consumed.mapped("lot_id")
+        self.assertIn(lots[0], consumed_lots)
+        self.assertIn(lots[1], consumed_lots)
+        self.assertEqual(consumed.mapped("quantity"), [1.0, 1.0])
+
+    def test_t5_serial_overscan_triggers_force_not_eat(self):
+        """Over-scanning (demand=1, two different SNs) triggers Force and
+        does NOT silently eat the first scanned SN line.
+        """
+        mo, comp, lots = self._t5_make_serial_component_mo(demand=1.0)
+        wiz = self.WizScanMrp.create({"production_id": mo.id})
+        self.action_barcode_scanned(wiz, "PROD-COMP-SER-T5")
+        self.action_barcode_scanned(wiz, lots[0].name)
+        # First SN consumed
+        move = mo.move_raw_ids.filtered(lambda m: m.product_id == comp)
+        self.assertTrue(move.move_line_ids.filtered(
+            lambda l: l.lot_id == lots[0] and l.picked))
+        # Second different SN: re-scan product (state cleaned), demand already
+        # met -> Force is triggered and the first SN line is NOT eaten.
+        self.action_barcode_scanned(wiz, "PROD-COMP-SER-T5")
+        self.action_barcode_scanned(wiz, lots[1].name)
+        self.assertTrue(wiz.visible_force_done)
+        first_line = move.move_line_ids.filtered(lambda l: l.lot_id == lots[0])
+        self.assertTrue(first_line, "First scanned SN must not be eaten")
+        self.assertEqual(first_line.quantity, 1.0)
+        second_line = move.move_line_ids.filtered(lambda l: l.lot_id == lots[1])
+        self.assertFalse(second_line, "Second SN must not be written before Force")
