@@ -72,3 +72,55 @@ registry.category("web_tour.tours").add("mrp_scan_app_multi_match", {
         },
     ],
 });
+
+/**
+ * Tour 3 — finished SN display + clear. For a serial finished product,
+ * scanning the finished SN binds it and shows a display row with a
+ * "Clear SN" button. Clicking Clear removes the binding (and the
+ * MO's lot_producing_ids for serial products).
+ */
+registry.category("web_tour.tours").add("mrp_scan_app_finished_sn_display", {
+    steps: () => [
+        {
+            trigger: ".o_control_panel button[name='action_open_scan_wizard']",
+            content: "Click the Scan header button",
+            run: "click",
+        },
+        {
+            trigger: ".o_mrp_scan_app",
+            content: "MrpScanApp client action is mounted",
+        },
+        {
+            // Scan the serial finished product barcode → MO selected +
+            // components auto-filled.
+            trigger: ".o_mrp_scan_input",
+            content: "Scan serial finished product barcode",
+            run: "edit SERIAL_FP_BARCODE_001 && press Enter",
+        },
+        {
+            trigger: ".o_mrp_scan_mo_info:contains('MO:')",
+            content: "MO info strip appears",
+        },
+        {
+            // Scan a brand-new finished SN → serial one-scan-write binds it.
+            trigger: ".o_mrp_scan_input",
+            content: "Scan finished SN",
+            run: "edit TOUR-FINISHED-SN-001 && press Enter",
+        },
+        {
+            // The finished-SN display row must now show the scanned SN.
+            trigger: ".o_mrp_scan_finished_sn:contains('TOUR-FINISHED-SN-001')",
+            content: "Finished SN display row shows the scanned SN",
+        },
+        {
+            trigger: ".o_mrp_scan_finished_sn button",
+            content: "Click Clear SN",
+            run: "click",
+        },
+        {
+            // After clearing, the display row is gone.
+            trigger: ".o_mrp_scan_app:not(:has(.o_mrp_scan_finished_sn))",
+            content: "Finished SN display row disappears after Clear",
+        },
+    ],
+});

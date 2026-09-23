@@ -114,3 +114,30 @@ class TestMrpScanAppTour(HttpCase):
             login="admin",
             timeout=120,
         )
+
+    def test_03_finished_sn_display_and_clear(self):
+        """Serial finished SN scan → display row appears. Clear → gone.
+
+        Verifies the finished-SN display strip (`.o_mrp_scan_finished_sn`)
+        shows the bound SN and the Clear SN button unbinds it.
+        """
+        Product = self.env["product.product"]
+        finished = Product.create({
+            "name": "SerialFinishedProduct",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "SERIAL_FP_BARCODE_001",
+        })
+        component = Product.create({
+            "name": "SerialFpComp",
+            "type": "consu",
+        })
+        self._make_bom_and_mo(finished, qty=1.0, components=[(component, 1.0)])
+
+        self.start_tour(
+            self._open_mo_list(),
+            "mrp_scan_app_finished_sn_display",
+            login="admin",
+            timeout=120,
+        )

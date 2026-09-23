@@ -61,6 +61,18 @@
                 </div>
             </div>
 
+            <!-- Finished SN display + clear button -->
+            <div t-if="state.finished_lot_name || state.finished_lot_id"
+                 class="o_mrp_scan_finished_sn d-flex align-items-center gap-2 px-3 py-2 bg-light border-bottom">
+                <i class="fa fa-barcode text-success"/>
+                <span class="text-muted">成品 SN：</span>
+                <span class="fw-bold"><t t-out="state.finished_lot_name" /></span>
+                <button t-if="canCleanFinishedLot"
+                        type="button"
+                        class="btn btn-sm btn-outline-danger ms-auto"
+                        t-on-click="onCleanFinishedLot">Clear SN</button>
+            </div>
+
             <!-- Component checklist -->
             <div class="o_mrp_scan_components flex-grow-1 overflow-auto p-3">
                 <div t-if="!state.components.length" class="text-muted">
@@ -73,6 +85,7 @@
                             <th>Component</th>
                             <th class="text-end">Demand</th>
                             <th class="text-end">Reserved</th>
+                            <th class="text-center">SN</th>
                             <th class="text-center">Picked</th>
                         </tr>
                     </thead>
@@ -93,8 +106,25 @@
                                 <td class="text-end"><t t-out="comp.demand" /></td>
                                 <td class="text-end"><t t-out="comp.quantity" /></td>
                                 <td class="text-center">
+                                    <span t-if="comp.lots.length"
+                                          class="badge bg-info cursor-pointer"
+                                          t-on-click.stop="() => this.onToggleComponentLots(comp.id)">
+                                        <t t-out="comp.lots.length" /> 个 SN
+                                    </span>
+                                </td>
+                                <td class="text-center">
                                     <span t-if="comp.picked" class="badge bg-success">✓</span>
                                     <span t-else="" class="badge bg-danger">✗</span>
+                                </td>
+                            </tr>
+                            <tr t-if="state.expandedComponentId === comp.id">
+                                <td colspan="6" class="ps-4 py-1 bg-white">
+                                    <t t-foreach="comp.lots" t-as="sn" t-key="sn">
+                                        <div class="small text-muted">
+                                            <i class="fa fa-circle-o me-1"/>
+                                            <t t-out="sn" />
+                                        </div>
+                                    </t>
                                 </td>
                             </tr>
                         </t>

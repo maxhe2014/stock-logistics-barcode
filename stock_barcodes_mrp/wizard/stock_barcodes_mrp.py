@@ -500,6 +500,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                 "quantity": sum(move_lines.mapped("quantity")),
                 "picked": picked_all,
                 "state": mv.state,
+                "lots": move_lines.mapped("lot_id.name"),
             })
         return {
             "wiz_id": self.id,
@@ -1009,10 +1010,11 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.ensure_one()
         if not self.production_id or not self.company_id:
             return self._create_new_lot_flow(barcode)
-        # Strategy 1: global lot name (company-scoped)
+        # Strategy 1: global lot name (company-scoped, allow shared lots
+        # with company_id=False — consistent with _scan_lot and Strategy 2).
         lots = self.env["stock.lot"].search([
             ("name", "=", barcode),
-            ("company_id", "=", self.company_id.id),
+            ("company_id", "in", [self.company_id.id, False]),
         ])
         if len(lots) > 1:
             # Disambiguate cross-product SN collisions by context before
@@ -1065,10 +1067,41 @@ class WizStockBarcodesMrp(models.TransientModel):
     def _create_new_lot_flow(self, barcode):
         """Treat an unknown barcode as a new lot for the current product."""
         self.ensure_one()
-        # TODO: confirm with business whether unknown lots should auto-create
+        # If no product is locked but a component row is click-selected,
+        # borrow that move's product so the new lot is not created against
+        # an empty product_id (which yields "Enter the quantity for False"
+        # at step 4).
+        if not self.product_id and self.active_move_id:
+            self.product_id = self.active_move_id.product_id
+            self.product_uom_id = self.product_id.uom_id
+        # Defensive: unreachable in normal flow (fallback requires a
+        # search_product from product_id or active_move_id), but kept as
+        # a safety net against future refactors that might widen the call
+        # surface.
+        if not self.product_id:
+            self._set_message(
+                "error",
+                _("Scan a component product barcode or click a component row first."),
+            )
+            return True
         self.lot_name = barcode
         self.lot_id = False
         self.qty_available = 0.0
+        # Serial: one SN = one physical item. Create the lot (action_confirm
+        # builds it from lot_name) and consume qty=1 immediately — no qty
+        # prompt. If consume fails (force needed / not a component / missing
+        # location), fall back to step 3 (scan-lot phase) so step stays
+        # consistent with product_id + lot_name being set; the error message
+        # set by action_confirm guides the operator.
+        if self.product_id.tracking == "serial":
+            self.product_qty = 1.0
+            if not self.location_id:
+                self.location_id = self.production_id.location_src_id
+            result = self.action_confirm()
+            if not result:
+                self.step = 3
+                self._set_message_step()
+            return True
         self._set_message("info", _("New lot: %s. Enter qty and confirm.") % barcode)
         self.step = 4
         self._set_message_step()
@@ -1943,8 +1976,12 @@ class WizStockBarcodesMrp(models.TransientModel):
         if self.step == 2:
             return _("Scan a component of MO %s") % self.production_id.name
         if self.step == 3:
+            if not self.product_id:
+                return _("Scan a component product barcode")
             return _("Scan the lot/serial of %s") % self.product_id.name
         if self.step == 4:
+            if not self.product_id:
+                return _("Scan a component product barcode")
             return _("Enter the quantity for %s") % self.product_id.name
         return ""
 

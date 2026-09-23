@@ -190,6 +190,72 @@ class TestStockBarcodesMrp(TransactionCase):
         cls.production_serial.action_confirm()
         cls.production_serial.action_assign()
 
+        # Two serial components + shared lots (company_id=False) for the
+        # fallback / cross-component SN tests.
+        cls.component_serial_a = cls.Product.create({
+            "name": "Component Serial A",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-COMP-SER-A",
+        })
+        cls.component_serial_b = cls.Product.create({
+            "name": "Component Serial B",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-COMP-SER-B",
+        })
+        # Shared lots (company_id=False) — must be found by fallback search.
+        cls.lot_serial_a_shared = cls.StockProductionLot.create({
+            "name": "SN-SER-A-SHARED",
+            "product_id": cls.component_serial_a.id,
+            "company_id": False,
+        })
+        cls.lot_serial_b_shared = cls.StockProductionLot.create({
+            "name": "SN-SER-B-SHARED",
+            "product_id": cls.component_serial_b.id,
+            "company_id": False,
+        })
+        cls.StockQuant.create({
+            "product_id": cls.component_serial_a.id,
+            "lot_id": cls.lot_serial_a_shared.id,
+            "location_id": cls.components_location.id,
+            "quantity": 1.0,
+        })
+        cls.StockQuant.create({
+            "product_id": cls.component_serial_b.id,
+            "lot_id": cls.lot_serial_b_shared.id,
+            "location_id": cls.components_location.id,
+            "quantity": 1.0,
+        })
+        cls.bom_serial_2comp = cls.MrpBom.create({
+            "product_id": cls.finished_product_serial.id,
+            "product_tmpl_id": cls.finished_product_serial.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [
+                (0, 0, {
+                    "product_id": cls.component_serial_a.id,
+                    "product_qty": 1.0,
+                    "product_uom_id": cls.component_serial_a.uom_id.id,
+                }),
+                (0, 0, {
+                    "product_id": cls.component_serial_b.id,
+                    "product_qty": 1.0,
+                    "product_uom_id": cls.component_serial_b.uom_id.id,
+                }),
+            ],
+        })
+        cls.production_serial_2comp = cls.MrpProduction.create({
+            "product_id": cls.finished_product_serial.id,
+            "product_qty": 1.0,
+            "bom_id": cls.bom_serial_2comp.id,
+            "location_src_id": cls.components_location.id,
+            "location_dest_id": cls.finished_location.id,
+        })
+        cls.production_serial_2comp.action_confirm()
+        cls.production_serial_2comp.action_assign()
+
     def action_barcode_scanned(self, wizard, barcode):
         """Simulate scanning a barcode."""
         wizard._barcode_scanned = barcode
@@ -2485,3 +2551,155 @@ class TestStockBarcodesMrp(TransactionCase):
         # Direction B + option A: Clean also clears the MO binding.
         self.assertFalse(wiz.production_id.lot_producing_ids)
         self.assertFalse(wiz.finished_lot_id)
+
+    def _t6_open_2comp_wizard(self):
+        """Open a fresh wizard on the 2-serial-component MO."""
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": self.production_serial_2comp.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": self.production_serial_2comp.id,
+        })
+        return wiz
+
+    def _t6_fresh_2comp_mo(self):
+        """Create a brand-new confirmed+assigned MO from the 2-comp serial
+        BOM, so consumption tests do not interfere with each other via the
+        shared class-level production_serial_2comp fixture."""
+        mo = self.MrpProduction.create({
+            "product_id": self.finished_product_serial.id,
+            "bom_id": self.bom_serial_2comp.id,
+            "product_qty": 1.0,
+        })
+        mo.action_confirm()
+        mo.action_assign()
+        return mo
+
+    def test_t6_fallback_finds_shared_lot(self):
+        """Cross-component shared lot SN is found by fallback and consumed.
+
+        Regression: scanning a shared (company_id=False) lot of component B
+        while active_move points to component A used to miss the fallback
+        (company filter excluded shared lots) and fall through to
+        _create_new_lot_flow, producing 'Enter the quantity for False'.
+        """
+        wiz = self._t6_open_2comp_wizard()
+        # Scan finished product -> auto-fill clears product_id, step=2.
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.assertFalse(wiz.product_id)
+        # Click component A row (active_move set, product_id still empty).
+        move_a = wiz.production_id.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_a
+        )
+        wiz.set_active_move(move_a.id)
+        self.assertTrue(wiz.active_move_id)
+        self.assertFalse(wiz.product_id)
+        # Scan the shared lot of component B (different from active_move).
+        self.action_barcode_scanned(wiz, self.lot_serial_b_shared.name)
+        # Must NOT show "for False".
+        self.assertNotIn("for False", wiz.message or "")
+        # Lot B must be consumed (picked move line).
+        move_b = wiz.production_id.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_b
+        )
+        lines_b = move_b.move_line_ids.filtered(
+            lambda l: l.lot_id == self.lot_serial_b_shared
+        )
+        self.assertTrue(lines_b, "shared lot B should be consumed")
+        self.assertTrue(lines_b.picked)
+
+    def test_t6_create_new_lot_requires_product(self):
+        """_create_new_lot_flow without product context must not set step=4.
+
+        The defensive branch is unreachable via normal dispatch (_scan_lot
+        returns False when both product_id and active_move_id are empty, and
+        _accept_new_finished_lot catches the barcode as a finished SN), so
+        the method is invoked directly.
+
+        Regression: _create_new_lot_flow set step=4 while product_id was
+        empty, yielding 'Enter the quantity for False'.
+        """
+        wiz = self._t6_open_2comp_wizard()
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.assertFalse(wiz.product_id)
+        self.assertFalse(wiz.active_move_id)
+        # Invoke directly with no product context.
+        wiz._create_new_lot_flow("DEFINITELY-NOT-A-BARCODE-999")
+        self.assertEqual(wiz.message_type, "error")
+        self.assertNotEqual(wiz.step, 4)
+        self.assertFalse(wiz.product_id)
+
+    def test_t6_create_new_lot_uses_active_move(self):
+        """Unknown barcode borrows active_move's product as context.
+
+        For a serial component, the new SN is auto-created and consumed
+        (qty=1) immediately — no step=4 quantity prompt.
+        """
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        move_a = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_a
+        )
+        wiz.set_active_move(move_a.id)
+        self.action_barcode_scanned(wiz, "DEFINITELY-NOT-A-BARCODE-888")
+        # Serial auto-consume runs; after success values are cleaned (step=2).
+        self.assertEqual(wiz.step, 2)
+        self.assertNotIn("for False", wiz.message or "")
+        # A move line was created for the new lot on component A.
+        ml = move_a.move_line_ids.filtered(
+            lambda l: l.lot_id.name == "DEFINITELY-NOT-A-BARCODE-888"
+        )
+        self.assertTrue(ml)
+        self.assertEqual(ml.quantity, 1.0)
+
+    def test_t6_create_new_lot_serial_autoconsume_via_product_scan(self):
+        """Scan serial component product, then a new SN → auto-create + consume.
+
+        Regression: previously _create_new_lot_flow set step=4 for serial
+        products too, yielding 'Enter the quantity for <component>' instead
+        of consuming the single serial unit.
+        """
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        # Scan component product barcode → step 3 (scan lot).
+        self.action_barcode_scanned(wiz, self.component_serial_a.barcode)
+        self.assertEqual(wiz.product_id, self.component_serial_a)
+        self.assertEqual(wiz.step, 3)
+        # Scan a brand-new serial SN → should auto-create lot and consume.
+        self.action_barcode_scanned(wiz, "T6-NEW-SERIAL-SN-001")
+        self.assertEqual(wiz.step, 2)  # cleaned after consume
+        move_a = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_a
+        )
+        ml = move_a.move_line_ids.filtered(
+            lambda l: l.lot_id.name == "T6-NEW-SERIAL-SN-001"
+        )
+        self.assertTrue(ml)
+        self.assertEqual(ml.quantity, 1.0)
+
+    def test_t6_scan_state_includes_component_lots(self):
+        """get_scan_state components expose scanned lot names for display."""
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, self.component_serial_a.barcode)
+        self.action_barcode_scanned(wiz, self.lot_serial_a_shared.name)
+        state = wiz.get_scan_state()
+        comp_a = next(
+            c for c in state["components"]
+            if c["product_name"] == self.component_serial_a.display_name
+        )
+        self.assertIn(self.lot_serial_a_shared.name, comp_a["lots"])

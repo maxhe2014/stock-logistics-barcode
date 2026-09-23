@@ -72,6 +72,8 @@ export class MrpScanApp extends Component {
             // Task 4: click-selected component move
             active_move_id: false,
             active_move_product_name: "",
+            // Component scanned-SN expansion row (move id or false)
+            expandedComponentId: false,
         });
 
         onWillStart(async () => {
@@ -296,6 +298,11 @@ export class MrpScanApp extends Component {
         );
     }
 
+    /** Clear Finished SN visible: a finished lot/SN name is bound. */
+    get canCleanFinishedLot() {
+        return !!(this.state.finished_lot_name || this.state.finished_lot_id);
+    }
+
     /**
      * Unified RPC handler for wizard action methods.
      * - If the backend returns an action dict (act_window, e.g. consumption
@@ -343,6 +350,17 @@ export class MrpScanApp extends Component {
     /** Finish production: auto-applies pending lot, then marks MO done. */
     onFinishProduction() {
         return this._callAction("action_finish_production", _t("Finish Production"));
+    }
+
+    /** Clear the bound finished SN (backend also clears MO.lot_producing_ids for serial). */
+    onCleanFinishedLot() {
+        return this._callAction("action_clean_finished_lot", _t("Clear SN"));
+    }
+
+    /** Toggle the scanned-SN expansion row for a component move. */
+    onToggleComponentLots(moveId) {
+        this.state.expandedComponentId =
+            this.state.expandedComponentId === moveId ? false : moveId;
     }
 }
 
