@@ -2095,3 +2095,133 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(res.get("res_model"), "mrp.production.backorder")
         self.assertEqual(wiz.production_id, self.production)
         self.assertNotEqual(self.production.state, "done")
+
+    # --- Task 4: cross-product SN collision disambiguation ---
+
+    COLLIDE_LOT = "T4-COLLIDE-001"
+
+    def _t4_add_colliding_component(self, name, barcode):
+        """Add a tracked component that has a lot sharing the collision
+        name T4-COLLIDE-001 (different from component_tracked's
+        LOT-COMP-001, so _scan_lot misses and falls back)."""
+        comp = self.Product.create({
+            "name": name,
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "lot",
+            "barcode": barcode,
+        })
+        self.StockProductionLot.create({
+            "name": self.COLLIDE_LOT,
+            "product_id": comp.id,
+            "company_id": self.company.id,
+        })
+        self.env["stock.move"].create({
+            "product_id": comp.id,
+            "product_uom_qty": 1.0,
+            "product_uom": comp.uom_id.id,
+            "raw_material_production_id": self.production.id,
+            "location_id": self.components_location.id,
+            "location_dest_id": comp.property_stock_production.id,
+            "date": "2026-09-23 00:00:00",
+            "company_id": self.company.id,
+            "procure_method": "make_to_order",
+        })
+        return comp
+
+    def test_t4_collision_resolved_by_current_product(self):
+        """Cross-product SN collision: with product_id set to one of the
+        colliding products, the scan binds that product's lot directly."""
+        comp_c = self._t4_add_colliding_component("Component C Tracked", "PROD-COMP-C")
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        # Lock to comp_c
+        self.action_barcode_scanned(wiz, "PROD-COMP-C")
+        self.assertEqual(wiz.product_id, comp_c)
+        # Scan the colliding SN → _scan_lot finds comp_c's lot directly
+        self.action_barcode_scanned(wiz, self.COLLIDE_LOT)
+        self.assertEqual(wiz.lot_id.product_id, comp_c)
+        self.assertEqual(wiz.product_id, comp_c)
+        self.assertNotEqual(wiz.message_type, "more_match")
+
+    def test_t4_collision_ambiguous_without_context(self):
+        """Cross-product SN collision: product_id set to a product that
+        does NOT own the collision lot → fallback finds 2 lots, both are
+        MO components → genuine ambiguity → more_match."""
+        # Two components both own a lot named T4-COLLIDE-001
+        self._t4_add_colliding_component("Component D Tracked", "PROD-COMP-D")
+        self._t4_add_colliding_component("Component D2 Tracked", "PROD-COMP-D2")
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        # Lock to component_tracked (owns LOT-COMP-001, not T4-COLLIDE-001)
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        self.assertEqual(wiz.product_id, self.component_tracked)
+        # Scan collision SN → _scan_lot misses → fallback → 2 lots → more_match
+        self.action_barcode_scanned(wiz, self.COLLIDE_LOT)
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertFalse(wiz.lot_id)
+
+    def test_t4_active_move_disambiguates(self):
+        """With active_move_id set (and product_id unset), scanning a
+        colliding SN binds the lot of the active move's product."""
+        comp_c = self._t4_add_colliding_component(
+            "Component E Tracked", "PROD-COMP-E"
+        )
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        # product_id intentionally NOT set; rely on active_move_id
+        move_c = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == comp_c
+        )
+        self.assertTrue(wiz.set_active_move(move_c.id))
+        self.assertEqual(wiz.active_move_id, move_c)
+        # Scan collision SN → _scan_lot uses active_move's product → binds
+        self.action_barcode_scanned(wiz, self.COLLIDE_LOT)
+        self.assertEqual(wiz.product_id, comp_c)
+        self.assertEqual(wiz.lot_id.product_id, comp_c)
+
+    def test_t4_no_collision_normal_binding(self):
+        """Regression: a single (non-colliding) lot binds normally even
+        with active_move_id unset."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        # LOT-COMP-001 is unique to component_tracked in this MO
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
+        self.assertEqual(wiz.lot_id, self.component_lot)
+        self.assertEqual(wiz.message_type, "info")
+
+    def test_t4_set_active_move_rejects_foreign_move(self):
+        """set_active_move rejects a move that does not belong to the
+        current MO's raw materials."""
+        other_mo = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "product_uom_id": self.finished_product.uom_id.id,
+        })
+        other_mo.action_confirm()
+        other_move = other_mo.move_raw_ids[:1]
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.assertFalse(wiz.set_active_move(other_move.id))
+        self.assertFalse(wiz.active_move_id)
+
+    def test_t4_active_move_cleared_on_mo_switch(self):
+        """Switching to another MO clears the active_move_id."""
+        comp_c = self._t4_add_colliding_component(
+            "Component F Tracked", "PROD-COMP-F"
+        )
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        move_c = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == comp_c
+        )
+        wiz.set_active_move(move_c.id)
+        self.assertTrue(wiz.active_move_id)
+        # Create + confirm another MO and switch to it
+        other_mo = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "product_uom_id": self.finished_product.uom_id.id,
+        })
+        other_mo.action_confirm()
+        wiz._switch_production(other_mo)
+        self.assertFalse(wiz.active_move_id)

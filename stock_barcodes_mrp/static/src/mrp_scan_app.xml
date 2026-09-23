@@ -69,6 +69,7 @@
                 <table t-else="" class="table table-sm align-middle">
                     <thead>
                         <tr>
+                            <th class="text-center" style="width:2rem"></th>
                             <th>Component</th>
                             <th class="text-end">Demand</th>
                             <th class="text-end">Reserved</th>
@@ -77,7 +78,17 @@
                     </thead>
                     <tbody>
                         <t t-foreach="state.components" t-as="comp" t-key="comp.id">
-                            <tr t-att-class="!comp.picked ? 'table-danger' : 'table-success'">
+                            <tr
+                                t-att-class="!comp.picked ? 'table-danger' : 'table-success'"
+                                t-att-style="state.active_move_id === comp.id ? 'border-left:4px solid #0d6efd;' : ''"
+                                t-on-click="() => this.onSelectMove(comp.id)"
+                                role="button"
+                            >
+                                <td class="text-center">
+                                    <i
+                                        t-att-class="state.active_move_id === comp.id ? 'fa fa-hand-o-right text-primary' : 'fa fa-hand-o-right text-muted opacity-25'"
+                                    />
+                                </td>
                                 <td><t t-out="comp.product_name" /></td>
                                 <td class="text-end"><t t-out="comp.demand" /></td>
                                 <td class="text-end"><t t-out="comp.quantity" /></td>
@@ -89,6 +100,13 @@
                         </t>
                     </tbody>
                 </table>
+                <div
+                    t-if="state.active_move_product_name"
+                    class="mt-2 small text-primary"
+                >
+                    <i class="fa fa-hand-o-right" /> Scanning for:
+                    <t t-out="state.active_move_product_name" />
+                </div>
             </div>
 
             <!-- Action buttons (fixed at bottom for shop-floor scanning) -->

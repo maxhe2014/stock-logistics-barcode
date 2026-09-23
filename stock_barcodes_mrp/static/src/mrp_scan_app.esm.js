@@ -69,6 +69,9 @@ export class MrpScanApp extends Component {
             finished_lot_id: false,
             finished_lot_name: "",
             visible_force_done: false,
+            // Task 4: click-selected component move
+            active_move_id: false,
+            active_move_product_name: "",
         });
 
         onWillStart(async () => {
@@ -159,6 +162,32 @@ export class MrpScanApp extends Component {
         } catch (err) {
             this.notification.add(
                 _t("Open candidates failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
+        }
+    }
+
+    /**
+     * Task 4: click a component row to preselect the target move.
+     * Tells the backend to narrow subsequent lot/SN scans to this
+     * move's product (resolves cross-product SN collisions).
+     */
+    async onSelectMove(moveId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        try {
+            const ok = await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "set_active_move",
+                [[this.wizId], moveId]
+            );
+            if (ok) {
+                await this._refreshState();
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Select component failed: %(err)s", { err: err?.message || String(err) }),
                 { type: "danger" }
             );
         }

@@ -146,6 +146,17 @@ class WizStockBarcodesMrp(models.TransientModel):
         readonly=True,
     )
 
+    # --- Task 4: click-to-select target component move ---
+    active_move_id = fields.Many2one(
+        comodel_name="stock.move",
+        string="Active Component Move",
+        help="Operator-selected target component move. When set, scanning "
+        "a serial/lot narrows the lot lookup to this move's product "
+        "first, so cross-product SN collisions resolve automatically. "
+        "Cleared on MO switch, finished-lot scan, or scanning a "
+        "different product.",
+    )
+
     # --- TODO-B1: work-order queue ---
     queue_mode = fields.Selection(
         [("my", "My Work Orders"), ("all", "All MO")],
@@ -515,6 +526,12 @@ class WizStockBarcodesMrp(models.TransientModel):
             "finished_lot_id": self.finished_lot_id.id or False,
             "finished_lot_name": self.finished_lot_name or "",
             "visible_force_done": bool(self.visible_force_done),
+            # Task 4: click-selected component move
+            "active_move_id": self.active_move_id.id or False,
+            "active_move_product_name": (
+                self.active_move_id.product_id.display_name or ""
+                if self.active_move_id else ""
+            ),
             "components": components,
         }
 
@@ -615,6 +632,9 @@ class WizStockBarcodesMrp(models.TransientModel):
             return False
         if self.finished_lot_id:
             return False
+        # Task 4: finished-lot scan ends the component phase; clear any
+        # click-selected component target.
+        self.active_move_id = False
         lot_domain = [("name", "=", barcode), ("product_id", "=", finished_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
         if not lots:
@@ -648,6 +668,9 @@ class WizStockBarcodesMrp(models.TransientModel):
             return False
         if self.finished_lot_id:
             return False
+        # Task 4: finished-lot scan ends the component phase; clear any
+        # click-selected component target.
+        self.active_move_id = False
         # Guard: existing lot of any product → don't shadow it
         if self.env["stock.lot"].search([("name", "=", barcode)], limit=1):
             return False
@@ -777,6 +800,12 @@ class WizStockBarcodesMrp(models.TransientModel):
                 return self._scan_product_fallback(product)
         # Normal component of this MO -> set scanned product on wizard
         self.product_id = product
+        # Task 4: if the scanned product differs from the click-selected
+        # component move's product, the selection is stale — drop it so
+        # the next lot scan is not misrouted. Same product keeps it
+        # (operator scanning several SNs of the same component).
+        if self.active_move_id and self.active_move_id.product_id != product:
+            self.active_move_id = False
         self.product_uom_id = product.uom_id
         self.lot_id = False
         self.lot_name = False
@@ -884,11 +913,16 @@ class WizStockBarcodesMrp(models.TransientModel):
         return True
 
     def _scan_lot(self, barcode):
-        if not self.product_id or self.product_id.tracking == "none":
+        # Task 4: when no product is locked yet but the operator has
+        # click-selected a component move, use that move's product as the
+        # search target so cross-product SN collisions resolve via the
+        # active selection instead of falling through to not_found.
+        search_product = self.product_id
+        if not search_product and self.active_move_id:
+            search_product = self.active_move_id.product_id
+        if not search_product or search_product.tracking == "none":
             return False
-        lot_domain = [("name", "=", barcode)]
-        if self.product_id:
-            lot_domain.append(("product_id", "=", self.product_id.id))
+        lot_domain = [("name", "=", barcode), ("product_id", "=", search_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
         if not lots:
             # Not a lot of the current product -> TODO-A2 reverse lookup
@@ -899,6 +933,10 @@ class WizStockBarcodesMrp(models.TransientModel):
         lot = lots
         self.lot_id = lot
         self.lot_name = lot.name
+        # Keep product_id in sync (matters when the search used the
+        # active_move's product because product_id was not locked).
+        self.product_id = lot.product_id
+        self.product_uom_id = lot.product_id.uom_id
         self._compute_qty_available()
         self._set_message("info", _("Lot: %s. Enter qty and confirm.") % lot.name)
         self.step = 4
@@ -925,9 +963,33 @@ class WizStockBarcodesMrp(models.TransientModel):
             ("company_id", "=", self.company_id.id),
         ])
         if len(lots) > 1:
+            # Disambiguate cross-product SN collisions by context before
+            # giving up. Priority: active_move_id > current product_id >
+            # any component of this MO. Only a genuine ambiguity (still
+            # >1 after filtering) shows the guidance message.
+            narrowed = lots
+            if self.active_move_id:
+                narrowed = narrowed.filtered(
+                    lambda l: l.product_id == self.active_move_id.product_id
+                )
+            elif self.product_id:
+                narrowed = narrowed.filtered(
+                    lambda l: l.product_id == self.product_id
+                )
+            if len(narrowed) > 1 and self.production_id:
+                component_products = self.production_id.move_raw_ids.mapped(
+                    "product_id"
+                )
+                narrowed = narrowed.filtered(
+                    lambda l: l.product_id in component_products
+                )
+            if len(narrowed) == 1:
+                return self._resolve_lot_owner(narrowed, narrowed.product_id)
             self._set_message(
                 "more_match",
-                _("Multiple lots found for barcode: %s") % barcode,
+                _("Multiple lots named %(sn)s found. Click the target "
+                  "component row first, then scan again.")
+                % {"sn": barcode},
             )
             return True
         if len(lots) == 1:
@@ -960,6 +1022,22 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._set_message_step()
         return True
 
+    def set_active_move(self, move_id):
+        """Bind the operator's target component move.
+
+        RPC entry for click-to-select in the OWL component list. Rejects
+        moves that do not belong to the current MO's raw materials so a
+        stale click cannot redirect the scan to an unrelated move.
+        """
+        self.ensure_one()
+        if not self.production_id:
+            return False
+        move = self.env["stock.move"].browse(move_id)
+        if not move or move not in self.production_id.move_raw_ids:
+            return False
+        self.active_move_id = move
+        return True
+
     def _resolve_lot_owner(self, lot, product):
         """Identify whether `product` is a component or the finished product
         of the current MO and handle accordingly.
@@ -986,6 +1064,11 @@ class WizStockBarcodesMrp(models.TransientModel):
         )
         if component_moves:
             self.product_id = product
+            # Task 4: drop the click-selected target if the resolved lot's
+            # product does not match it. A match (the common disambiguated
+            # case) keeps the selection for consecutive SN scans.
+            if self.active_move_id and self.active_move_id.product_id != product:
+                self.active_move_id = False
             self.product_uom_id = product.uom_id
             if lot:
                 self.lot_id = lot
@@ -1148,6 +1231,8 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.product_qty = 0.0
         self.qty_available = 0.0
         self.location_id = new_mo.location_src_id
+        # --- Task 4: clear the click-selected component target ---
+        self.active_move_id = False
         # --- Flags & misc ---
         self.visible_force_done = False
         self.visible_force_add = False
