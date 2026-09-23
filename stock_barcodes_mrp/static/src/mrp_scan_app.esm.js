@@ -262,14 +262,14 @@ export class MrpScanApp extends Component {
         return badges;
     }
 
-    /** Apply Lot visible: tracked finished product + a lot is pending/selected
-     *  + positive qty. Mirrors action_apply_finished_lot guards (no step check —
-     *  the backend does not enforce step, and after scanning the product/SN the
-     *  wizard is at step 2). */
+    /** Apply Lot visible: tracked (non-serial) finished product + a lot is
+     *  pending/selected + positive qty. Serial products auto-apply the SN at
+     *  scan time (Direction B), so the button is redundant and hidden. */
     get canApplyLot() {
         return (
             !!this.state.production_id &&
             this.state.finished_product_tracking !== "none" &&
+            this.state.finished_product_tracking !== "serial" &&
             (!!this.state.finished_lot_id || !!this.state.finished_lot_name) &&
             (this.state.finished_qty_producing || 0) > 0
         );

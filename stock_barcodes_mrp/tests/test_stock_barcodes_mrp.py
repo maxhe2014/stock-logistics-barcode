@@ -155,6 +155,41 @@ class TestStockBarcodesMrp(TransactionCase):
         })
         cls.production_tracked.action_confirm()
 
+        # Serial finished product (Direction B: scan-time MO write)
+        cls.finished_product_serial = cls.Product.create({
+            "name": "Finished Product Serial",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-FIN-SER-T6",
+        })
+        cls.finished_lot_serial = cls.StockProductionLot.create({
+            "name": "SN-SER-EXIST-001",
+            "product_id": cls.finished_product_serial.id,
+            "company_id": cls.company.id,
+        })
+        cls.bom_serial = cls.MrpBom.create({
+            "product_id": cls.finished_product_serial.id,
+            "product_tmpl_id": cls.finished_product_serial.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [
+                (0, 0, {
+                    "product_id": cls.component_simple.id,
+                    "product_qty": 1.0,
+                    "product_uom_id": cls.component_simple.uom_id.id,
+                }),
+            ],
+        })
+        cls.production_serial = cls.MrpProduction.create({
+            "product_id": cls.finished_product_serial.id,
+            "product_qty": 3.0,
+            "bom_id": cls.bom_serial.id,
+            "location_src_id": cls.components_location.id,
+            "location_dest_id": cls.finished_location.id,
+        })
+        cls.production_serial.action_confirm()
+        cls.production_serial.action_assign()
+
     def action_barcode_scanned(self, wizard, barcode):
         """Simulate scanning a barcode."""
         wizard._barcode_scanned = barcode
@@ -674,6 +709,9 @@ class TestStockBarcodesMrp(TransactionCase):
 
     def test_23_partial_production_returns_backorder_wizard(self):
         """Finishing with qty below demand returns the backorder wizard."""
+        # Force create_backorder='ask' so the test is deterministic
+        # regardless of the dev DB's picking type default.
+        self.production.picking_type_id.create_backorder = "ask"
         # Consume components proportionally to the partial production
         # (core scales expected consumption by qty_producing / product_qty)
         _, res = self._scan_component(
@@ -736,6 +774,7 @@ class TestStockBarcodesMrp(TransactionCase):
         simple component not scanned at all. It must be auto-scaled to 1.2
         and picked, so the only remaining issue is the backorder wizard.
         """
+        self.production.picking_type_id.create_backorder = "ask"
         _, res = self._scan_component(
             self.production, self.component_tracked,
             "PROD-COMP-T", 0.8, lot_barcode="LOT-COMP-001",
@@ -2077,9 +2116,12 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertIn("No more MOs", wiz.message)
         self.assertEqual(self.production.state, "done")
 
-    def test_t3_finish_backorder_does_not_switch(self):
-        """When button_mark_done returns a backorder/consumption dialog,
-        the wizard does NOT auto-switch — the user must resolve the dialog."""
+    def test_t3_finish_backorder_switches_to_new_mo(self):
+        """Direction B: partial finish auto-creates a backorder (create
+        _backorder='always') and the wizard switches to the new backorder
+        MO so the operator keeps scanning without leaving the interface.
+        """
+        self.production.picking_type_id.create_backorder = "always"
         self._scan_component(
             self.production, self.component_tracked,
             "PROD-COMP-T", 0.8, lot_barcode="LOT-COMP-001",
@@ -2090,11 +2132,13 @@ class TestStockBarcodesMrp(TransactionCase):
         wiz.queue_mode = "all"
         wiz.finished_qty_producing = 0.4
         res = wiz.action_finish_production()
-        # Backorder wizard returned → no switch.
-        self.assertIsInstance(res, dict)
-        self.assertEqual(res.get("res_model"), "mrp.production.backorder")
-        self.assertEqual(wiz.production_id, self.production)
-        self.assertNotEqual(self.production.state, "done")
+        # Backorder auto-created → True (not a dialog), wizard switched.
+        self.assertTrue(res is True)
+        self.assertEqual(self.production.state, "done")
+        self.assertNotEqual(wiz.production_id, self.production)
+        # New MO is the backorder with the remaining quantity.
+        self.assertEqual(wiz.production_id.product_qty, 0.6)
+        self.assertIn(wiz.production_id.state, ("confirmed", "progress", "to_close"))
 
     # --- Task 4: cross-product SN collision disambiguation ---
 
@@ -2349,3 +2393,95 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(first_line.quantity, 1.0)
         second_line = move.move_line_ids.filtered(lambda l: l.lot_id == lots[1])
         self.assertFalse(second_line, "Second SN must not be written before Force")
+
+    # ------------------------------------------------------------------
+    # T6 — Direction B: serial SN written to MO immediately on scan
+    # ------------------------------------------------------------------
+
+    def _t6_open_serial_wizard(self):
+        """Open a fresh wizard on the serial production MO."""
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": self.production_serial.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": self.production_serial.id,
+        })
+        return wiz
+
+    def test_t6_serial_scan_existing_lot_writes_mo_immediately(self):
+        wiz = self._t6_open_serial_wizard()
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, self.finished_lot_serial.name)
+        # Direction B: MO.lot_producing_ids is populated immediately.
+        self.assertEqual(wiz.production_id.lot_producing_ids, self.finished_lot_serial)
+        self.assertEqual(wiz.finished_lot_id, self.finished_lot_serial)
+        self.assertEqual(wiz.finished_qty_producing, 1.0)
+
+    def test_t6_serial_scan_new_sn_writes_mo_immediately(self):
+        wiz = self._t6_open_serial_wizard()
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-NEW-001")
+        self.assertEqual(len(wiz.production_id.lot_producing_ids), 1)
+        self.assertEqual(wiz.production_id.lot_producing_ids.name, "SN-SER-NEW-001")
+        self.assertEqual(wiz.finished_qty_producing, 1.0)
+
+    def test_t6_serial_rescan_replaces_lot(self):
+        wiz = self._t6_open_serial_wizard()
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-RES-001")
+        first = wiz.production_id.lot_producing_ids
+        self.assertEqual(first.name, "SN-SER-RES-001")
+        # Re-scan product (state cleaned) then a different SN replaces it.
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-RES-002")
+        replaced = wiz.production_id.lot_producing_ids
+        self.assertEqual(len(replaced), 1)
+        self.assertEqual(replaced.name, "SN-SER-RES-002")
+
+    def test_t6_lot_tracking_keeps_two_phase(self):
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": self.production_tracked.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": self.production_tracked.id,
+        })
+        self.action_barcode_scanned(wiz, self.finished_product_tracked.barcode)
+        self.action_barcode_scanned(wiz, self.finished_lot.name)
+        # Lot-tracked: MO stays empty until Apply Lot.
+        self.assertFalse(wiz.production_id.lot_producing_ids)
+        self.assertTrue(wiz.finished_lot_id)
+
+    def test_t6_finish_without_apply_still_works(self):
+        wiz = self._t6_open_serial_wizard()
+        original_mo = wiz.production_id
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-FIN-001")
+        # Serial: MO already has the lot. Finish directly (no Apply click).
+        self.assertEqual(len(original_mo.lot_producing_ids), 1)
+        # Consume enough for 1 unit (component_simple is non-tracked,
+        # _auto_fill_components marks reserved move lines picked).
+        result = wiz.action_finish_production()
+        self.assertTrue(result is True)
+        # product_qty=3, qty_producing=1 → backorder created, wizard
+        # switched to it. The original MO must be done.
+        self.assertEqual(original_mo.state, "done")
+
+    def test_t6_backorder_jumps_to_new_mo(self):
+        wiz = self._t6_open_serial_wizard()
+        wiz.production_id.picking_type_id.create_backorder = "always"
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-BO-001")
+        # product_qty=3, qty_producing=1 -> backorder for 2 is auto-created.
+        result = wiz.action_finish_production()
+        self.assertTrue(result is True)
+        # Wizard switched to the backorder MO (product_qty == 2).
+        self.assertEqual(wiz.production_id.product_qty, 2.0)
+        self.assertIn(wiz.production_id.state, ("confirmed", "progress", "to_close"))
+
+    def test_t6_clean_clears_mo_lot_for_serial(self):
+        wiz = self._t6_open_serial_wizard()
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-CLEAN-001")
+        self.assertTrue(wiz.production_id.lot_producing_ids)
+        wiz.action_clean_finished_lot()
+        # Direction B + option A: Clean also clears the MO binding.
+        self.assertFalse(wiz.production_id.lot_producing_ids)
+        self.assertFalse(wiz.finished_lot_id)
