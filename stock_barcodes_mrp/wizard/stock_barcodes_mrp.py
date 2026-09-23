@@ -426,6 +426,12 @@ class WizStockBarcodesMrp(models.TransientModel):
         # Try lot
         if self._scan_lot(barcode):
             return True
+        # Last resort: unknown barcode → record as a pending finished lot
+        # name (actual lot creation happens at Apply Lot / Finish). Every
+        # scanner above has already declined the barcode, so this cannot
+        # swallow MO refs / location barcodes / product barcodes / lots.
+        if self._accept_new_finished_lot(barcode):
+            return True
         # Not found
         self._set_message("not_found", _("Barcode not found: %s") % barcode)
         return True
@@ -498,6 +504,17 @@ class WizStockBarcodesMrp(models.TransientModel):
             "lot_name": self.lot_id.display_name or "",
             "finished_qty_producing": self.finished_qty_producing or 0.0,
             "visible_switch_selector": bool(self.visible_switch_selector),
+            # Button visibility fields (mirror the old form invisible attrs)
+            "production_state": self.production_state or "",
+            "finished_product_tracking": self.finished_product_tracking or "none",
+            "product_id": self.product_id.id or False,
+            "product_tracking": self.product_tracking or "none",
+            "product_qty": self.product_qty or 0.0,
+            "lot_id": self.lot_id.id or False,
+            "lot_name_raw": self.lot_name or "",
+            "finished_lot_id": self.finished_lot_id.id or False,
+            "finished_lot_name": self.finished_lot_name or "",
+            "visible_force_done": bool(self.visible_force_done),
             "components": components,
         }
 
@@ -581,36 +598,62 @@ class WizStockBarcodesMrp(models.TransientModel):
         return True
 
     def _scan_finished_lot(self, barcode):
-        """Scan a lot/serial barcode for the finished product.
-        Only matches EXISTING lots at step 0. Unknown barcodes fall through
-        to location/product/lot dispatch so users can still scan locations
-        and components before setting the finished lot.
+        """Scan an EXISTING lot/serial of the finished product.
+
+        Unknown barcodes fall through the dispatch chain; the last-resort
+        handler _accept_new_finished_lot records the barcode as a pending
+        finished lot name (lot created at apply/finish time). So location /
+        MO / product barcodes can never be swallowed here.
+
+        Works at any step (not just step 0) so the operator can bind the
+        finished lot after components are auto-filled.
         """
         if not self.production_id:
             return False
         finished_product = self.production_id.product_id
         if finished_product.tracking == "none":
             return False
-        # Only try at step 0 (before finished lot is applied)
-        if self.step != 0:
-            return False
         if self.finished_lot_id:
             return False
-        # Only match existing lots — don't treat unknown barcodes as new lots
         lot_domain = [("name", "=", barcode), ("product_id", "=", finished_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
         if not lots:
-            return False  # Fall through to location/product/lot dispatch
+            return False
         if len(lots) > 1:
             self._set_message("more_match", _("Multiple finished lots found"))
             return True
         self.finished_lot_id = lots
         self.finished_lot_name = lots.name
-        # TODO-A3: scanned finished product lot -> auto-fill components too
-        # (consistent with scanning the finished product barcode).
         self._auto_fill_components()
-        self.step = 0
-        self._set_message_step()
+        return True
+
+    def _accept_new_finished_lot(self, barcode):
+        """Last-resort fallback: record an unknown barcode as a pending
+        finished lot name for the current MO.
+
+        Does NOT create the stock.lot record or write
+        production.lot_producing_ids — those happen at Apply Lot /
+        Finish Production (consistent with _scan_finished_lot, and keeps
+        the scan phase free of DB side effects so a mistyped SN can be
+        cleared without polluting the MO).
+
+        Only fires when ALL other scanners failed. Placed at the END of
+        the dispatch chain so it cannot swallow MO refs, location barcodes,
+        product barcodes, or existing lots of other products.
+        """
+        if not self.production_id:
+            return False
+        finished_product = self.production_id.product_id
+        if finished_product.tracking == "none":
+            return False
+        if self.finished_lot_id:
+            return False
+        # Guard: existing lot of any product → don't shadow it
+        if self.env["stock.lot"].search([("name", "=", barcode)], limit=1):
+            return False
+        self.finished_lot_name = barcode
+        self._auto_fill_components()
+        self._set_message("info", _("Pending finished lot: %s") % barcode)
         return True
 
     def _scan_production(self, barcode):
@@ -1490,7 +1533,12 @@ class WizStockBarcodesMrp(models.TransientModel):
                 move.picked = True
 
     def action_finish_production(self):
-        """Apply the scanned finished lot/qty (if any), then mark the MO done.
+        """Finish production: auto-applies any pending finished_lot_name
+        (building the lot if needed) before calling button_mark_done.
+
+        Do NOT remove the auto-apply step (lot creation + lot_producing_ids
+        write below) without updating the OWL Apply Lot button visibility
+        logic — the two share the same lot binding semantics.
 
         Mirrors core button_mark_done: consumption/backorder wizard actions
         are returned to the client for the user to resolve; a plain True
@@ -1516,7 +1564,9 @@ class WizStockBarcodesMrp(models.TransientModel):
             and not self.production_id.lot_producing_ids
         ):
             self._set_message(
-                "error", _("Finished lot required before finishing production")
+                "error",
+                _("Please scan the finished product serial number (SN) first, "
+                  "or use Manual Entry."),
             )
             return False
         qty = self.finished_qty_producing or self.production_id.qty_producing

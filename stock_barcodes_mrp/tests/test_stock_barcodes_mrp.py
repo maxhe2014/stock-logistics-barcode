@@ -228,8 +228,11 @@ class TestStockBarcodesMrp(TransactionCase):
     def test_04_action_barcode_scan_from_production(self):
         """Test the action_barcode_scan entry point on mrp.production."""
         action = self.production.action_barcode_scan()
-        self.assertEqual(action["res_model"], "wiz.stock.barcodes.mrp")
-        wiz = self.WizScanMrp.browse(action["res_id"])
+        # All entry points now return the OWL client action (not the
+        # legacy act_window wizard form).
+        self.assertEqual(action["type"], "ir.actions.client")
+        self.assertEqual(action["tag"], "stock_barcodes_mrp_scan_app")
+        wiz = self.WizScanMrp.browse(action["params"]["wiz_id"])
         self.assertEqual(wiz.production_id, self.production)
         self.assertEqual(wiz.location_id, self.components_location)
 
@@ -400,6 +403,9 @@ class TestStockBarcodesMrp(TransactionCase):
         # Scanning should still work via the workorder-linked wizard
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.assertEqual(wiz.location_id, self.components_location)
+        # Location barcode must never become a finished lot on a tracked MO
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertFalse(wiz.finished_lot_name)
         self.action_barcode_scanned(wiz, "PROD-COMP-S")
         self.assertEqual(wiz.product_id, self.component_simple)
         wiz.product_qty = 3.0
@@ -646,6 +652,9 @@ class TestStockBarcodesMrp(TransactionCase):
             "production_id": self.production_tracked.id,
         })
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        # Location barcode must never become a finished lot on a tracked MO
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertFalse(wiz.finished_lot_name)
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
         wiz.product_qty = 2.0
@@ -1515,10 +1524,10 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.step, 0)
         self.assertIn("finished product lot", wiz.message)
         self.assertIn(self.finished_product_tracked.name, wiz.message)
-        # Scan finished lot -> still step 0 until it is applied
+        # Scan finished lot -> step 2 (auto-fill runs, lot bound on wizard)
         self.action_barcode_scanned(wiz, "LOT-FIN-001")
         self.assertEqual(wiz.finished_lot_id, self.finished_lot)
-        self.assertEqual(wiz.step, 0)
+        self.assertEqual(wiz.step, 2)
         # Apply -> step 1, banner names the MO and the source location
         wiz.action_apply_finished_lot()
         self.assertEqual(wiz.step, 1)
@@ -1920,3 +1929,112 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(domain_ids, candidate_ids)
         # barcode_wizard_id passed so row buttons can switch the wizard
         self.assertEqual(action.get("context", {}).get("barcode_wizard_id"), wiz.id)
+
+    # --- Task 1: scan new finished SN → pending lot name (two-phase) ---
+
+    def test_t1_scan_new_sn_after_product_creates_pending_lot(self):
+        """After auto-fill, a new SN is recorded as pending finished lot
+        name only — no stock.lot and no lot_producing_ids at scan time."""
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.assertEqual(wiz.step, 0)
+        # Scan finished product barcode → auto-fill, step 2
+        self.action_barcode_scanned(wiz, "PROD-FIN-T")
+        self.assertEqual(wiz.step, 2)
+        self.assertFalse(wiz.finished_lot_id)
+        # Scan a brand-new SN
+        self.action_barcode_scanned(wiz, "NEW-FIN-999")
+        self.assertEqual(wiz.finished_lot_name, "NEW-FIN-999")
+        self.assertFalse(wiz.finished_lot_id)  # two-phase: lot not created yet
+        self.assertEqual(wiz.step, 2)
+        self.assertEqual(wiz.message_type, "info")
+        self.assertIn("NEW-FIN-999", wiz.message)
+        # No stock.lot exists, MO is untouched
+        self.assertFalse(self.StockProductionLot.search([
+            ("name", "=", "NEW-FIN-999"),
+        ]))
+        self.assertFalse(self.production_tracked.lot_producing_ids)
+
+    def test_t1_scan_new_sn_at_step_0_directly(self):
+        """Scan a new SN directly (skip product barcode): pending name is
+        recorded and components are still auto-filled (idempotent)."""
+        self.production_tracked.action_assign()
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.assertEqual(wiz.step, 0)
+        self.action_barcode_scanned(wiz, "BRAND-NEW-SN-001")
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertEqual(wiz.finished_lot_name, "BRAND-NEW-SN-001")
+        self.assertEqual(wiz.step, 2)
+        self.assertIn("BRAND-NEW-SN-001", wiz.message)
+        # _auto_fill_components ran: reserved raw moves are marked picked
+        for move in self.production_tracked.move_raw_ids:
+            self.assertTrue(
+                move.picked,
+                "Raw move %s should be picked after auto-fill" % move.product_id.name,
+            )
+
+    def test_t1_scan_existing_lot_at_step_2_does_not_reset_step(self):
+        """At step 2, scanning an existing finished lot keeps step=2."""
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        # Scan product barcode → auto-fill → step 2
+        self.action_barcode_scanned(wiz, "PROD-FIN-T")
+        self.assertEqual(wiz.step, 2)
+        # Now scan existing finished lot
+        self.action_barcode_scanned(wiz, "LOT-FIN-001")
+        self.assertEqual(wiz.finished_lot_id, self.finished_lot)
+        self.assertEqual(wiz.step, 2)
+
+    def test_t1_product_barcode_not_treated_as_pending_lot(self):
+        """Product barcode must not be swallowed as a pending finished lot."""
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.assertEqual(wiz.step, 0)
+        # Scan finished product barcode → _scan_product path, not pending lot
+        self.action_barcode_scanned(wiz, "PROD-FIN-T")
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertNotEqual(wiz.finished_lot_name, "PROD-FIN-T")
+        self.assertEqual(wiz.step, 2)
+        self.assertIn("auto-filled", wiz.message)
+
+    def test_t1_scan_new_sn_then_apply_writes_lot_producing_ids(self):
+        """Pending SN → action_apply_finished_lot creates the lot and
+        writes lot_producing_ids on the MO (second phase)."""
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.action_barcode_scanned(wiz, "FINAL-SN-42")
+        # Scan phase: pending name only
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertEqual(wiz.finished_lot_name, "FINAL-SN-42")
+        # Apply → lot created and written to MO
+        wiz.finished_qty_producing = 1.0
+        res = wiz.action_apply_finished_lot()
+        self.assertTrue(res)
+        lot = self.StockProductionLot.search([
+            ("name", "=", "FINAL-SN-42"),
+            ("product_id", "=", self.finished_product_tracked.id),
+        ])
+        self.assertTrue(lot)
+        self.assertIn(lot.id, self.production_tracked.lot_producing_ids.ids)
+        self.assertEqual(lot.product_id, self.finished_product_tracked)
+        self.assertEqual(self.production_tracked.qty_producing, 1.0)
+
+    def test_t1_location_barcode_not_treated_as_pending_lot(self):
+        """On a tracked MO, a location barcode is handled by _scan_location
+        and never recorded as a pending finished lot name."""
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.assertEqual(wiz.step, 0)
+        self.action_barcode_scanned(wiz, "LOC-COMP-001")
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertFalse(wiz.finished_lot_name)
+        self.assertEqual(wiz.location_id, self.components_location)
+        self.assertEqual(wiz.step, 2)
+        self.assertEqual(wiz.message_type, "info")

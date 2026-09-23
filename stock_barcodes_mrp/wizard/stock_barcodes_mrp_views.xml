@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!--
+  DEPRECATED: legacy wizard form (wiz.stock.barcodes.mrp).
+  All barcode entry points (MO form / WO form / MO list) now return the
+  OWL client action MrpScanApp (stock_barcodes_mrp_scan_app). This form
+  and its act_window (action_stock_barcodes_mrp) are kept as a historical
+  reference only — no entry point opens it anymore.
+-->
 <odoo>
     <record id="view_move_component_checklist_tree" model="ir.ui.view">
         <field name="name">stock.move.component.checklist.tree</field>

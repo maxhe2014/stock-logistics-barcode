@@ -28,9 +28,19 @@
                             t-on-keydown="onManualScanEnter"
                         />
                     </div>
-                    <div class="col-auto text-muted small">
-                        Step <t t-out="state.step || 0" />: <t t-out="state.message_step" />
-                    </div>
+                </div>
+                <!-- 5-step progress bar (mirrors the legacy wizard form).
+                     State is derived in the component from step + tracking fields. -->
+                <div class="o_mrp_scan_stepbar d-flex flex-wrap justify-content-center gap-1 small mt-2 px-2">
+                    <t t-foreach="stepBadges" t-as="badge" t-key="badge.key">
+                        <span
+                            t-if="!badge.hidden"
+                            t-att-class="'badge rounded-pill ' + badge.cls"
+                        >
+                            <t t-if="badge.done"><i class="fa fa-check me-1" /></t>
+                            <t t-out="badge.label" />
+                        </span>
+                    </t>
                 </div>
             </div>
 
@@ -98,18 +108,32 @@
                     >View candidate MOs</button>
 
                     <button
-                        t-if="state.production_id"
+                        t-if="canApplyLot"
+                        type="button"
+                        class="btn btn-primary btn-lg o_mrp_scan_apply_lot"
+                        t-on-click="onApplyLot"
+                    >Apply Lot</button>
+
+                    <button
+                        t-if="canConfirm"
                         type="button"
                         class="btn btn-primary btn-lg o_mrp_scan_confirm"
                         t-on-click="onConfirm"
                     >Confirm</button>
 
                     <button
-                        t-if="state.production_id"
+                        t-if="state.visible_force_done"
                         type="button"
-                        class="btn btn-danger btn-lg o_mrp_scan_force_done"
+                        class="btn btn-warning btn-lg o_mrp_scan_force_done"
                         t-on-click="onForceDone"
-                    >Force Done</button>
+                    >Force Consume</button>
+
+                    <button
+                        t-if="canFinish"
+                        type="button"
+                        class="btn btn-success btn-lg o_mrp_scan_finish"
+                        t-on-click="onFinishProduction"
+                    >Finish Production</button>
                 </div>
             </div>
         </div>

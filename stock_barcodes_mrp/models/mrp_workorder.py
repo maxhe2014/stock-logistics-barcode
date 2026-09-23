@@ -7,6 +7,11 @@ class MrpWorkorder(models.Model):
     _inherit = "mrp.workorder"
 
     def action_barcode_scan(self):
+        """Open the MRP scan client action (OWL MrpScanApp) for this WO.
+
+        Returns an ir.actions.client (not the legacy act_window wizard form)
+        so all barcode entry points converge on the OWL interface.
+        """
         self.ensure_one()
         wiz = self.env["wiz.stock.barcodes.mrp"].create({
             "production_id": self.production_id.id,
@@ -14,8 +19,9 @@ class MrpWorkorder(models.Model):
             "res_model_id": self.env.ref("mrp.model_mrp_workorder").id,
             "res_id": self.id,
         })
-        action = self.env["ir.actions.actions"]._for_xml_id(
-            "stock_barcodes_mrp.action_stock_barcodes_mrp"
-        )
-        action["res_id"] = wiz.id
-        return action
+        return {
+            "type": "ir.actions.client",
+            "tag": "stock_barcodes_mrp_scan_app",
+            "params": {"wiz_id": wiz.id},
+            "target": "fullscreen",
+        }
