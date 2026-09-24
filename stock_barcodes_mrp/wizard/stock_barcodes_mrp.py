@@ -500,8 +500,23 @@ class WizStockBarcodesMrp(models.TransientModel):
                 "quantity": sum(move_lines.mapped("quantity")),
                 "picked": picked_all,
                 "state": mv.state,
-                "lots": move_lines.mapped("lot_id.name"),
+                "lots": [
+                    {"id": l.lot_id.id, "name": l.lot_id.name}
+                    for l in move_lines
+                    if l.lot_id
+                ],
             })
+        # Fallback: wizard reopened fresh after exit — pull the finished
+        # lot from the MO's binding so the UI keeps showing it. The wizard
+        # local fields (finished_lot_id/name) are empty on a new wizard,
+        # but lot_producing_ids on the MO persists the scanned SN.
+        finished_lot_id = self.finished_lot_id.id or False
+        finished_lot_name = self.finished_lot_name or ""
+        if not finished_lot_id and not finished_lot_name and production:
+            mo_lot = production.lot_producing_ids[:1]
+            if mo_lot:
+                finished_lot_id = mo_lot.id
+                finished_lot_name = mo_lot.name
         return {
             "wiz_id": self.id,
             "step": self.step,
@@ -524,8 +539,8 @@ class WizStockBarcodesMrp(models.TransientModel):
             "product_qty": self.product_qty or 0.0,
             "lot_id": self.lot_id.id or False,
             "lot_name_raw": self.lot_name or "",
-            "finished_lot_id": self.finished_lot_id.id or False,
-            "finished_lot_name": self.finished_lot_name or "",
+            "finished_lot_id": finished_lot_id,
+            "finished_lot_name": finished_lot_name,
             "visible_force_done": bool(self.visible_force_done),
             # Task 4: click-selected component move
             "active_move_id": self.active_move_id.id or False,
@@ -1911,6 +1926,37 @@ class WizStockBarcodesMrp(models.TransientModel):
         else:
             self.step = 1
         self._set_message_step()
+
+    def action_remove_component_lot(self, move_id, lot_id):
+        """Remove a scanned component lot/SN from the MO.
+
+        Serial components: 1 move line = 1 SN = qty 1 → unlink the line.
+        Lot-tracked components: one line with qty > 1 → reduce qty by 1
+        (defensive layer; production is serial so this path is untested).
+
+        Does NOT delete the stock.lot record itself — it is an inventory
+        entity; only the consumption (move line) is undone.
+
+        :param move_id: stock.move id (must belong to this MO's raw moves)
+        :param lot_id: stock.lot id to remove from that move
+        :return: True on success, False if move_id/lot_id invalid
+        """
+        self.ensure_one()
+        move = self.component_move_ids.filtered(lambda m: m.id == move_id)
+        if not move:
+            return False
+        lot = self.env["stock.lot"].browse(lot_id)
+        if not lot.exists():
+            return False
+        lines = move.move_line_ids.filtered(lambda l: l.lot_id.id == lot_id)
+        if not lines:
+            return False
+        line = lines[0]
+        if line.quantity > 1:
+            line.quantity -= 1
+        else:
+            line.unlink()
+        return True
 
     def action_manual_entry(self):
         self.manual_entry = not self.manual_entry

@@ -2702,4 +2702,94 @@ class TestStockBarcodesMrp(TransactionCase):
             c for c in state["components"]
             if c["product_name"] == self.component_serial_a.display_name
         )
-        self.assertIn(self.lot_serial_a_shared.name, comp_a["lots"])
+        lot_names = [lot["name"] for lot in comp_a["lots"]]
+        self.assertIn(self.lot_serial_a_shared.name, lot_names)
+
+    def test_t6_get_scan_state_backfills_finished_lot_from_mo(self):
+        """Reopening the wizard (exit & re-enter) must still show the
+        finished SN that was bound to the MO.
+
+        Regression: get_scan_state read self.finished_lot_id/name (wizard
+        local fields), which are empty on a freshly created wizard even
+        though MO.lot_producing_ids persists the scanned SN.
+        """
+        mo = self._t6_fresh_2comp_mo()
+        # Scan finished product + SN → binds SN to MO (lot_producing_ids).
+        wiz1 = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        self.action_barcode_scanned(wiz1, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz1, "SN-BACKFILL-001")
+        self.assertTrue(mo.lot_producing_ids)
+        # Simulate exit & re-enter: a brand-new wizard bound to the same MO.
+        wiz2 = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        state = wiz2.get_scan_state()
+        self.assertEqual(state["finished_lot_name"], "SN-BACKFILL-001")
+        self.assertTrue(state["finished_lot_id"])
+
+    def test_t6_remove_component_lot(self):
+        """action_remove_component_lot unlinks the SN's move line.
+
+        After removing the only scanned SN: move_line_ids empty,
+        move.quantity == 0, move.state falls back to 'waiting' (Odoo
+        does not auto-re-reserve).
+        """
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        # Scan finished product (auto-fill), then component A + its SN.
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, self.component_serial_a.barcode)
+        self.action_barcode_scanned(wiz, self.lot_serial_a_shared.name)
+        move_a = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_a
+        )
+        line = move_a.move_line_ids.filtered(
+            lambda l: l.lot_id == self.lot_serial_a_shared
+        )
+        self.assertTrue(line)
+        self.assertEqual(line.quantity, 1.0)
+        lot_id = self.lot_serial_a_shared.id
+        # Remove the SN.
+        res = wiz.action_remove_component_lot(move_a.id, lot_id)
+        self.assertTrue(res)
+        move_a.invalidate_recordset()
+        self.assertFalse(move_a.move_line_ids)
+        self.assertEqual(move_a.quantity, 0.0)
+        self.assertEqual(move_a.state, "waiting")
+
+    def test_t6_remove_component_lot_wrong_move(self):
+        """action_remove_component_lot returns False when move_id does not
+        belong to the current MO's raw moves (tamper guard)."""
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        # Scan component A + SN so there is a real line to (not) touch.
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, self.component_serial_a.barcode)
+        self.action_barcode_scanned(wiz, self.lot_serial_a_shared.name)
+        move_a = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_a
+        )
+        line_count_before = len(move_a.move_line_ids)
+        # Pass a move_id that is not part of this MO.
+        bogus_move_id = move_a.id + 99999
+        res = wiz.action_remove_component_lot(
+            bogus_move_id, self.lot_serial_a_shared.id
+        )
+        self.assertFalse(res)
+        # No line was harmed.
+        move_a.invalidate_recordset()
+        self.assertEqual(len(move_a.move_line_ids), line_count_before)

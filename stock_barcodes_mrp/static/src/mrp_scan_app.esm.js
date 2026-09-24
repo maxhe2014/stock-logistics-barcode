@@ -362,6 +362,35 @@ export class MrpScanApp extends Component {
         this.state.expandedComponentId =
             this.state.expandedComponentId === moveId ? false : moveId;
     }
+
+    /** Remove a single scanned component SN (unlinks its move line). */
+    async onRemoveComponentLot(moveId, lotId) {
+        try {
+            await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "action_remove_component_lot",
+                [[this.wizId], moveId, lotId]
+            );
+            await this._refreshState();
+            // If the component has 0 or 1 lot left, collapse the expand
+            // row. With 1 lot the SN is shown directly in the column (no
+            // badge to click), so the expand row would otherwise be stuck
+            // open with no way to collapse it.
+            const comp = (this.state.components || []).find(
+                (c) => c.id === moveId
+            );
+            if (!comp || !comp.lots || comp.lots.length <= 1) {
+                this.state.expandedComponentId = false;
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Remove SN failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+        }
+    }
 }
 
 registry

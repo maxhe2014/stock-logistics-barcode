@@ -106,11 +106,25 @@
                                 <td class="text-end"><t t-out="comp.demand" /></td>
                                 <td class="text-end"><t t-out="comp.quantity" /></td>
                                 <td class="text-center">
-                                    <span t-if="comp.lots.length"
-                                          class="badge bg-info cursor-pointer"
-                                          t-on-click.stop="() => this.onToggleComponentLots(comp.id)">
-                                        <t t-out="comp.lots.length" /> 个 SN
-                                    </span>
+                                    <t t-if="comp.lots.length === 1">
+                                        <span class="d-inline-flex align-items-center gap-1">
+                                            <span class="small text-truncate" style="max-width: 12em;">
+                                                <t t-out="comp.lots[0].name" />
+                                            </span>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-link text-danger p-0"
+                                                    t-att-title="'Remove ' + comp.lots[0].name"
+                                                    t-on-click.stop="() => this.onRemoveComponentLot(comp.id, comp.lots[0].id)">
+                                                <i class="fa fa-trash"/>
+                                            </button>
+                                        </span>
+                                    </t>
+                                    <t t-elif="comp.lots.length > 1">
+                                        <span class="badge bg-info cursor-pointer"
+                                              t-on-click.stop="() => this.onToggleComponentLots(comp.id)">
+                                            <t t-out="comp.lots.length" /> 个 SN
+                                        </span>
+                                    </t>
                                 </td>
                                 <td class="text-center">
                                     <span t-if="comp.picked" class="badge bg-success">✓</span>
@@ -119,10 +133,16 @@
                             </tr>
                             <tr t-if="state.expandedComponentId === comp.id">
                                 <td colspan="6" class="ps-4 py-1 bg-white">
-                                    <t t-foreach="comp.lots" t-as="sn" t-key="sn">
-                                        <div class="small text-muted">
+                                    <t t-foreach="comp.lots" t-as="sn" t-key="sn.id">
+                                        <div class="d-flex align-items-center small text-muted">
                                             <i class="fa fa-circle-o me-1"/>
-                                            <t t-out="sn" />
+                                            <span class="flex-fill"><t t-out="sn.name" /></span>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                    t-att-title="'Remove ' + sn.name"
+                                                    t-on-click.stop="() => this.onRemoveComponentLot(comp.id, sn.id)">
+                                                <i class="fa fa-trash"/>
+                                            </button>
                                         </div>
                                     </t>
                                 </td>
