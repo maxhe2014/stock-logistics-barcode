@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-20 23:35+0000\n"
-"PO-Revision-Date: 2026-09-20 23:35+0000\n"
+"POT-Creation-Date: 2026-09-24 02:44+0000\n"
+"PO-Revision-Date: 2026-09-24 02:44+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -27,6 +27,12 @@ msgid ""
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+msgid "%(label)s failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model:ir.actions.report,print_report_name:stock_barcodes_mrp.report_stock_lot_traceability
 msgid "'Lot Traceability - %s' % (object.display_name)"
 msgstr ""
@@ -34,6 +40,11 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "<i class=\"fa fa-angle-up me-1\" role=\"img\" title=\"Hide\"/>Hide Tools"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "<i class=\"fa fa-check-circle me-1\" role=\"img\" title=\"Bound\"/>"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -113,6 +124,11 @@ msgid "<span class=\"form-check-label small\">High Priority</span>"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__active_move_id
+msgid "Active Component Move"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Added & consumed: %(prod)s x%(qty)s"
@@ -131,6 +147,9 @@ msgid "Already on MO %s"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Apply Lot"
 msgstr ""
@@ -141,6 +160,8 @@ msgid "Available"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Back"
 msgstr ""
@@ -178,6 +199,12 @@ msgid "Candidate MOs"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Candidate MOs (%s)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Clean Component"
 msgstr ""
@@ -193,18 +220,34 @@ msgid "Clean Lot / SN"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Clear SN"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__company_id
 msgid "Company"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__product_id
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_move_component_checklist_tree
 msgid "Component"
 msgstr ""
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__components_availability_state
 msgid "Component Availability"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__component_move_ids
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Component Checklist"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -230,6 +273,9 @@ msgid "Components auto-filled: %(filled)s full, %(partial)s partial."
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Confirm"
 msgstr ""
@@ -269,12 +315,16 @@ msgid ""
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__total_demand
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_move_component_checklist_tree
 msgid "Demand"
 msgstr ""
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_production__display_name
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_production_backorder__display_name
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_workorder__display_name
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_res_users__display_name
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__display_name
@@ -329,6 +379,9 @@ msgid ""
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Finish Production"
 msgstr ""
@@ -361,13 +414,12 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Finished lot required before finishing production"
+msgid "Finished lot required for tracked product"
 msgstr ""
 
 #. module: stock_barcodes_mrp
-#. odoo-python
-#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Finished lot required for tracked product"
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "Finished lot/serial bound to this MO"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -383,6 +435,13 @@ msgid "Force Add"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Force Consume"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Force Done"
 msgstr ""
@@ -394,12 +453,25 @@ msgid "Force add only supports non-tracked products"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Found %s MOs for %s — click 'View candidate MOs' to pick."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Found %s MOs for SN %s — click 'View candidate MOs' to pick."
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_filter_priority
 msgid "High Priority"
 msgstr ""
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_production__id
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_production_backorder__id
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_mrp_workorder__id
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_res_users__id
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__id
@@ -437,6 +509,12 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_dest_id
 msgid "Location where the system will stock the finished products."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Location:"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -498,6 +576,24 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO %(done)s done. Switched to MO %(next)s."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO %(done)s done. Switched to backorder %(bo)s."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "MO %s is already done"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "MO %s is not active (draft/done/cancelled)"
 msgstr ""
 
@@ -528,6 +624,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "MO is draft, confirm it before scanning"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "MO:"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -603,7 +705,15 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Multiple lots found for barcode: %s"
+msgid "Multiple lots found for %s — refine barcode."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"Multiple lots named %(sn)s found. Click the target component row first, then"
+" scan again."
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -639,6 +749,18 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "New lot: %s. Enter qty and confirm."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "No active MO for product %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "No components to display. Scan a finished product / MO first."
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -697,6 +819,46 @@ msgid "Open MO"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+msgid "Open candidates failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__active_move_id
+msgid ""
+"Operator-selected target component move. When set, scanning a serial/lot "
+"narrows the lot lookup to this move's product first, so cross-product SN "
+"collisions resolve automatically. Cleared on MO switch, finished-lot scan, "
+"or scanning a different product."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__pending_finish
+msgid "Pending finish"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Pending finished lot: %s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Picked"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"Please scan the finished product serial number (SN) first, or use Manual "
+"Entry."
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__produced_lot_ids
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.report_lot_traceability
 msgid "Produced Finished Lots"
@@ -749,6 +911,12 @@ msgid "Product to Produce"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Product:"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Product: %s. Enter qty and confirm."
@@ -763,12 +931,24 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Production done: %(mo)s. No more MOs in queue."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Production done: %s"
 msgstr ""
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_qty_producing
 msgid "Qty Producing"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Qty producing:"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -822,6 +1002,12 @@ msgid ""
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+msgid "Remove SN failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__res_id
 msgid "Res"
 msgstr ""
@@ -829,6 +1015,29 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__res_model_id
 msgid "Res Model"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Reserved"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Resolving consumption warning for %s..."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "SN"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.mrp_production_list_inherit_stock_barcodes_mrp
+msgid "Scan"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -851,7 +1060,25 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan a component product barcode"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Scan a component product barcode or click a component row first."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Scan component product"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+msgid "Scan failed: %(err)s"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -869,6 +1096,12 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Scan or type barcode, then press Enter"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Scan or type barcode…"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -890,8 +1123,19 @@ msgid "Scan the lot/serial of %s"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_move_component_checklist_tree
+msgid "Scanned"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Scanned Component"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Scanning for:"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -902,6 +1146,25 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "Select Manufacturing Order"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+msgid "Select component failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Serial %s bound to MO"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__pending_finish
+msgid ""
+"Set by action_finish_production's dialog path; consumed by "
+"_onchange_production_state once the MO actually goes done."
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -1013,8 +1276,20 @@ msgid "Value of the last barcode scanned."
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
+msgid "View candidate MOs"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__visible_force_done
 msgid "Visible Force Done"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model,name:stock_barcodes_mrp.model_mrp_production_backorder
+msgid "Wizard to mark as done or create back order"
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -1043,4 +1318,16 @@ msgstr ""
 msgid ""
 "Work centers this operator is assigned to. Used to filter the MRP barcode "
 "queue (My Work Orders)."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "个 SN"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "成品 SN："
 msgstr ""
