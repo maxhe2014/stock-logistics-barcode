@@ -504,7 +504,13 @@ class WizStockBarcodesMrp(models.TransientModel):
             components.append({
                 "id": mv.id,
                 "product_name": mv.product_id.display_name or "",
-                "demand": mv.product_uom_qty,
+                # Match the MO form's "To Consume" / "Consumed" semantics:
+                #   - should_consume_qty = (qty_producing - qty_produced) * unit_factor
+                #   - product_uom_qty    = BOM total demand (denominator of the
+                #                         "X / Y" display in mrp_should_consume)
+                #   - quantity           = actually consumed (sum of move_lines)
+                "to_consume": getattr(mv, "should_consume_qty", 0.0) or 0.0,
+                "total_demand": mv.product_uom_qty,
                 "quantity": sum(move_lines.mapped("quantity")),
                 "picked": picked_all,
                 "state": mv.state,

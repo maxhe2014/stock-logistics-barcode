@@ -115,11 +115,8 @@
                         <tr>
                             <th class="text-center" style="width:2rem"></th>
                             <th>Component</th>
-                            <th class="text-end">Demand</th>
-                            <th class="text-end">Reserved</th>
-                            <th class="text-center">SN</th>
+                            <th class="text-center">SN / Action</th>
                             <th class="text-center">Picked</th>
-                            <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -130,15 +127,27 @@
                                 t-on-click="() => this.onSelectMove(comp.id)"
                                 role="button"
                             >
-                                <td class="text-center">
+                                <td class="text-center align-middle">
                                     <i
                                         t-att-class="state.active_move_id === comp.id ? 'fa fa-hand-o-right text-primary' : 'fa fa-hand-o-right text-muted opacity-25'"
                                     />
                                 </td>
-                                <td><t t-out="comp.product_name" /></td>
-                                <td class="text-end"><t t-out="comp.demand" /></td>
-                                <td class="text-end"><t t-out="comp.quantity" /></td>
-                                <td class="text-center">
+                                <td class="align-middle">
+                                    <div><t t-out="comp.product_name" /></div>
+                                    <!-- Compact qty line: matches MO form semantics
+                                         (to_consume / total_demand  and  consumed quantity) -->
+                                    <div class="small text-muted lh-sm">
+                                        待消耗
+                                        <t t-out="comp.to_consume" />
+                                        /
+                                        <t t-out="comp.total_demand" />
+                                        <span class="mx-1">·</span>
+                                        已消耗
+                                        <t t-out="comp.quantity" />
+                                    </div>
+                                </td>
+                                <td class="text-center align-middle">
+                                    <!-- SN present: show SN(s) + per-SN delete -->
                                     <t t-if="comp.lots.length === 1">
                                         <span class="d-inline-flex align-items-center gap-1">
                                             <span class="small text-truncate" style="max-width: 12em;">
@@ -158,32 +167,31 @@
                                             <t t-out="comp.lots.length" /> 个 SN
                                         </span>
                                     </t>
+                                    <!-- No SN: consume / reset actions live here to save a column -->
+                                    <t t-else="">
+                                        <button t-if="!comp.picked &amp;&amp; comp.tracking !== 'serial'"
+                                                type="button"
+                                                class="btn btn-sm btn-outline-success"
+                                                title="Consume BOM demand quantity"
+                                                t-on-click.stop="() => this.onConsumeByDemand(comp.id)">
+                                            消耗
+                                        </button>
+                                        <button t-if="comp.picked"
+                                                type="button"
+                                                class="btn btn-sm btn-outline-warning"
+                                                title="Reset consumed quantity"
+                                                t-on-click.stop="() => this.onResetComponentMove(comp.id)">
+                                            重置
+                                        </button>
+                                    </t>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center align-middle">
                                     <span t-if="comp.picked" class="badge bg-success">✓</span>
                                     <span t-else="" class="badge bg-danger">✗</span>
                                 </td>
-                                <td class="text-center">
-                                    <!-- One-click consume by BOM demand (non-serial, not picked yet) -->
-                                    <button t-if="!comp.picked &amp;&amp; comp.tracking !== 'serial'"
-                                            type="button"
-                                            class="btn btn-sm btn-outline-success"
-                                            title="Consume BOM demand quantity"
-                                            t-on-click.stop="() => this.onConsumeByDemand(comp.id)">
-                                        消耗
-                                    </button>
-                                    <!-- Reset consumed quantity (any tracking, once picked) -->
-                                    <button t-if="comp.picked"
-                                            type="button"
-                                            class="btn btn-sm btn-outline-warning"
-                                            title="Reset consumed quantity"
-                                            t-on-click.stop="() => this.onResetComponentMove(comp.id)">
-                                        重置
-                                    </button>
-                                </td>
                             </tr>
                             <tr t-if="state.expandedComponentId === comp.id">
-                                <td colspan="7" class="ps-4 py-1 bg-white">
+                                <td colspan="4" class="ps-4 py-1 bg-white">
                                     <t t-foreach="comp.lots" t-as="sn" t-key="sn.id">
                                         <div class="d-flex align-items-center small text-muted">
                                             <i class="fa fa-circle-o me-1"/>
