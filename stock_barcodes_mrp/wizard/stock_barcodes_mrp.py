@@ -1364,6 +1364,44 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.product_qty = demand
         return self.action_confirm()
 
+    def action_consume_component_with_qty(self, move_id, qty):
+        """Consume a non-serial component with an operator-specified quantity.
+
+        Same flow as action_consume_component_by_demand but uses the
+        provided ``qty`` instead of the BOM-scaled demand. Used by the
+        OWL inline pencil button so the operator can consume a partial or
+        custom quantity without scanning the product barcode first.
+
+        :param move_id: stock.move id (must belong to this MO's raw moves)
+        :param qty: quantity to consume (must be > 0)
+        :return: action_confirm's result (move_lines dict or False)
+        """
+        self.ensure_one()
+        move = self.component_move_ids.filtered(lambda m: m.id == move_id)
+        if not move:
+            return False
+        if move.product_id.tracking == "serial":
+            self._set_message(
+                "error",
+                _("Serial component %s must be consumed by scanning SNs")
+                % move.product_id.name,
+            )
+            return False
+        try:
+            qty = float(qty)
+        except (TypeError, ValueError):
+            return False
+        if qty <= 0:
+            return False
+        self.product_id = move.product_id
+        self.product_uom_id = move.product_id.uom_id
+        if not self.location_id:
+            self.location_id = self.production_id.location_src_id
+        self.lot_id = False
+        self.lot_name = False
+        self.product_qty = qty
+        return self.action_confirm()
+
     def _resolve_lot_owner(self, lot, product):
         """Identify whether `product` is a component or the finished product
         of the current MO and handle accordingly.

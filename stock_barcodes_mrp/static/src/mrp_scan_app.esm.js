@@ -74,6 +74,9 @@ export class MrpScanApp extends Component {
             active_move_product_name: "",
             // Component scanned-SN expansion row (move id or false)
             expandedComponentId: false,
+            // Inline quantity editing for non-serial components
+            editingQtyMoveId: false,
+            draftQty: "",
         });
 
         onWillStart(async () => {
@@ -196,43 +199,81 @@ export class MrpScanApp extends Component {
     }
 
     /**
-     * Set the consumption quantity for the currently scanned component.
-     * Only enabled for non-serial components (serial SNs are qty=1 and
-     * auto-confirmed). Debounce-free: the input commits on blur/Enter so
-     * a scan-heavy shop floor does not spam RPCs on every keystroke.
+     * Enter inline quantity-edit mode for a non-serial component row.
+     * Pre-fills the draft with the BOM-scaled demand so the operator can
+     * tweak it or just confirm.
      */
-    async onProductQtyChange(ev) {
-        if (this.state.scanning || !this.wizId) {
+    onEditComponentQty(moveId) {
+        const comp = this.state.components.find((c) => c.id === moveId);
+        if (!comp) {
             return;
         }
-        const qty = parseFloat(ev.currentTarget.value);
-        if (!qty || qty <= 0) {
-            return;
-        }
-        try {
-            const ok = await this.orm.call(
-                "wiz.stock.barcodes.mrp",
-                "set_product_qty",
-                [[this.wizId], qty]
-            );
-            if (ok) {
-                this.state.product_qty = qty;
-            }
-        } catch (err) {
-            this.notification.add(
-                _t("Set quantity failed: %(err)s", { err: err?.message || String(err) }),
-                { type: "danger" }
-            );
+        this.state.editingQtyMoveId = moveId;
+        this.state.draftQty = comp.to_consume || 0;
+    }
+
+    /** Track the draft quantity as the operator types. */
+    onDraftQtyInput(ev) {
+        this.state.draftQty = ev.currentTarget.value;
+    }
+
+    /** Enter confirms the draft qty; Escape cancels. */
+    onDraftQtyKeydown(ev, moveId) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this.onConfirmComponentQty(moveId);
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this.onCancelComponentQty();
         }
     }
 
-    /** Show the component quantity input when a component is scanned and
-     *  it is not serial-tracked (serial SNs consume exactly 1 each). */
-    get showComponentQtyInput() {
-        return (
-            !!this.state.product_id &&
-            this.state.product_tracking !== "serial"
-        );
+    /** Consume a non-serial component with the operator-entered quantity.
+     *  Calls the backend action_consume_component_with_qty which sets the
+     *  scan context and runs action_confirm in one shot. */
+    async onConfirmComponentQty(moveId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        const qty = parseFloat(this.state.draftQty);
+        if (!qty || qty <= 0) {
+            this.notification.add(_t("Please enter a positive quantity"), {
+                type: "danger",
+            });
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "action_consume_component_with_qty",
+                [[this.wizId], moveId, qty]
+            );
+            if (res && typeof res === "object" && res.type) {
+                await this.actionService.doAction(res, {
+                    onClose: () => this._refreshState(),
+                });
+            } else {
+                await this._refreshState();
+            }
+            this.state.editingQtyMoveId = false;
+            this.state.draftQty = "";
+        } catch (err) {
+            this.notification.add(
+                _t("Consume with quantity failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /** Exit inline quantity-edit mode without consuming. */
+    onCancelComponentQty() {
+        this.state.editingQtyMoveId = false;
+        this.state.draftQty = "";
     }
 
     /** Show the "Scan Finished SN" escape button next to the scan input.
@@ -268,33 +309,6 @@ export class MrpScanApp extends Component {
                 _t("Failed to reset scan context: %(err)s", {
                     err: err?.message || String(err),
                 }),
-                { type: "danger" }
-            );
-        }
-    }
-
-    /**
-     * Shortcut: fill the quantity input with the BOM demand for the
-     * currently scanned component (unit_factor * finished_qty_producing).
-     * Backend returns the demand float; update the local state so the
-     * input reflects it without a full refresh.
-     */
-    async onSetQtyToDemand() {
-        if (this.state.scanning || !this.wizId) {
-            return;
-        }
-        try {
-            const demand = await this.orm.call(
-                "wiz.stock.barcodes.mrp",
-                "action_set_qty_to_demand",
-                [[this.wizId]]
-            );
-            if (demand) {
-                this.state.product_qty = demand;
-            }
-        } catch (err) {
-            this.notification.add(
-                _t("Fill demand failed: %(err)s", { err: err?.message || String(err) }),
                 { type: "danger" }
             );
         }

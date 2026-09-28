@@ -44,32 +44,20 @@
             </div>
 
             <!-- Consolidated operational hints: status message +
-                 active-scan target + quantity input (non-serial only).
-                 All live below the scan box so the operator has one
-                 place to look for "what do I do next". -->
-            <div t-if="state.message || state.active_move_product_name || showComponentQtyInput"
+                 active-scan target merged into one alert box. The quantity
+                 input for non-serial components lives inline on the
+                 component row (pencil button) instead of here. -->
+            <div t-if="state.message || state.active_move_product_name"
                  class="o_mrp_scan_message m-3">
-                <div t-if="state.message" t-att-class="'alert ' + alertClass + ' mb-2'">
-                    <t t-out="state.message" />
-                </div>
-                <div t-if="state.active_move_product_name" class="small text-primary d-flex align-items-center gap-1">
-                    <i class="fa fa-hand-o-right" /> 正在扫描：
-                    <t t-out="state.active_move_product_name" />
-                </div>
-                <div t-if="showComponentQtyInput" class="d-flex align-items-center gap-2 mt-2">
-                    <span class="text-muted">数量：</span>
-                    <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        class="form-control form-control-sm"
-                        style="width: 7rem;"
-                        t-att-value="state.product_qty"
-                        t-on-change="onProductQtyChange"
-                    />
-                    <span t-if="state.product_uom_name" class="text-muted small">
-                        <t t-out="state.product_uom_name" />
-                    </span>
+                <div t-att-class="'alert ' + (state.message ? alertClass : 'alert-info') + ' mb-0'">
+                    <t t-if="state.message"><t t-out="state.message" /></t>
+                    <t t-if="state.message &amp;&amp; state.active_move_product_name"><br/></t>
+                    <t t-if="state.active_move_product_name">
+                        <span class="text-primary">
+                            <i class="fa fa-hand-o-right me-1"/>正在扫描：
+                            <t t-out="state.active_move_product_name" />
+                        </span>
+                    </t>
                 </div>
             </div>
 
@@ -163,13 +151,49 @@
                                                 <i class="fa fa-barcode"/>
                                                 请扫描序列号
                                             </span>
-                                            <button t-if="!comp.picked &amp;&amp; comp.tracking !== 'serial'"
-                                                    type="button"
-                                                    class="btn btn-sm btn-outline-success"
-                                                    title="Consume BOM demand quantity"
-                                                    t-on-click.stop="() => this.onConsumeByDemand(comp.id)">
-                                                消耗
-                                            </button>
+                                            <!-- Non-serial, not consumed: one-click consume by demand
+                                                 + pencil to enter a custom quantity inline. -->
+                                            <t t-if="!comp.picked &amp;&amp; comp.tracking !== 'serial'">
+                                                <t t-if="state.editingQtyMoveId === comp.id">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        class="form-control form-control-sm"
+                                                        style="width: 6rem;"
+                                                        t-att-value="state.draftQty || comp.to_consume"
+                                                        t-on-input="(ev) => this.onDraftQtyInput(ev)"
+                                                        t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, comp.id)"
+                                                        t-on-click.stop=""
+                                                    />
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-success"
+                                                            title="Confirm quantity"
+                                                            t-on-click.stop="() => this.onConfirmComponentQty(comp.id)">
+                                                        <i class="fa fa-check"/>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            title="Cancel"
+                                                            t-on-click.stop="() => this.onCancelComponentQty()">
+                                                        <i class="fa fa-times"/>
+                                                    </button>
+                                                </t>
+                                                <t t-else="">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-success"
+                                                            title="Consume BOM demand quantity"
+                                                            t-on-click.stop="() => this.onConsumeByDemand(comp.id)">
+                                                        消耗
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary"
+                                                            title="Edit quantity to consume"
+                                                            t-on-click.stop="() => this.onEditComponentQty(comp.id)">
+                                                        <i class="fa fa-pencil"/>
+                                                    </button>
+                                                </t>
+                                            </t>
                                             <button t-if="comp.picked"
                                                     type="button"
                                                     class="btn btn-sm btn-outline-warning"
