@@ -506,17 +506,12 @@ class WizStockBarcodesMrp(models.TransientModel):
                     if l.lot_id
                 ],
             })
-        # Fallback: wizard reopened fresh after exit — pull the finished
-        # lot from the MO's binding so the UI keeps showing it. The wizard
-        # local fields (finished_lot_id/name) are empty on a new wizard,
-        # but lot_producing_ids on the MO persists the scanned SN.
-        finished_lot_id = self.finished_lot_id.id or False
-        finished_lot_name = self.finished_lot_name or ""
-        if not finished_lot_id and not finished_lot_name and production:
-            mo_lot = production.lot_producing_ids[:1]
-            if mo_lot:
-                finished_lot_id = mo_lot.id
-                finished_lot_name = mo_lot.name
+        # Resolve the effective finished lot (wizard fields first, then
+        # fall back to the MO's lot_producing_ids) so the UI keeps showing
+        # the SN after the wizard is reopened fresh.
+        effective_lot = self._get_effective_finished_lot()
+        finished_lot_id = effective_lot.id or False
+        finished_lot_name = effective_lot.name or ""
         return {
             "wiz_id": self.id,
             "step": self.step,
@@ -640,6 +635,14 @@ class WizStockBarcodesMrp(models.TransientModel):
 
         Works at any step (not just step 0) so the operator can bind the
         finished lot after components are auto-filled.
+
+        Semantics: once a finished SN is bound to the MO
+        (lot_producing_ids), it stays bound until the operator clicks
+        Clear SN. Re-scanning the same SN is idempotent; scanning a
+        different SN is rejected (no silent replacement) and the
+        operator is told to Clear first. The binding is written to the
+        MO immediately for all tracked products (serial + lot) so it
+        survives wizard exit/re-entry.
         """
         if not self.production_id:
             return False
@@ -647,12 +650,6 @@ class WizStockBarcodesMrp(models.TransientModel):
         if finished_product.tracking == "none":
             return False
         is_serial = finished_product.tracking == "serial"
-        # Once a finished lot is bound, do not accept another finished lot
-        # scan here. To replace the SN (serial), the operator rescans the
-        # finished product first (see _scan_product), which clears
-        # finished_lot_id and re-enters this phase.
-        if self.finished_lot_id:
-            return False
         lot_domain = [("name", "=", barcode), ("product_id", "=", finished_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
         if not lots:
@@ -660,37 +657,53 @@ class WizStockBarcodesMrp(models.TransientModel):
         if len(lots) > 1:
             self._set_message("more_match", _("Multiple finished lots found"))
             return True
-        # Confirmed finished-lot match: end the component phase and clear
-        # any click-selected component target. Done only AFTER the match
-        # so a non-matching barcode does not destroy the active_move
-        # context that _scan_lot needs.
-        self.active_move_id = False
         lot = lots
+        # --- Rejection guard: MO already has a finished lot bound ---
+        current_bound = self.production_id.lot_producing_ids
+        if current_bound:
+            if lot == current_bound[0]:
+                # Same SN re-scanned: idempotent no-op.
+                self._set_message(
+                    "info",
+                    _("SN %s is already bound to this MO") % lot.name,
+                )
+                return True
+            # Different SN: reject, do not replace.
+            self._set_message(
+                "error",
+                _("MO already has SN %(cur)s bound. Clear it first to "
+                  "scan a different one.")
+                % {"cur": current_bound[0].name},
+            )
+            return True
+        # --- No bound lot yet: bind it ---
+        # End the component phase and clear any click-selected component
+        # target. Done only AFTER the match so a non-matching barcode
+        # does not destroy the active_move context that _scan_lot needs.
+        self.active_move_id = False
         self.finished_lot_id = lot
         self.finished_lot_name = lot.name
         if is_serial:
-            # Direction B: one SN = one unit; write MO immediately so the
-            # binding survives any later wizard state reset.
             self.finished_qty_producing = 1.0
-            self._apply_finished_lot_to_mo(lot)
-            self._auto_fill_components()
-            self._set_message(
-                "success",
-                _("Serial %s bound to MO") % lot.name,
-            )
-        else:
-            self._auto_fill_components()
+        # Apply to MO for all tracked products so the binding survives
+        # wizard exit/re-entry (lot_producing_ids is the source of truth).
+        self._apply_finished_lot_to_mo(lot)
+        self._auto_fill_components()
+        self._set_message(
+            "success",
+            _("%(type)s %(lot)s bound to MO")
+            % {"type": _("Serial") if is_serial else _("Lot"), "lot": lot.name},
+        )
         return True
 
     def _accept_new_finished_lot(self, barcode):
-        """Last-resort fallback: record an unknown barcode as a pending
-        finished lot name for the current MO.
+        """Last-resort fallback: record an unknown barcode as a new
+        finished lot for the current MO.
 
-        Does NOT create the stock.lot record or write
-        production.lot_producing_ids — those happen at Apply Lot /
-        Finish Production (consistent with _scan_finished_lot, and keeps
-        the scan phase free of DB side effects so a mistyped SN can be
-        cleared without polluting the MO).
+        Creates the stock.lot and writes production.lot_producing_ids
+        immediately for all tracked products (serial + lot) so the
+        binding survives wizard exit/re-entry. Consistent with
+        _scan_finished_lot: once bound, the SN stays valid until Clear.
 
         Only fires when ALL other scanners failed. Placed at the END of
         the dispatch chain so it cannot swallow MO refs, location barcodes,
@@ -702,32 +715,41 @@ class WizStockBarcodesMrp(models.TransientModel):
         if finished_product.tracking == "none":
             return False
         is_serial = finished_product.tracking == "serial"
-        # Once a finished lot is bound, do not swallow unknown barcodes as
-        # new finished lots. To replace the SN (serial), rescan the
-        # finished product first to clear finished_lot_id.
-        if self.finished_lot_id:
-            return False
         # Guard: existing lot of any product → don't shadow it
         if self.env["stock.lot"].search([("name", "=", barcode)], limit=1):
             return False
-        # Confirmed new finished lot: end the component phase. Done only
-        # AFTER the guards so a non-matching barcode does not destroy the
-        # active_move context that _scan_lot needs.
+        # --- Rejection guard: MO already has a finished lot bound ---
+        # The scanned barcode is a brand-new lot name (not in stock.lot),
+        # so it can never match the bound lot (which exists in stock.lot).
+        # Any second scan while a lot is bound is therefore a different SN
+        # and must be rejected, not replaced.
+        current_bound = self.production_id.lot_producing_ids
+        if current_bound:
+            self._set_message(
+                "error",
+                _("MO already has SN %(cur)s bound. Clear it first to "
+                  "scan a different one.")
+                % {"cur": current_bound[0].name},
+            )
+            return True
+        # --- No bound lot yet: create + bind it ---
+        # End the component phase. Done only AFTER the guards so a
+        # non-matching barcode does not destroy the active_move context
+        # that _scan_lot needs.
         self.active_move_id = False
         self.finished_lot_name = barcode
+        lot = self._create_new_finished_lot()
         if is_serial:
-            # Direction B: create the lot and write the MO immediately.
-            lot = self._create_new_finished_lot()
             self.finished_qty_producing = 1.0
-            self._apply_finished_lot_to_mo(lot)
-            self._auto_fill_components()
-            self._set_message(
-                "success",
-                _("Serial %s bound to MO") % barcode,
-            )
-        else:
-            self._auto_fill_components()
-            self._set_message("info", _("Pending finished lot: %s") % barcode)
+        # Apply to MO for all tracked products so the binding survives
+        # wizard exit/re-entry (lot_producing_ids is the source of truth).
+        self._apply_finished_lot_to_mo(lot)
+        self._auto_fill_components()
+        self._set_message(
+            "success",
+            _("%(type)s %(lot)s bound to MO")
+            % {"type": _("Serial") if is_serial else _("Lot"), "lot": barcode},
+        )
         return True
 
     def _scan_production(self, barcode):
@@ -837,14 +859,10 @@ class WizStockBarcodesMrp(models.TransientModel):
             return True
         # TODO-A3: scanned the finished product of this MO -> auto-fill
         # all components so the operator only needs to confirm qty.
+        # Rescanning the finished product does NOT clear the bound
+        # finished SN — the SN stays valid until the operator clicks
+        # Clear SN (see _scan_finished_lot / _accept_new_finished_lot).
         if self.production_id and product == self.production_id.product_id:
-            # Direction B: rescanning the finished product clears any
-            # bound finished SN so the operator can bind a different SN
-            # (serial replace flow). _auto_fill_components does not touch
-            # finished_lot_id, so clear it explicitly here.
-            if self.production_id.product_id.tracking != "none":
-                self.finished_lot_id = False
-                self.finished_lot_name = False
             return self._auto_fill_components()
         # If the product is NOT a component of the current MO, run the
         # TODO-A1 fallback BEFORE overwriting the in-progress scan state:
@@ -1700,14 +1718,42 @@ class WizStockBarcodesMrp(models.TransientModel):
         production.write(vals)
         return True
 
+    def _get_effective_finished_lot(self):
+        """Return the effective finished lot for the current wizard.
+
+        Wizard-local fields take precedence (user just scanned). If they
+        are empty (wizard reopened fresh after exit), fall back to the
+        MO's lot_producing_ids so business methods agree with the UI
+        (which backfills from the same source).
+        """
+        self.ensure_one()
+        if self.finished_lot_id:
+            return self.finished_lot_id
+        if self.finished_lot_name and self.production_id:
+            lot = self.env["stock.lot"].search([
+                ("name", "=", self.finished_lot_name),
+                ("product_id", "=", self.production_id.product_id.id),
+            ], limit=1)
+            if lot:
+                return lot
+            # Lot name entered (manual entry) but the stock.lot record
+            # does not exist yet → create it now (same behaviour the old
+            # apply/finish paths had via _create_new_finished_lot).
+            return self._create_new_finished_lot()
+        if self.production_id:
+            mo_lot = self.production_id.lot_producing_ids[:1]
+            if mo_lot:
+                return mo_lot
+        return self.env["stock.lot"]
+
     def action_apply_finished_lot(self):
         """Apply the scanned finished lot and qty_producing to the MO."""
         if not self.production_id:
             return False
-        # Create new lot if needed
-        lot = self.finished_lot_id
-        if not lot and self.finished_lot_name:
-            lot = self._create_new_finished_lot()
+        # Resolve the effective finished lot (wizard fields first, then
+        # fall back to the MO's lot_producing_ids so re-opened wizards
+        # can re-apply the already-bound SN).
+        lot = self._get_effective_finished_lot()
         if not lot and self.production_id.product_id.tracking != "none":
             self._set_message("error", _("Finished lot required for tracked product"))
             return False
@@ -1794,14 +1840,13 @@ class WizStockBarcodesMrp(models.TransientModel):
                 % {"state": self.production_state},
             )
             return False
-        # Apply scanned finished lot before marking done
-        lot = self.finished_lot_id
-        if not lot and self.finished_lot_name:
-            lot = self._create_new_finished_lot()
+        # Apply scanned finished lot before marking done. Resolve the
+        # effective lot (wizard fields first, then MO's lot_producing_ids)
+        # so a re-opened wizard can finish with the already-bound SN.
+        lot = self._get_effective_finished_lot()
         if (
             self.production_id.product_id.tracking != "none"
             and not lot
-            and not self.production_id.lot_producing_ids
         ):
             self._set_message(
                 "error",
@@ -1907,15 +1952,15 @@ class WizStockBarcodesMrp(models.TransientModel):
     def action_clean_finished_lot(self):
         """Clear the scanned finished lot.
 
-        For serial finished products (Direction B: scan-time MO write),
-        also clear the MO's lot_producing_ids so wizard and MO stay
-        consistent. Lot-tracked products keep the two-phase behaviour
-        (only the wizard state is cleared; Apply is what writes the MO).
+        For all tracked finished products (serial + lot), the finished
+        SN is written to the MO at scan time, so Clear also removes the
+        MO's lot_producing_ids to keep wizard and MO consistent. Step is
+        reset to 0 so the operator knows to re-scan the finished SN.
         """
         production = self.production_id
         if (
             production
-            and production.product_id.tracking == "serial"
+            and production.product_id.tracking != "none"
             and production.lot_producing_ids
         ):
             production.write({"lot_producing_ids": [(5, 0, 0)]})
@@ -1926,6 +1971,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         else:
             self.step = 1
         self._set_message_step()
+        return True
 
     def action_remove_component_lot(self, move_id, lot_id):
         """Remove a scanned component lot/SN from the MO.

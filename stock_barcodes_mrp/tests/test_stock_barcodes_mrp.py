@@ -2037,9 +2037,9 @@ class TestStockBarcodesMrp(TransactionCase):
 
     # --- Task 1: scan new finished SN → pending lot name (two-phase) ---
 
-    def test_t1_scan_new_sn_after_product_creates_pending_lot(self):
-        """After auto-fill, a new SN is recorded as pending finished lot
-        name only — no stock.lot and no lot_producing_ids at scan time."""
+    def test_t1_scan_new_sn_applies_to_mo(self):
+        """After auto-fill, a new SN is created and bound to the MO
+        immediately (stock.lot + lot_producing_ids at scan time)."""
         wiz = self.WizScanMrp.create({
             "production_id": self.production_tracked.id,
         })
@@ -2051,29 +2051,34 @@ class TestStockBarcodesMrp(TransactionCase):
         # Scan a brand-new SN
         self.action_barcode_scanned(wiz, "NEW-FIN-999")
         self.assertEqual(wiz.finished_lot_name, "NEW-FIN-999")
-        self.assertFalse(wiz.finished_lot_id)  # two-phase: lot not created yet
+        # Lot is created and written to MO immediately.
+        self.assertTrue(wiz.finished_lot_id)
         self.assertEqual(wiz.step, 2)
-        self.assertEqual(wiz.message_type, "info")
+        self.assertEqual(wiz.message_type, "success")
         self.assertIn("NEW-FIN-999", wiz.message)
-        # No stock.lot exists, MO is untouched
-        self.assertFalse(self.StockProductionLot.search([
+        # stock.lot exists and MO has the binding.
+        lot = self.StockProductionLot.search([
             ("name", "=", "NEW-FIN-999"),
-        ]))
-        self.assertFalse(self.production_tracked.lot_producing_ids)
+        ])
+        self.assertTrue(lot)
+        self.assertIn(lot.id, self.production_tracked.lot_producing_ids.ids)
 
     def test_t1_scan_new_sn_at_step_0_directly(self):
-        """Scan a new SN directly (skip product barcode): pending name is
-        recorded and components are still auto-filled (idempotent)."""
+        """Scan a new SN directly (skip product barcode): lot is created
+        and bound to the MO immediately, components are still auto-filled."""
         self.production_tracked.action_assign()
         wiz = self.WizScanMrp.create({
             "production_id": self.production_tracked.id,
         })
         self.assertEqual(wiz.step, 0)
         self.action_barcode_scanned(wiz, "BRAND-NEW-SN-001")
-        self.assertFalse(wiz.finished_lot_id)
+        # Lot is created and written to MO immediately.
+        self.assertTrue(wiz.finished_lot_id)
         self.assertEqual(wiz.finished_lot_name, "BRAND-NEW-SN-001")
         self.assertEqual(wiz.step, 2)
         self.assertIn("BRAND-NEW-SN-001", wiz.message)
+        # MO has the binding.
+        self.assertTrue(self.production_tracked.lot_producing_ids)
         # _auto_fill_components ran: reserved raw moves are marked picked
         for move in self.production_tracked.move_raw_ids:
             self.assertTrue(
@@ -2108,25 +2113,28 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertIn("auto-filled", wiz.message)
 
     def test_t1_scan_new_sn_then_apply_writes_lot_producing_ids(self):
-        """Pending SN → action_apply_finished_lot creates the lot and
-        writes lot_producing_ids on the MO (second phase)."""
+        """New SN is created and bound to the MO at scan time; Apply Lot
+        afterwards is idempotent (lot unchanged)."""
         wiz = self.WizScanMrp.create({
             "production_id": self.production_tracked.id,
         })
         self.action_barcode_scanned(wiz, "FINAL-SN-42")
-        # Scan phase: pending name only
-        self.assertFalse(wiz.finished_lot_id)
+        # Scan phase: lot created and written to MO immediately.
+        self.assertTrue(wiz.finished_lot_id)
         self.assertEqual(wiz.finished_lot_name, "FINAL-SN-42")
-        # Apply → lot created and written to MO
-        wiz.finished_qty_producing = 1.0
-        res = wiz.action_apply_finished_lot()
-        self.assertTrue(res)
         lot = self.StockProductionLot.search([
             ("name", "=", "FINAL-SN-42"),
             ("product_id", "=", self.finished_product_tracked.id),
         ])
         self.assertTrue(lot)
         self.assertIn(lot.id, self.production_tracked.lot_producing_ids.ids)
+        # Apply → idempotent: lot is unchanged on the MO.
+        wiz.finished_qty_producing = 1.0
+        res = wiz.action_apply_finished_lot()
+        self.assertTrue(res)
+        self.assertEqual(
+            self.production_tracked.lot_producing_ids.ids, [lot.id]
+        )
         self.assertEqual(lot.product_id, self.finished_product_tracked)
         self.assertEqual(self.production_tracked.qty_producing, 1.0)
 
@@ -2490,20 +2498,30 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.production_id.lot_producing_ids.name, "SN-SER-NEW-001")
         self.assertEqual(wiz.finished_qty_producing, 1.0)
 
-    def test_t6_serial_rescan_replaces_lot(self):
+    def test_t6_serial_rescan_rejects_different_lot(self):
         wiz = self._t6_open_serial_wizard()
         self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
         self.action_barcode_scanned(wiz, "SN-SER-RES-001")
         first = wiz.production_id.lot_producing_ids
         self.assertEqual(first.name, "SN-SER-RES-001")
-        # Re-scan product (state cleaned) then a different SN replaces it.
+        # Re-scan product (does NOT clear the bound SN) then a different SN
+        # is rejected — the original binding stays untouched.
         self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
         self.action_barcode_scanned(wiz, "SN-SER-RES-002")
-        replaced = wiz.production_id.lot_producing_ids
-        self.assertEqual(len(replaced), 1)
-        self.assertEqual(replaced.name, "SN-SER-RES-002")
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("Clear", wiz.message)
+        still_bound = wiz.production_id.lot_producing_ids
+        self.assertEqual(len(still_bound), 1)
+        self.assertEqual(still_bound.name, "SN-SER-RES-001")
+        # Clear SN → binding removed → scan a different SN now succeeds.
+        wiz.action_clean_finished_lot()
+        self.assertFalse(wiz.production_id.lot_producing_ids)
+        self.action_barcode_scanned(wiz, "SN-SER-RES-002")
+        bound = wiz.production_id.lot_producing_ids
+        self.assertEqual(len(bound), 1)
+        self.assertEqual(bound.name, "SN-SER-RES-002")
 
-    def test_t6_lot_tracking_keeps_two_phase(self):
+    def test_t6_lot_tracking_applies_to_mo(self):
         wiz = self.env["wiz.stock.barcodes.mrp"].create({
             "production_id": self.production_tracked.id,
             "res_model_id": self.env.ref("mrp.model_mrp_production").id,
@@ -2511,8 +2529,11 @@ class TestStockBarcodesMrp(TransactionCase):
         })
         self.action_barcode_scanned(wiz, self.finished_product_tracked.barcode)
         self.action_barcode_scanned(wiz, self.finished_lot.name)
-        # Lot-tracked: MO stays empty until Apply Lot.
-        self.assertFalse(wiz.production_id.lot_producing_ids)
+        # Lot-tracked: the lot is bound to the MO immediately at scan time.
+        self.assertIn(
+            self.finished_lot.id,
+            wiz.production_id.lot_producing_ids.ids,
+        )
         self.assertTrue(wiz.finished_lot_id)
 
     def test_t6_finish_without_apply_still_works(self):
@@ -2551,6 +2572,83 @@ class TestStockBarcodesMrp(TransactionCase):
         # Direction B + option A: Clean also clears the MO binding.
         self.assertFalse(wiz.production_id.lot_producing_ids)
         self.assertFalse(wiz.finished_lot_id)
+
+    def test_t6_finish_after_reopen_uses_mo_lot(self):
+        """Scan finished SN → exit (new wizard) → Finish Production
+        succeeds using the MO's lot_producing_ids (no 'please scan' error)."""
+        wiz = self._t6_open_serial_wizard()
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-REOPEN-001")
+        mo = wiz.production_id
+        self.assertTrue(mo.lot_producing_ids)
+        # Simulate exit + re-entry: a brand-new wizard on the same MO.
+        wiz2 = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        self.assertFalse(wiz2.finished_lot_id)
+        self.assertFalse(wiz2.finished_lot_name)
+        # Finish must NOT fail with "please scan finished SN".
+        result = wiz2.action_finish_production()
+        self.assertNotEqual(result, False)
+        self.assertNotIn("Please scan the finished product", wiz2.message or "")
+
+    def test_t6_apply_after_reopen_uses_mo_lot(self):
+        """Scan finished SN → exit (new wizard) → Apply Lot succeeds
+        using the MO's lot_producing_ids (no 'finished lot required' error)."""
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": self.production_tracked.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": self.production_tracked.id,
+        })
+        self.action_barcode_scanned(wiz, self.finished_product_tracked.barcode)
+        self.action_barcode_scanned(wiz, "LOT-REOPEN-001")
+        mo = wiz.production_id
+        self.assertTrue(mo.lot_producing_ids)
+        # Simulate exit + re-entry.
+        wiz2 = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+        self.assertFalse(wiz2.finished_lot_id)
+        wiz2.finished_qty_producing = 1.0
+        res = wiz2.action_apply_finished_lot()
+        self.assertTrue(res)
+        self.assertEqual(mo.lot_producing_ids.name, "LOT-REOPEN-001")
+
+    def test_t6_clean_clears_mo_lot_for_lot_tracked(self):
+        """For lot-tracked products, Clear SN also removes the MO's
+        lot_producing_ids and resets step to 0."""
+        wiz = self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": self.production_tracked.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": self.production_tracked.id,
+        })
+        self.action_barcode_scanned(wiz, self.finished_product_tracked.barcode)
+        self.action_barcode_scanned(wiz, self.finished_lot.name)
+        self.assertTrue(wiz.production_id.lot_producing_ids)
+        wiz.action_clean_finished_lot()
+        self.assertFalse(wiz.production_id.lot_producing_ids)
+        self.assertFalse(wiz.finished_lot_id)
+        self.assertFalse(wiz.finished_lot_name)
+        self.assertEqual(wiz.step, 0)
+
+    def test_t6_rescan_same_sn_idempotent(self):
+        """Re-scanning the same finished SN is a no-op (info message, MO
+        binding unchanged)."""
+        wiz = self._t6_open_serial_wizard()
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-SER-IDEM-001")
+        bound = wiz.production_id.lot_producing_ids
+        self.assertEqual(bound.name, "SN-SER-IDEM-001")
+        # Scan the same SN again.
+        self.action_barcode_scanned(wiz, "SN-SER-IDEM-001")
+        self.assertEqual(wiz.message_type, "info")
+        self.assertIn("already bound", wiz.message)
+        # MO binding is unchanged.
+        self.assertEqual(wiz.production_id.lot_producing_ids, bound)
 
     def _t6_open_2comp_wizard(self):
         """Open a fresh wizard on the 2-serial-component MO."""
