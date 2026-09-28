@@ -73,6 +73,38 @@
                         t-on-click="onCleanFinishedLot">Clear SN</button>
             </div>
 
+            <!-- Current component scan context: product + lot + qty input.
+                 Visible once a component product is scanned. For serial
+                 components qty is locked to 1 (auto-confirmed), so the
+                 input is hidden. -->
+            <div t-if="state.product_id"
+                 class="o_mrp_scan_component_context d-flex flex-wrap align-items-center gap-2 px-3 py-2 bg-primary bg-opacity-10 border-bottom">
+                <i class="fa fa-cubes text-primary"/>
+                <span class="text-muted">组件：</span>
+                <span class="fw-bold"><t t-out="state.product_name" /></span>
+                <t t-if="state.lot_name_raw || state.lot_id">
+                    <span class="text-muted ms-2">批次：</span>
+                    <span class="fw-bold">
+                        <t t-out="state.lot_name_raw || state.lot_name" />
+                    </span>
+                </t>
+                <div t-if="showComponentQtyInput" class="d-flex align-items-center gap-1 ms-auto">
+                    <span class="text-muted">数量：</span>
+                    <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        class="form-control form-control-sm"
+                        style="width: 7rem;"
+                        t-att-value="state.product_qty"
+                        t-on-change="onProductQtyChange"
+                    />
+                    <span t-if="state.product_uom_name" class="text-muted small">
+                        <t t-out="state.product_uom_name" />
+                    </span>
+                </div>
+            </div>
+
             <!-- Component checklist -->
             <div class="o_mrp_scan_components flex-grow-1 overflow-auto p-3">
                 <div t-if="!state.components.length" class="text-muted">

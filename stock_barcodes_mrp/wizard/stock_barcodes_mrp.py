@@ -541,6 +541,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             "product_id": self.product_id.id or False,
             "product_tracking": self.product_tracking or "none",
             "product_qty": self.product_qty or 0.0,
+            "product_uom_name": self.product_uom_id.name or "",
             "lot_id": self.lot_id.id or False,
             "lot_name_raw": self.lot_name or "",
             "finished_lot_id": finished_lot_id,
@@ -1163,6 +1164,27 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not move or move not in self.production_id.move_raw_ids:
             return False
         self.active_move_id = move
+        return True
+
+    def set_product_qty(self, qty):
+        """Set the consumption quantity for the currently scanned component.
+
+        RPC entry for the OWL quantity input. Only meaningful for
+        non-serial components (serial SNs are always qty=1 and
+        auto-confirmed at scan time). Rejects non-positive values and
+        requires a scanned product so the field is never written on an
+        empty scan context.
+        """
+        self.ensure_one()
+        if not self.product_id:
+            return False
+        try:
+            qty = float(qty)
+        except (TypeError, ValueError):
+            return False
+        if qty <= 0:
+            return False
+        self.product_qty = qty
         return True
 
     def _resolve_lot_owner(self, lot, product):

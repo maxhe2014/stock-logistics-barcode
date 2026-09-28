@@ -65,6 +65,7 @@ export class MrpScanApp extends Component {
             product_id: false,
             product_tracking: "none",
             product_qty: 0,
+            product_uom_name: "",
             lot_id: false,
             lot_name_raw: "",
             finished_lot_id: false,
@@ -194,6 +195,46 @@ export class MrpScanApp extends Component {
                 { type: "danger" }
             );
         }
+    }
+
+    /**
+     * Set the consumption quantity for the currently scanned component.
+     * Only enabled for non-serial components (serial SNs are qty=1 and
+     * auto-confirmed). Debounce-free: the input commits on blur/Enter so
+     * a scan-heavy shop floor does not spam RPCs on every keystroke.
+     */
+    async onProductQtyChange(ev) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        const qty = parseFloat(ev.currentTarget.value);
+        if (!qty || qty <= 0) {
+            return;
+        }
+        try {
+            const ok = await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "set_product_qty",
+                [[this.wizId], qty]
+            );
+            if (ok) {
+                this.state.product_qty = qty;
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Set quantity failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
+        }
+    }
+
+    /** Show the component quantity input when a component is scanned and
+     *  it is not serial-tracked (serial SNs consume exactly 1 each). */
+    get showComponentQtyInput() {
+        return (
+            !!this.state.product_id &&
+            this.state.product_tracking !== "serial"
+        );
     }
 
     /** Map message_type → alert CSS class for the message bar. */
