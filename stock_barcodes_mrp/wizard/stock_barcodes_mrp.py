@@ -360,7 +360,15 @@ class WizStockBarcodesMrp(models.TransientModel):
             if not self.location_id:
                 self.location_id = self.production_id.location_src_id
             if not self.finished_qty_producing:
-                self.finished_qty_producing = self.production_id.product_qty
+                # Prefer the MO's current qty_producing (reflects scanned
+                # finished lots) so re-entering the scan app after a partial
+                # SN scan keeps the displayed producing count accurate.
+                # Fall back to product_qty for freshly confirmed MOs where
+                # qty_producing is still 0.
+                self.finished_qty_producing = (
+                    self.production_id.qty_producing
+                    or self.production_id.product_qty
+                )
             # If finished product is tracked and no lot yet, start at step 0
             if (
                 self.production_id.product_id.tracking != "none"
@@ -1349,7 +1357,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         # --- Finished-lot scan state ---
         self.finished_lot_id = False
         self.finished_lot_name = False
-        self.finished_qty_producing = new_mo.product_qty
+        self.finished_qty_producing = new_mo.qty_producing or new_mo.product_qty
         # --- Component scan state ---
         self.product_id = False
         self.product_uom_id = False
