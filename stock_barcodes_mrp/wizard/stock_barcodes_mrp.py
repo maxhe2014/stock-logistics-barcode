@@ -1715,6 +1715,15 @@ class WizStockBarcodesMrp(models.TransientModel):
         vals = {"qty_producing": qty}
         if lot:
             vals["lot_producing_ids"] = [(6, 0, [lot.id])]
+            # serial tracking: qty_producing MUST equal the number of SNs
+            # (core _change_producing onchange semantics). A plain write()
+            # does NOT trigger that onchange, so without this a MO with
+            # product_qty > 1 and a single scanned SN leaves qty_producing
+            # > len(lot_producing_ids). _post_inventory then creates extra
+            # no-lot move lines for the surplus qty, and button_mark_done
+            # raises "You need to supply a Lot/Serial Number".
+            if production.product_id.tracking == "serial":
+                vals["qty_producing"] = len([lot.id])
         production.write(vals)
         return True
 
@@ -1858,11 +1867,11 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not qty or qty <= 0:
             self._set_message("error", _("Quantity to produce must be positive"))
             return False
-        vals = {"qty_producing": qty}
-        if lot:
-            # Replace semantics: core allows max 1 lot for lot-tracked products
-            vals["lot_producing_ids"] = [(6, 0, [lot.id])]
-        self.production_id.write(vals)
+        # Apply lot + qty to MO. Reuse _apply_finished_lot_to_mo so serial
+        # tracking keeps qty_producing == len(lot_producing_ids) (otherwise
+        # _post_inventory creates surplus no-lot move lines and
+        # button_mark_done raises "need Lot/Serial Number").
+        self._apply_finished_lot_to_mo(lot)
         # Scale not-yet-scanned non-tracked auto moves before the core
         # consumption check (explicit scanned lines are never touched).
         self._auto_consume_non_tracked_components()
