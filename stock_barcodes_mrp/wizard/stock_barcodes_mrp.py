@@ -525,6 +525,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             "product_name": self.product_id.display_name or "",
             "lot_name": self.lot_id.display_name or "",
             "finished_qty_producing": self.finished_qty_producing or 0.0,
+            "production_product_qty": self.production_product_qty or 0.0,
             "visible_switch_selector": bool(self.visible_switch_selector),
             # Button visibility fields (mirror the old form invisible attrs)
             "production_state": self.production_state or "",

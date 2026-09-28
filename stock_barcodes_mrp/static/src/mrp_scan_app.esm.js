@@ -55,6 +55,7 @@ export class MrpScanApp extends Component {
             product_name: "",
             lot_name: "",
             finished_qty_producing: 0,
+            production_product_qty: 0,
             visible_switch_selector: false,
             components: [],
             scanning: false,

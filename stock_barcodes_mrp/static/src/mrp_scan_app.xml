@@ -57,7 +57,7 @@
                     <span><strong>MO:</strong> <t t-out="state.production_name" /></span>
                     <span><strong>Product:</strong> <t t-out="state.production_product_name" /></span>
                     <span t-if="state.location_name"><strong>Location:</strong> <t t-out="state.location_name" /></span>
-                    <span><strong>Qty producing:</strong> <t t-out="state.finished_qty_producing" /></span>
+                    <span><strong>Qty producing:</strong> <t t-out="state.finished_qty_producing" /> / <t t-out="state.production_product_qty" /></span>
                 </div>
             </div>
 
