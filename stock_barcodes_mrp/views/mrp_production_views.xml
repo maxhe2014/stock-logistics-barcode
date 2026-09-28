@@ -57,4 +57,23 @@
             </xpath>
         </field>
     </record>
+
+    <!-- Kanban view: per-card scan shortcut.
+         Adds a barcode button to each MO card so the operator can jump
+         straight into the scan app for that MO from the kanban view,
+         mirroring the list-view row button. Hidden for done/cancel MOs. -->
+    <record id="mrp_production_kanban_inherit_stock_barcodes_mrp" model="ir.ui.view">
+        <field name="name">mrp.production.kanban.stock.barcodes.mrp</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_kanban_view" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='product_uom_id']" position="after">
+                <button name="action_open_scan_wizard"
+                        type="object"
+                        icon="fa-barcode"
+                        class="btn btn-primary btn-sm ms-2 flex-shrink-0"
+                        invisible="state not in ('confirmed', 'progress', 'to_close')" />
+            </xpath>
+        </field>
+    </record>
 </odoo>
