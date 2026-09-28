@@ -282,7 +282,9 @@ export class MrpScanApp extends Component {
                 [[this.wizId], moveId]
             );
             if (res && typeof res === "object" && res.type) {
-                this.actionService.doAction(res);
+                await this.actionService.doAction(res, {
+                    onClose: () => this._refreshState(),
+                });
             } else {
                 await this._refreshState();
             }
@@ -450,7 +452,16 @@ export class MrpScanApp extends Component {
                 [[this.wizId]]
             );
             if (res && typeof res === "object" && res.type) {
-                this.actionService.doAction(res);
+                // Backend returned a dialog action (consumption warning /
+                // backorder from button_mark_done). doAction's promise
+                // resolves when the dialog MOUNTS (not when it closes), so
+                // we must refresh from the onClose callback. After the
+                // operator confirms the warning the MO goes done and the
+                // backend's get_scan_state jumps the wizard to the
+                // backorder / next MO.
+                await this.actionService.doAction(res, {
+                    onClose: () => this._refreshState(),
+                });
             } else {
                 await this._refreshState();
             }

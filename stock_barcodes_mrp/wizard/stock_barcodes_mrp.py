@@ -339,16 +339,76 @@ class WizStockBarcodesMrp(models.TransientModel):
     @api.onchange("production_state")
     def _onchange_production_state(self):
         """D3: after a dialog-close reload, if the MO actually went done,
-        swap the placeholder 'Resolving consumption warning...' banner for
-        a real 'Production done' success banner. Consumes the
-        pending_finish flag so a later unrelated state change does not
-        re-trigger the success banner.
+        jump to the newly-created backorder (or the next MO in the queue)
+        and set a success banner.
+
+        This mirrors the result-is-True branch of action_finish_production
+        so the post-dialog path (consumption warning confirmed by the user)
+        does not leave the wizard stuck on a 'done' MO. Without this jump
+        the operator sees "MO is done, cannot finish production" on the
+        next click because production_id still points at the finished MO.
+
+        Consumes the pending_finish flag so a later unrelated state change
+        does not re-trigger the jump.
         """
-        if self.pending_finish and self.production_state == "done":
+        self._handle_pending_finish_jump()
+
+    def _handle_pending_finish_jump(self):
+        """Jump off a just-finished MO onto its backorder (or next MO).
+
+        Called both from the production_state onchange and from
+        get_scan_state (the OWL client refreshes via RPC read, which does
+        NOT trigger onchange). When pending_finish is set and the bound MO
+        is done, this switches the wizard to the backorder in the same
+        production group, otherwise to the next MO in the operator queue,
+        and sets a success banner. Consumes pending_finish.
+        """
+        if not (self.pending_finish and self.production_state == "done"):
+            return
+        self.pending_finish = False
+        done_mo = self.production_id
+        done_name = done_mo.name
+        done_group_id = done_mo.production_group_id.id
+        done_mo_id = done_mo.id
+        # Priority: backorder in the same production group, otherwise
+        # the next MO in the operator's queue (done MO is excluded by
+        # the queue domain).
+        backorders = self.env["mrp.production"].search([
+            ("production_group_id", "=", done_group_id),
+            ("id", "!=", done_mo_id),
+            ("state", "in", ("confirmed", "progress", "to_close")),
+        ], order="id desc", limit=1)
+        if backorders:
+            self._switch_production(backorders)
             self._set_message(
-                "success", _("Production done: %s") % self.production_id.name
+                "success",
+                _("MO %(done)s done. Switched to backorder %(bo)s.")
+                % {"done": done_name, "bo": backorders.name},
             )
-            self.pending_finish = False
+        else:
+            next_mo = self._get_next_mo_in_queue()
+            if next_mo:
+                self._switch_production(next_mo)
+                self._set_message(
+                    "success",
+                    _("MO %(done)s done. Switched to MO %(next)s.")
+                    % {"done": done_name, "next": next_mo.name},
+                )
+            else:
+                self._set_message(
+                    "success",
+                    _("Production done: %(mo)s. No more MOs in queue.")
+                    % {"mo": done_name},
+                )
+        # The just-finished MO's stashed scan state can never be
+        # restored — drop it to prevent unbounded stash growth.
+        if (
+            self.scan_progress_stash
+            and str(done_mo_id) in self.scan_progress_stash
+        ):
+            stash = dict(self.scan_progress_stash)
+            stash.pop(str(done_mo_id), None)
+            self.scan_progress_stash = stash
 
     def _set_default_values(self):
         """Set default source location and qty from the MO."""
@@ -494,6 +554,11 @@ class WizStockBarcodesMrp(models.TransientModel):
         demand, reserved quantity, picked, state).
         """
         self.ensure_one()
+        # The OWL client refreshes via this RPC read (not a form onchange),
+        # so a just-confirmed consumption-warning dialog leaves the wizard
+        # pointing at a 'done' MO unless we jump here. pending_finish +
+        # done state switches the wizard to the backorder / next MO.
+        self._handle_pending_finish_jump()
         production = self.production_id
         components = []
         for mv in self.component_move_ids.filtered(
