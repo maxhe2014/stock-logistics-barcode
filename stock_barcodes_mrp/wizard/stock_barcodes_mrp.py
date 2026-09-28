@@ -508,6 +508,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                 "quantity": sum(move_lines.mapped("quantity")),
                 "picked": picked_all,
                 "state": mv.state,
+                "tracking": mv.product_id.tracking or "none",
                 "lots": [
                     {"id": l.lot_id.id, "name": l.lot_id.name}
                     for l in move_lines
@@ -1186,6 +1187,71 @@ class WizStockBarcodesMrp(models.TransientModel):
             return False
         self.product_qty = qty
         return True
+
+    def action_set_qty_to_demand(self):
+        """Fill the component quantity input with the BOM-scaled demand.
+
+        Shortcut button for non-serial components: sets product_qty to the
+        quantity this component should consume for the current producing
+        qty (move.unit_factor * finished_qty_producing), matching
+        _auto_fill_components' demand formula. The operator can then
+        tweak or confirm directly.
+
+        :return: the demand float on success, False if no product/MO
+        """
+        self.ensure_one()
+        if not self.product_id or not self.production_id:
+            return False
+        moves = self.production_id.move_raw_ids.filtered(
+            lambda m: m.product_id == self.product_id and m.state != "cancel"
+        )
+        if not moves:
+            return False
+        qty = self.finished_qty_producing or self.production_id.product_qty
+        demand = sum(
+            m.product_uom.round(m.unit_factor * qty) for m in moves
+        )
+        if demand <= 0:
+            return False
+        self.product_qty = demand
+        return demand
+
+    def action_consume_component_by_demand(self, move_id):
+        """One-click consume a non-serial component by its BOM demand.
+
+        Sets the wizard scan context (product, qty, location) for the
+        given component move to the BOM-scaled demand and immediately
+        runs action_confirm — so the operator clicks once on the
+        component row instead of scanning the barcode, typing a qty and
+        confirming. Serial components are rejected: they must be
+        consumed one SN at a time via barcode scan.
+
+        :param move_id: stock.move id (must belong to this MO's raw moves)
+        :return: action_confirm's result (move_lines dict or False)
+        """
+        self.ensure_one()
+        move = self.component_move_ids.filtered(lambda m: m.id == move_id)
+        if not move:
+            return False
+        if move.product_id.tracking == "serial":
+            self._set_message(
+                "error",
+                _("Serial component %s must be consumed by scanning SNs")
+                % move.product_id.name,
+            )
+            return False
+        qty = self.finished_qty_producing or self.production_id.product_qty
+        demand = move.product_uom.round(move.unit_factor * qty)
+        if demand <= 0:
+            return False
+        self.product_id = move.product_id
+        self.product_uom_id = move.product_id.uom_id
+        if not self.location_id:
+            self.location_id = self.production_id.location_src_id
+        self.lot_id = False
+        self.lot_name = False
+        self.product_qty = demand
+        return self.action_confirm()
 
     def _resolve_lot_owner(self, lot, product):
         """Identify whether `product` is a component or the finished product
@@ -2042,6 +2108,35 @@ class WizStockBarcodesMrp(models.TransientModel):
             line.quantity -= 1
         else:
             line.unlink()
+        return True
+
+    def action_reset_component_move(self, move_id):
+        """Reset (undo) the consumed quantity of a component move.
+
+        Handles all tracking types uniformly:
+          - serial: unlinks every move line (each line = 1 SN), so the
+            bound SNs are released and the component returns to unpicked.
+          - lot / none: sets every move line quantity to 0 and picked
+            to False, so previously reserved lines are preserved but the
+            consumption is undone.
+
+        Used by the per-row "重置" button in the OWL scan app so the
+        operator can correct an over/incorrect consumption without
+        leaving the scan flow.
+
+        :param move_id: stock.move id (must belong to this MO's raw moves)
+        :return: True on success, False if the move is invalid
+        """
+        self.ensure_one()
+        move = self.component_move_ids.filtered(lambda m: m.id == move_id)
+        if not move:
+            return False
+        if move.product_id.tracking == "serial":
+            move.move_line_ids.unlink()
+        else:
+            for line in move.move_line_ids:
+                line.quantity = 0.0
+                line.picked = False
         return True
 
     def action_manual_entry(self):

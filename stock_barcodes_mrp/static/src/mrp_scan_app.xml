@@ -119,6 +119,7 @@
                             <th class="text-end">Reserved</th>
                             <th class="text-center">SN</th>
                             <th class="text-center">Picked</th>
+                            <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -162,9 +163,27 @@
                                     <span t-if="comp.picked" class="badge bg-success">✓</span>
                                     <span t-else="" class="badge bg-danger">✗</span>
                                 </td>
+                                <td class="text-center">
+                                    <!-- One-click consume by BOM demand (non-serial, not picked yet) -->
+                                    <button t-if="!comp.picked &amp;&amp; comp.tracking !== 'serial'"
+                                            type="button"
+                                            class="btn btn-sm btn-outline-success"
+                                            title="Consume BOM demand quantity"
+                                            t-on-click.stop="() => this.onConsumeByDemand(comp.id)">
+                                        消耗
+                                    </button>
+                                    <!-- Reset consumed quantity (any tracking, once picked) -->
+                                    <button t-if="comp.picked"
+                                            type="button"
+                                            class="btn btn-sm btn-outline-warning"
+                                            title="Reset consumed quantity"
+                                            t-on-click.stop="() => this.onResetComponentMove(comp.id)">
+                                        重置
+                                    </button>
+                                </td>
                             </tr>
                             <tr t-if="state.expandedComponentId === comp.id">
-                                <td colspan="6" class="ps-4 py-1 bg-white">
+                                <td colspan="7" class="ps-4 py-1 bg-white">
                                     <t t-foreach="comp.lots" t-as="sn" t-key="sn.id">
                                         <div class="d-flex align-items-center small text-muted">
                                             <i class="fa fa-circle-o me-1"/>

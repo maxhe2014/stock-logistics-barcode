@@ -237,6 +237,97 @@ export class MrpScanApp extends Component {
         );
     }
 
+    /**
+     * Shortcut: fill the quantity input with the BOM demand for the
+     * currently scanned component (unit_factor * finished_qty_producing).
+     * Backend returns the demand float; update the local state so the
+     * input reflects it without a full refresh.
+     */
+    async onSetQtyToDemand() {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        try {
+            const demand = await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "action_set_qty_to_demand",
+                [[this.wizId]]
+            );
+            if (demand) {
+                this.state.product_qty = demand;
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Fill demand failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
+        }
+    }
+
+    /**
+     * One-click consume a non-serial component by its BOM demand.
+     * Backend sets product + qty and runs action_confirm in one shot.
+     * If the backend returns an action dict (e.g. consumption warning),
+     * doAction it; otherwise refresh state.
+     */
+    async onConsumeByDemand(moveId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "action_consume_component_by_demand",
+                [[this.wizId], moveId]
+            );
+            if (res && typeof res === "object" && res.type) {
+                this.actionService.doAction(res);
+            } else {
+                await this._refreshState();
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Consume by demand failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /**
+     * Reset (undo) a component's consumed quantity. Works for all
+     * tracking types (serial SNs are unlinked; lot/none lines are
+     * zeroed). Collapses the expansion row if the reset component was
+     * expanded (its SN list is now empty).
+     */
+    async onResetComponentMove(moveId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        try {
+            await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "action_reset_component_move",
+                [[this.wizId], moveId]
+            );
+            await this._refreshState();
+            if (this.state.expandedComponentId === moveId) {
+                this.state.expandedComponentId = false;
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Reset component failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+        }
+    }
+
     /** Map message_type → alert CSS class for the message bar. */
     get alertClass() {
         const t = this.state.message_type || "info";
