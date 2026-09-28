@@ -67,11 +67,11 @@
         <field name="model">mrp.production</field>
         <field name="inherit_id" ref="mrp.mrp_production_kanban_view" />
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='product_uom_id']" position="after">
+            <xpath expr="//field[@name='priority']" position="before">
                 <button name="action_open_scan_wizard"
                         type="object"
                         icon="fa-barcode"
-                        class="btn btn-primary btn-sm ms-2 flex-shrink-0"
+                        class="btn btn-primary me-2 flex-shrink-0 o_kanban_scan_btn"
                         invisible="state not in ('confirmed', 'progress', 'to_close')" />
             </xpath>
         </field>

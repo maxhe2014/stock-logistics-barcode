@@ -21,6 +21,7 @@
         "web.assets_web": [
             "stock_barcodes_mrp/static/src/mrp_scan_app.esm.js",
             "stock_barcodes_mrp/static/src/mrp_scan_app.xml",
+            "stock_barcodes_mrp/static/src/mrp_scan_app.css",
         ],
         "web.assets_tests": [
             "stock_barcodes_mrp/static/src/tours/mrp_scan_app_tour.js",
