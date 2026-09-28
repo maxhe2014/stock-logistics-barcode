@@ -7,47 +7,69 @@
   Renders a touch-friendly scan flow:
     - manual input box (Enter to submit; also driven by global
       barcode_service keyboard listener)
-    - status message bar (info/success/warning/error)
+    - consolidated hint area (status message + active-scan target + qty)
     - MO info strip (production name + finished product + qty)
-    - step indicator (de-emphasized)
     - component checklist (per move: name, demand, picked)
     - action buttons (fixed at bottom for shop-floor scanning)
 -->
 <templates id="template" xml:space="preserve">
     <t t-name="stock_barcodes_mrp.MrpScanApp">
         <div class="o_mrp_scan_app d-flex flex-column h-100">
-            <!-- Header: manual scan input + step indicator -->
+            <!-- Header: manual scan input + escape-hatch button -->
             <div class="o_mrp_scan_header p-3 border-bottom">
                 <div class="row g-2 align-items-center">
-                    <div class="col-auto">
+                    <div class="col">
                         <input
                             type="text"
                             class="form-control form-control-lg o_mrp_scan_input"
                             placeholder="Scan or type barcode…"
                             t-att-disabled="state.scanning ? 'disabled' : ''"
                             t-on-keydown="onManualScanEnter"
-                        /> 
+                        />
                     </div>
-                </div>
-                <!-- 5-step progress bar (mirrors the legacy wizard form).
-                     State is derived in the component from step + tracking fields. -->
-                <div class="o_mrp_scan_stepbar d-flex flex-wrap justify-content-center gap-1 small mt-2 px-2">
-                    <t t-foreach="stepBadges" t-as="badge" t-key="badge.key">
-                        <span
-                            t-if="!badge.hidden"
-                            t-att-class="'badge rounded-pill ' + badge.cls"
-                        >
-                            <t t-if="badge.done"><i class="fa fa-check me-1" /></t>
-                            <t t-out="badge.label" />
-                        </span>
-                    </t>
+                    <!-- Escape hatch: when the finished SN has not been
+                         scanned yet, the operator may have clicked a
+                         component row by mistake. This button drops the
+                         component context so the next scan matches the
+                         finished product SN. -->
+                    <div t-if="canBackToFinishedLot" class="col-auto">
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary btn-lg"
+                            t-on-click="onBackToFinishedLot">
+                            <i class="fa fa-barcode me-1"/>扫成品SN
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Status message bar -->
-            <div t-if="state.message" class="o_mrp_scan_message m-3">
-                <div t-att-class="'alert ' + alertClass + ' mb-0'">
+            <!-- Consolidated operational hints: status message +
+                 active-scan target + quantity input (non-serial only).
+                 All live below the scan box so the operator has one
+                 place to look for "what do I do next". -->
+            <div t-if="state.message || state.active_move_product_name || showComponentQtyInput"
+                 class="o_mrp_scan_message m-3">
+                <div t-if="state.message" t-att-class="'alert ' + alertClass + ' mb-2'">
                     <t t-out="state.message" />
+                </div>
+                <div t-if="state.active_move_product_name" class="small text-primary d-flex align-items-center gap-1">
+                    <i class="fa fa-hand-o-right" /> 正在扫描：
+                    <t t-out="state.active_move_product_name" />
+                </div>
+                <div t-if="showComponentQtyInput" class="d-flex align-items-center gap-2 mt-2">
+                    <span class="text-muted">数量：</span>
+                    <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        class="form-control form-control-sm"
+                        style="width: 7rem;"
+                        t-att-value="state.product_qty"
+                        t-on-change="onProductQtyChange"
+                    />
+                    <span t-if="state.product_uom_name" class="text-muted small">
+                        <t t-out="state.product_uom_name" />
+                    </span>
                 </div>
             </div>
 
@@ -71,38 +93,6 @@
                         type="button"
                         class="btn btn-sm btn-outline-danger ms-auto"
                         t-on-click="onCleanFinishedLot">Clear SN</button>
-            </div>
-
-            <!-- Current component scan context: product + lot + qty input.
-                 Visible once a component product is scanned. For serial
-                 components qty is locked to 1 (auto-confirmed), so the
-                 input is hidden. -->
-            <div t-if="state.product_id"
-                 class="o_mrp_scan_component_context d-flex flex-wrap align-items-center gap-2 px-3 py-2 bg-primary bg-opacity-10 border-bottom">
-                <i class="fa fa-cubes text-primary"/>
-                <span class="text-muted">组件：</span>
-                <span class="fw-bold"><t t-out="state.product_name" /></span>
-                <t t-if="state.lot_name_raw || state.lot_id">
-                    <span class="text-muted ms-2">批次：</span>
-                    <span class="fw-bold">
-                        <t t-out="state.lot_name_raw || state.lot_name" />
-                    </span>
-                </t>
-                <div t-if="showComponentQtyInput" class="d-flex align-items-center gap-1 ms-auto">
-                    <span class="text-muted">数量：</span>
-                    <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        class="form-control form-control-sm"
-                        style="width: 7rem;"
-                        t-att-value="state.product_qty"
-                        t-on-change="onProductQtyChange"
-                    />
-                    <span t-if="state.product_uom_name" class="text-muted small">
-                        <t t-out="state.product_uom_name" />
-                    </span>
-                </div>
             </div>
 
             <!-- Component checklist -->
@@ -210,13 +200,6 @@
                         </t>
                     </tbody>
                 </table>
-                <div
-                    t-if="state.active_move_product_name"
-                    class="mt-2 small text-primary"
-                >
-                    <i class="fa fa-hand-o-right" /> Scanning for:
-                    <t t-out="state.active_move_product_name" />
-                </div>
             </div>
 
             <!-- Action buttons (fixed at bottom for shop-floor scanning) -->

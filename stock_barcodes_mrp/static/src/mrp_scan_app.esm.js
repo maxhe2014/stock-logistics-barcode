@@ -44,10 +44,8 @@ export class MrpScanApp extends Component {
         // `get_scan_state()` after every scan; rendered by the
         // t-* directives in the template.
         this.state = useState({
-            step: 0,
             message: "",
             message_type: "info",
-            message_step: "",
             production_id: false,
             production_name: "",
             production_product_name: "",
@@ -237,6 +235,44 @@ export class MrpScanApp extends Component {
         );
     }
 
+    /** Show the "Scan Finished SN" escape button next to the scan input.
+     *  Only relevant when:
+     *    - a finished SN has NOT been bound yet, AND
+     *    - a component context is active (product scanned or row clicked).
+     *  Once the finished SN is bound the button is hidden because the
+     *  component phase is the correct next step. */
+    get canBackToFinishedLot() {
+        return (
+            !this.state.finished_lot_id &&
+            !this.state.finished_lot_name &&
+            (!!this.state.product_id || !!this.state.active_move_id)
+        );
+    }
+
+    /** Escape the component-scan context and return to finished-lot
+     *  scanning. Clears active_move_id / product_id / lot_id on the
+     *  backend so the next barcode is not hijacked as a component SN. */
+    async onBackToFinishedLot() {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        try {
+            await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "action_back_to_finished_lot",
+                [[this.wizId]]
+            );
+            await this._refreshState();
+        } catch (err) {
+            this.notification.add(
+                _t("Failed to reset scan context: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+        }
+    }
+
     /**
      * Shortcut: fill the quantity input with the BOM demand for the
      * currently scanned component (unit_factor * finished_qty_producing).
@@ -340,63 +376,6 @@ export class MrpScanApp extends Component {
             error: "alert-danger",
             not_found: "alert-danger",
         }[t] || "alert-info";
-    }
-
-    /**
-     * 5-step progress badges (mirrors the legacy wizard form stepbar).
-     * State is derived purely from state.step + tracking fields; done/current
-     * use the same step comparison as the old form. Hidden for steps that
-     * don't apply (e.g. Finished Lot for untracked products).
-     */
-    get stepBadges() {
-        const step = this.state.step || 0;
-        const finTrack = this.state.finished_product_tracking || "none";
-        const compTrack = this.state.product_tracking || "none";
-        const badges = [
-            {
-                key: "finished",
-                label: "Finished Lot",
-                done: step > 0,
-                current: step === 0,
-                hidden: finTrack === "none",
-            },
-            {
-                key: "location",
-                label: "Location",
-                done: step > 1,
-                current: step === 1,
-                hidden: false,
-            },
-            {
-                key: "component",
-                label: "Component",
-                done: step > 2,
-                current: step === 2,
-                hidden: false,
-            },
-            {
-                key: "lot",
-                label: "Lot / SN",
-                done: step > 3,
-                current: step === 3,
-                hidden: compTrack === "none",
-            },
-            {
-                key: "qty",
-                label: "Qty",
-                done: step > 4,
-                current: step === 4,
-                hidden: false,
-            },
-        ];
-        for (const b of badges) {
-            b.cls = b.done
-                ? "bg-success"
-                : b.current
-                ? "bg-primary"
-                : "bg-secondary opacity-50";
-        }
-        return badges;
     }
 
     /** Apply Lot visible: tracked (non-serial) finished product + a lot is

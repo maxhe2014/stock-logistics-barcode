@@ -433,16 +433,11 @@ class TestStockBarcodesMrp(TransactionCase):
             "production_id": self.production_tracked.id,
         })
         self.assertEqual(wiz.step, 0)
-        self.assertEqual(wiz.message_step, "Scan finished product lot")
         # For non-tracked product, should start at step 1
         wiz2 = self.WizScanMrp.create({
             "production_id": self.production.id,
         })
         self.assertEqual(wiz2.step, 1)
-        self.assertEqual(
-            wiz2.message_step,
-            "Scan source location (or scan component directly)",
-        )
 
     def test_10_traceability_finished_to_material(self):
         """Test bidirectional traceability: finished lot → consumed material lots."""

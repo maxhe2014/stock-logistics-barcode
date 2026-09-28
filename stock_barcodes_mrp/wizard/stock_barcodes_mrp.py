@@ -120,7 +120,6 @@ class WizStockBarcodesMrp(models.TransientModel):
         readonly=True,
     )
     message = fields.Char(readonly=True)
-    message_step = fields.Char(readonly=True)
     step = fields.Integer(default=1)
     visible_force_done = fields.Boolean()
     visible_force_add = fields.Boolean(
@@ -547,7 +546,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         """JSON-serializable snapshot of the wizard state for the OWL
         client action to render.
 
-        Includes: wiz_id, step, message/message_type/message_step,
+        Includes: wiz_id, step, message/message_type,
         MO + product + location + lot display names,
         finished_qty_producing, visible_switch_selector, and
         component_move_ids as a list of dicts (id, product_name,
@@ -597,7 +596,6 @@ class WizStockBarcodesMrp(models.TransientModel):
             "step": self.step,
             "message": self.message or "",
             "message_type": self.message_type or "info",
-            "message_step": self.message_step or "",
             "production_id": production.id,
             "production_name": production.name or "",
             "production_product_name": self.production_product_id.display_name or "",
@@ -1236,6 +1234,48 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not move or move not in self.production_id.move_raw_ids:
             return False
         self.active_move_id = move
+        self._set_message_step()
+        return True
+
+    def action_back_to_finished_lot(self):
+        """Clear the component-scan context and return to finished-lot
+        scanning.
+
+        RPC entry for the OWL "Scan Finished SN" button shown in the
+        component context bar. When the operator accidentally selects a
+        component row before scanning the finished SN, every subsequent
+        barcode is routed to the component (via active_move_id in
+        _scan_lot / _create_new_lot_flow). This method drops the
+        component selection so the next scan can match the finished
+        product's SN again.
+
+        Only meaningful when no finished lot is bound yet; once a
+        finished SN is bound the button is hidden by the UI.
+        """
+        self.ensure_one()
+        self.active_move_id = False
+        self.product_id = False
+        self.lot_id = False
+        self.lot_name = False
+        self.product_qty = 0.0
+        self.qty_available = 0.0
+        self.visible_force_done = False
+        self.visible_force_add = False
+        # Reset step to the finished-lot phase (or location phase for
+        # untracked finished products) so the banner matches the state.
+        if (
+            self.production_id
+            and self.production_id.product_id.tracking != "none"
+            and not self.finished_lot_id
+        ):
+            self.step = 0
+        else:
+            self.step = 1
+        self._set_message_step()
+        self._set_message(
+            "info",
+            _("Component selection cleared. Scan the finished product SN."),
+        )
         return True
 
     def set_product_qty(self, qty):
@@ -2263,6 +2303,13 @@ class WizStockBarcodesMrp(models.TransientModel):
         step automatically).
         """
         self.ensure_one()
+        # The active scan target may be set by click-selecting a component
+        # row (active_move_id) even before a product barcode is scanned.
+        # Fall back to that move's product so the instruction names the
+        # right component.
+        target_product = self.product_id or (
+            self.active_move_id.product_id if self.active_move_id else False
+        )
         if self.step == 0:
             return _("Scan the finished product lot: %s") % (
                 self.production_product_id.display_name
@@ -2274,24 +2321,16 @@ class WizStockBarcodesMrp(models.TransientModel):
         if self.step == 2:
             return _("Scan a component of MO %s") % self.production_id.name
         if self.step == 3:
-            if not self.product_id:
+            if not target_product:
                 return _("Scan a component product barcode")
-            return _("Scan the lot/serial of %s") % self.product_id.name
+            return _("Scan the lot/serial of %s") % target_product.name
         if self.step == 4:
-            if not self.product_id:
+            if not target_product:
                 return _("Scan a component product barcode")
-            return _("Enter the quantity for %s") % self.product_id.name
+            return _("Enter the quantity for %s") % target_product.name
         return ""
 
     def _set_message_step(self):
-        steps = {
-            0: _("Scan finished product lot"),
-            1: _("Scan source location (or scan component directly)"),
-            2: _("Scan component product"),
-            3: _("Scan lot/serial"),
-            4: _("Enter quantity and confirm"),
-        }
-        # Static short hint kept verbatim (tests assert it exactly).
-        self.message_step = steps.get(self.step, "")
-        # TODO-C2: dynamic instruction for the banner.
+        # Dynamic instruction for the banner (driven by the scan-flow `step`
+        # state machine, not by the removed progress bar).
         self._set_message("info", self._get_step_message())
