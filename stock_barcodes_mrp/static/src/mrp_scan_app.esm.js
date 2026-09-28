@@ -209,7 +209,7 @@ export class MrpScanApp extends Component {
             return;
         }
         this.state.editingQtyMoveId = moveId;
-        this.state.draftQty = comp.to_consume || 0;
+        this.state.draftQty = comp.total_demand || 0;
     }
 
     /** Track the draft quantity as the operator types. */

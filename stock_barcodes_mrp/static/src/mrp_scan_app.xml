@@ -161,7 +161,7 @@
                                                         step="any"
                                                         class="form-control form-control-sm"
                                                         style="width: 6rem;"
-                                                        t-att-value="state.draftQty || comp.to_consume"
+                                                        t-att-value="state.draftQty || comp.total_demand"
                                                         t-on-input="(ev) => this.onDraftQtyInput(ev)"
                                                         t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, comp.id)"
                                                         t-on-click.stop=""
