@@ -43,6 +43,12 @@ msgid ""
 " * Done: The MO is closed, the stock moves are posted. \n"
 " * Cancelled: The MO has been cancelled, can't be confirmed anymore."
 msgstr ""
+" * 草稿：制造订单尚未确认。\n"
+" * 已确认：制造订单已确认，库存规则和组件补货已触发。\n"
+" * 进行中：生产已开始（在制造订单或工单上）。\n"
+" * 待关闭：生产已完成，制造订单需要关闭。\n"
+" * 已完成：制造订单已关闭，库存移动已过账。 \n"
+" * 已取消：制造订单已取消，无法再确认。"
 
 #. module: stock_barcodes_mrp
 #. odoo-javascript
@@ -399,6 +405,7 @@ msgstr "创建时间"
 msgid ""
 "Date you plan to start production or date you actually started production."
 msgstr ""
+"您计划开始生产的日期或实际开始生产的日期。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__total_demand
@@ -461,6 +468,7 @@ msgid ""
 "actions, MO details, queue). No <details> precedent exists in core views, so"
 " visibility is toggled via this boolean."
 msgstr ""
+"展开工具面板以显示次要操作（手动输入、强制操作、制造订单详情、队列）。核心视图中没有 <details> 先例，因此通过此布尔值切换可见性。"
 
 #. module: stock_barcodes_mrp
 #. odoo-javascript
@@ -590,6 +598,7 @@ msgid ""
 "Latest component availability status for this MO. If green, then the MO's "
 "readiness status is ready, as per BOM configuration."
 msgstr ""
+"此制造订单的最新组件可用性状态。如果为绿色，则根据 BOM 配置，制造订单的就绪状态为就绪。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_location_src_id
@@ -706,6 +715,7 @@ msgstr "制造订单详情"
 msgid ""
 "MO already has SN %(cur)s bound. Clear it first to scan a different one."
 msgstr ""
+"制造订单已绑定序列号 %(cur)s。请先清除再扫描其他序列号。"
 
 #. module: stock_barcodes_mrp
 #. odoo-python
@@ -809,6 +819,7 @@ msgid ""
 "Multiple lots named %(sn)s found. Click the target component row first, then"
 " scan again."
 msgstr ""
+"找到多个名为 %(sn)s 的批次。请先点击目标组件行，然后重新扫描。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__wiz_stock_barcodes_mrp__message_type__more_match
@@ -926,6 +937,7 @@ msgid ""
 "collisions resolve automatically. Cleared on MO switch, finished-lot scan, "
 "or scanning a different product."
 msgstr ""
+"操作员选择的目标组件移动。设置后，扫描序列号/批次时会先在此移动的产品中查找批次，因此跨产品序列号冲突会自动解决。在切换制造订单、扫描成品批次或扫描其他产品时清除。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__pending_finish
@@ -945,6 +957,7 @@ msgid ""
 "Please scan the finished product serial number (SN) first, or use Manual "
 "Entry."
 msgstr ""
+"请先扫描成品序列号（SN），或使用手动输入。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_lot__produced_lot_ids
@@ -1082,6 +1095,7 @@ msgstr "队列可见"
 msgid ""
 "Reference of the document that generated this production order request."
 msgstr ""
+"生成此生产订单请求的单据的参考。"
 
 #. module: stock_barcodes_mrp
 #. odoo-javascript
@@ -1231,6 +1245,7 @@ msgid ""
 "Set by action_finish_production's dialog path; consumed by "
 "_onchange_production_state once the MO actually goes done."
 msgstr ""
+"由 action_finish_production 的对话框路径设置；一旦制造订单实际完成，由 _onchange_production_state 消耗。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__visible_switch_selector
@@ -1254,6 +1269,7 @@ msgid ""
 "keeps the queue off the scan screen; it only appears when no MO is active or"
 " the operator opens it from Tools."
 msgstr ""
+"在扫描区域下方显示工单队列抽屉。企业版应用将队列放在扫描屏幕之外；仅当没有活动的制造订单或操作员从工具中打开时才显示。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__production_origin
@@ -1313,6 +1329,7 @@ msgstr "已切换到制造订单 %(mo)s。%(next)s"
 msgid ""
 "This is a finished product lot. Enter/scan it in the finished lot area."
 msgstr ""
+"这是成品批次。请在成品批次区域输入/扫描。"
 
 #. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
@@ -1384,6 +1401,7 @@ msgid ""
 "Work centers this operator is assigned to. Used to filter the MRP barcode "
 "queue (My Work Orders)."
 msgstr ""
+"此操作员分配到的工作中心。用于过滤 MRP 条码队列（我的工单）。"
 
 #. module: stock_barcodes_mrp
 #. odoo-javascript
