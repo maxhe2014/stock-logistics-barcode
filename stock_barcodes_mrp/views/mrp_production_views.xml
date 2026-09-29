@@ -61,15 +61,30 @@
     <!-- Kanban view: per-card scan shortcut.
          Adds a barcode button to each MO card so the operator can jump
          straight into the scan app for that MO from the kanban view,
-         mirroring the list-view row button. Hidden for done/cancel MOs. -->
+         mirroring the list-view row button. Hidden for done/cancel MOs.
+         Also adds a header "Scan" button (scan-first mode, no preselected
+         MO) next to the "Create" button, mirroring the list-view header. -->
     <record id="mrp_production_kanban_inherit_stock_barcodes_mrp" model="ir.ui.view">
         <field name="name">mrp.production.kanban.stock.barcodes.mrp</field>
         <field name="model">mrp.production</field>
         <field name="inherit_id" ref="mrp.mrp_production_kanban_view" />
         <field name="arch" type="xml">
+            <!-- Header button: scan-first entry, no preselected MO.
+                 display="always" keeps it visible in the control panel
+                 without selecting a record. -->
+            <xpath expr="//kanban/field[1]" position="before">
+                <header>
+                    <button name="action_open_scan_wizard"
+                            type="object"
+                            string="Scan"
+                            class="oe_highlight"
+                            display="always" />
+                </header>
+            </xpath>
             <xpath expr="//field[@name='priority']" position="before">
                 <button name="action_open_scan_wizard"
                         type="object"
+                        string="Scan"
                         icon="fa-barcode"
                         class="btn btn-primary me-2 flex-shrink-0 o_kanban_scan_btn"
                         invisible="state not in ('confirmed', 'progress', 'to_close')" />
