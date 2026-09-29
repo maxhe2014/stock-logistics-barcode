@@ -72,7 +72,7 @@
             <!-- Header button: scan-first entry, no preselected MO.
                  display="always" keeps it visible in the control panel
                  without selecting a record. -->
-            <xpath expr="//kanban/field[1]" position="before">
+            <xpath expr="//field[@name='date_start']" position="before">
                 <header>
                     <button name="action_open_scan_wizard"
                             type="object"
