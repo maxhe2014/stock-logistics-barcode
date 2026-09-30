@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Add the barcode field to the stock.location form. The field exists on
+  the model (stock.location.barcode) but is not rendered in the core
+  stock view, so operators have no UI to assign a barcode to a location.
+-->
+<odoo>
+    <record id="stock_location_form_inherit_barcode" model="ir.ui.view">
+        <field name="name">stock.location.form.inherit.barcode</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_form"/>
+        <field name="arch" type="xml">
+            <group name="additional_info" position="after">
+                <group name="barcode" string="Barcode">
+                    <field name="barcode"/>
+                </group>
+            </group>
+        </field>
+    </record>
+</odoo>

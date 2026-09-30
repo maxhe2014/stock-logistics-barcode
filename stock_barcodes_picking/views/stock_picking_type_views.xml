@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Add a "Barcode" page to the stock.picking.type form, right after the
+  "General" page. Lets the admin toggle whether source / destination
+  locations must be barcode-scanned during the picking scan flow.
+-->
+<odoo>
+    <record id="view_picking_type_form_inherit_barcode" model="ir.ui.view">
+        <field name="name">stock.picking.type.form.inherit.barcode</field>
+        <field name="model">stock.picking.type</field>
+        <field name="inherit_id" ref="stock.view_picking_type_form"/>
+        <field name="arch" type="xml">
+            <page name="general" position="after">
+                <page name="barcode" string="Barcode">
+                    <group string="Location Scanning">
+                        <field name="barcode_scan_source_location"/>
+                        <field name="barcode_scan_dest_location"/>
+                    </group>
+                </page>
+            </page>
+        </field>
+    </record>
+</odoo>

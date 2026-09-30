@@ -14,6 +14,8 @@
         "data/ir_actions_client.xml",
         "wizard/stock_barcodes_picking_views.xml",
         "views/stock_picking_views.xml",
+        "views/stock_picking_type_views.xml",
+        "views/stock_location_views.xml",
     ],
     "assets": {
         "web.assets_web": [

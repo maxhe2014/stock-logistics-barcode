@@ -37,6 +37,21 @@ class WizStockBarcodesPicking(models.TransientModel):
     )
     company_id = fields.Many2one(related="picking_id.company_id")
 
+    # --- Picking-type barcode configuration ---
+    barcode_scan_source_location = fields.Boolean(
+        related="picking_id.picking_type_id.barcode_scan_source_location",
+        string="Scan Source Location",
+        help="Whether the operator must scan the source location barcode. "
+             "When False, the picking's default source location is used.",
+    )
+    barcode_scan_dest_location = fields.Boolean(
+        related="picking_id.picking_type_id.barcode_scan_dest_location",
+        string="Scan Destination Location",
+        help="Whether the operator must scan the destination location "
+             "barcode. When False, the picking's default destination "
+             "location is used.",
+    )
+
     # --- Scanned values ---
     barcode = fields.Char()
     res_model_id = fields.Many2one(comodel_name="ir.model", index=True)
@@ -47,6 +62,14 @@ class WizStockBarcodesPicking(models.TransientModel):
         help="Dynamic: the source location scanned by the operator. "
              "Overrides picking_location_id for the current scan context. "
              "Defaulted to picking_location_id on picking switch.",
+    )
+    location_dest_id = fields.Many2one(
+        comodel_name="stock.location",
+        string="Scanned Destination Location",
+        help="Dynamic: the destination location scanned by the operator. "
+             "Only used when the picking type requires destination "
+             "location scanning. Otherwise picking_location_dest_id "
+             "is used.",
     )
     product_id = fields.Many2one(
         comodel_name="product.product",
@@ -126,14 +149,34 @@ class WizStockBarcodesPicking(models.TransientModel):
         string="Stashed Scan Progress",
     )
 
-    # --- Scan steps (方案 C: outgoing 硬编码) ---
+    # --- Scan steps ---
     def _get_scan_steps(self):
         """Current picking type's ordered scan steps.
 
-        方案 C 硬编码 outgoing。未来加类型只需改此方法返回值 + 类型特有逻辑。
+        Steps are built from the picking type's barcode configuration:
+          - ``location``      included only if barcode_scan_source_location
+          - ``dest_location`` included only if barcode_scan_dest_location
+          - ``product``       always
+          - ``lot``           always (skipped for non-tracked products
+                              inside _scan_product, which jumps to qty)
+          - ``qty``           always
+
+        Both location steps (when enabled) come BEFORE product so that
+        move lines are created with the correct source/destination
+        locations from the first pick.
+
+        When a step is absent from this list, _step_index(key) asserts;
+        callers must guard on the config flags before referencing a
+        conditional step.
         """
         self.ensure_one()
-        return ["location", "product", "lot", "qty"]
+        steps = []
+        if self.barcode_scan_source_location:
+            steps.append("location")
+        if self.barcode_scan_dest_location:
+            steps.append("dest_location")
+        steps.extend(["product", "lot", "qty"])
+        return steps
 
     # --- Message state machine ---
     def _set_message(self, message_type, message):
@@ -172,6 +215,10 @@ class WizStockBarcodesPicking(models.TransientModel):
             if not target_product:
                 return _("Scan a product barcode first")
             return _("Enter the quantity for %s") % target_product.name
+        if step_key == "dest_location":
+            return _("Scan the destination location of transfer %s") % (
+                self.picking_id.name or ""
+            )
         return ""
 
     def _set_message_step(self):
@@ -210,17 +257,34 @@ class WizStockBarcodesPicking(models.TransientModel):
 
         Called on picking switch and after a successful move line
         confirmation to advance the step machine.
+
+        The starting step depends on the picking type's barcode
+        configuration:
+          - source location scanning ON  → start at "location"
+          - source location scanning OFF → start at "product" and use
+            the picking's default source location automatically.
         """
         self.ensure_one()
         if not self.picking_id:
             self.step = 0
             return
-        self.step = self._step_index("location")
-        # location_id stays False — the operator MUST scan the source
-        # location (section 4 of the handoff). action_confirm's
-        # "not location_id → error" check enforces this. location_id
-        # persists across product/lot scans (_clean_values does not
-        # clear it), so the operator scans it once per picking.
+        if self.barcode_scan_source_location:
+            self.step = self._step_index("location")
+            # location_id stays False — the operator MUST scan the source
+            # location. action_confirm's "not location_id → error" check
+            # enforces this.
+            self.location_id = False
+        else:
+            # Skip the source-location step: use the picking's default
+            # source location directly.
+            self.location_id = self.picking_location_id
+        if not self.barcode_scan_dest_location:
+            # Use the picking's default destination location.
+            self.location_dest_id = self.picking_location_dest_id
+        # Step lands on the first required location step, or "product"
+        # when both location scans are disabled.
+        steps = self._get_scan_steps()
+        self.step = 0
         self.product_id = False
         self.lot_id = False
         self.lot_name = False
@@ -249,6 +313,9 @@ class WizStockBarcodesPicking(models.TransientModel):
             "lot_name": self.lot_name,
             "product_qty": self.product_qty,
             "location_id": self.location_id.id if self.location_id else False,
+            "location_dest_id": (
+                self.location_dest_id.id if self.location_dest_id else False
+            ),
             "active_move_id": (
                 self.active_move_id.id if self.active_move_id else False
             ),
@@ -279,12 +346,16 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.lot_name = snapshot.get("lot_name") or False
         self.product_qty = snapshot.get("product_qty") or 0.0
         self.location_id = snapshot.get("location_id") or False
+        self.location_dest_id = snapshot.get("location_dest_id") or False
         self.active_move_id = snapshot.get("active_move_id") or False
         self.visible_force_done = bool(snapshot.get("visible_force_done"))
         self.visible_force_add = bool(snapshot.get("visible_force_add"))
-        # step 0 (location) is valid for picking — do not coerce to 1.
+        # step 0 may be "location" or "product" depending on the picking
+        # type config — do not coerce. Fall back to the first step of the
+        # current picking type's step list (safe even when the source
+        # location step is disabled).
         step = snapshot.get("step")
-        self.step = step if step is not None else self._step_index("location")
+        self.step = step if step is not None else 0
         if self.product_id:
             self._compute_qty_available()
         self._set_message_step()
@@ -321,6 +392,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.product_qty = 0.0
         self.qty_available = 0.0
         self.location_id = False
+        self.location_dest_id = False
         self.active_move_id = False
         self.visible_force_done = False
         self.visible_force_add = False
@@ -410,7 +482,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             "picking_type_code": self.picking_type_code or "",
             "location_id": self.location_id.id or False,
             "location_name": self.location_id.display_name or "",
-            "location_dest_name": self.picking_location_dest_id.display_name or "",
+            "location_dest_id": self.location_dest_id.id or False,
+            "location_dest_name": (
+                self.location_dest_id.display_name
+                or self.picking_location_dest_id.display_name
+                or ""
+            ),
             "product_id": self.product_id.id or False,
             "product_name": self.product_id.display_name or "",
             "product_tracking": self.product_tracking or "none",
@@ -500,6 +577,8 @@ class WizStockBarcodesPicking(models.TransientModel):
         if self._scan_picking(barcode):
             return True
         if self._scan_location(barcode):
+            return True
+        if self._scan_dest_location(barcode):
             return True
         if self._scan_product(barcode):
             return True
@@ -609,10 +688,38 @@ class WizStockBarcodesPicking(models.TransientModel):
             return True
         location = any_location
         self.location_id = location
-        self._set_message(
-            "info",
-            _("Location: %s. Scan a product.") % location.name,
+        # Advance to the next step (dest_location if required, else
+        # product). Using step+1 instead of a hardcoded step key keeps
+        # the flow correct regardless of the picking type config.
+        self.step += 1
+        self._set_message_step()
+        return True
+
+    def _scan_dest_location(self, barcode):
+        """Scan the destination location.
+
+        Only triggered when the picking type has
+        ``barcode_scan_dest_location`` enabled. Internal locations are
+        accepted (the destination of an internal transfer is a stock
+        location); customer/supplier locations are also accepted for
+        outgoing/incoming pickings.
+        """
+        any_location = self.env["stock.location"].search(
+            [("barcode", "=", barcode)], limit=1
         )
+        if not any_location:
+            return False
+        # For destination, accept internal, customer, and supplier
+        # locations (outgoing → customer, incoming → supplier,
+        # internal → internal). Reject only virtual/inventory/scrap.
+        if any_location.usage in ("view", "inventory", "production"):
+            self._set_message(
+                "error",
+                _("%s is not a valid destination location")
+                % any_location.name,
+            )
+            return True
+        self.location_dest_id = any_location
         self.step = self._step_index("product")
         self._set_message_step()
         return True
@@ -894,6 +1001,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self.location_id:
             self._set_message("error", _("No source location scanned"))
             return False
+        if self.barcode_scan_dest_location and not self.location_dest_id:
+            self._set_message(
+                "error", _("No destination location scanned")
+            )
+            return False
         if self.product_id.tracking != "none" and not self.lot_id and not self.lot_name:
             self._set_message("error", _("Lot required for tracked product"))
             return False
@@ -1023,7 +1135,11 @@ class WizStockBarcodesPicking(models.TransientModel):
                 "quantity": self.product_qty,
                 "picked": True,
                 "location_id": self.location_id.id,
-                "location_dest_id": move.location_dest_id.id,
+                "location_dest_id": (
+                    self.location_dest_id.id
+                    if self.location_dest_id
+                    else move.location_dest_id.id
+                ),
                 "lot_id": self.lot_id.id if self.lot_id else False,
                 "lot_name": self.lot_id.name if self.lot_id else self.lot_name or False,
             }
@@ -1212,7 +1328,11 @@ class WizStockBarcodesPicking(models.TransientModel):
             "product_uom": self.product_uom_id.id or product.uom_id.id,
             "picking_id": self.picking_id.id,
             "location_id": self.location_id.id,
-            "location_dest_id": self.picking_id.location_dest_id.id,
+            "location_dest_id": (
+                self.location_dest_id.id
+                if self.location_dest_id
+                else self.picking_id.location_dest_id.id
+            ),
         })
         # merge=False keeps the new move distinct from existing moves for
         # the same product (otherwise _action_confirm merges them and the

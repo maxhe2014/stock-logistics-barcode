@@ -51,6 +51,7 @@ export class PickingScanApp extends Component {
             picking_type_code: "",
             location_id: false,
             location_name: "",
+            location_dest_id: false,
             location_dest_name: "",
             product_id: false,
             product_name: "",
