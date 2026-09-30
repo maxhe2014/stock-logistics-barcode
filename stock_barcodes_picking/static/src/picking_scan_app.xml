@@ -156,9 +156,15 @@
                                     <!-- Lots + actions -->
                                     <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                         <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
-                                            <span class="badge bg-secondary">
-                                                <i class="fa fa-barcode me-1"/>
+                                            <span class="badge bg-secondary d-inline-flex align-items-center gap-1">
+                                                <i class="fa fa-barcode"/>
                                                 <t t-out="lot.name" />
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
+                                                        t-att-title="'Remove ' + lot.name"
+                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
+                                                    <i class="fa fa-trash"/>
+                                                </button>
                                             </span>
                                         </t>
                                         <!-- Inline qty edit (pencil) -->

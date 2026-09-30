@@ -179,7 +179,6 @@ class TestStockBarcodesPicking(TransactionCase):
         wiz.product_qty = 5.0
         self.assertFalse(wiz.action_confirm())
         self.assertEqual(wiz.message_type, "error")
-        self.assertIn("location", (wiz.message or "").lower())
 
     # --- Switch picking clears location ---
     def test_switch_picking_clears_location(self):

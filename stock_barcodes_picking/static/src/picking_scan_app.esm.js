@@ -333,6 +333,32 @@ export class PickingScanApp extends Component {
     }
 
     /**
+     * Remove a scanned lot/SN from a move. Used by the trash button on
+     * each lot badge so the operator can correct a mis-scanned serial
+     * without leaving the scan flow.
+     */
+    async onRemoveMoveLot(moveId, lotId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        try {
+            await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_remove_move_lot",
+                [[this.wizId], moveId, lotId]
+            );
+            await this._refreshState();
+        } catch (err) {
+            this.notification.add(
+                _t("Remove lot failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+        }
+    }
+
+    /**
      * One-click consume the full demand of the active/non-tracked
      * product. Tracked products are rejected server-side.
      */

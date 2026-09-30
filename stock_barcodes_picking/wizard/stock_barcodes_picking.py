@@ -1398,6 +1398,44 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         return self.action_force_add(product_id=product.id)
 
+    # --- Remove a scanned lot / SN ---
+    def action_remove_move_lot(self, move_id, lot_id):
+        """Remove a scanned lot/SN from a picking move.
+
+        Lets the operator correct a mis-scanned serial or lot without
+        leaving the scan flow. Behaviour mirrors the move-line lifecycle:
+          - serial (1 line = 1 SN = qty 1): unlink the move line.
+          - lot (qty > 1 on a single line): decrement quantity by 1; if
+            it reaches 0, unlink the line.
+
+        Does NOT delete the ``stock.lot`` record itself — it is an
+        inventory entity; only the picking move line is undone.
+
+        After removal the move's ``picked`` flag recomputes from its
+        remaining move lines automatically.
+
+        :param move_id: stock.move id (must belong to this picking)
+        :param lot_id: stock.lot id to remove from that move
+        :return: True on success, False if move_id/lot_id invalid
+        """
+        self.ensure_one()
+        if not self.picking_id:
+            return False
+        move = self.picking_id.move_ids.filtered(lambda m: m.id == move_id)
+        if not move:
+            return False
+        lines = move.move_line_ids.filtered(lambda l: l.lot_id.id == lot_id)
+        if not lines:
+            return False
+        line = lines[0]
+        if line.quantity > 1:
+            line.quantity -= 1
+            if line.quantity <= 0:
+                line.unlink()
+        else:
+            line.unlink()
+        return True
+
     # --- Cleanup ---
     def _clean_values(self):
         """Clean scanned values after successful confirmation.
