@@ -28,3 +28,29 @@ class StockPicking(models.Model):
         action["params"] = {"wiz_id": wiz.id}
         action["views"] = [(False, "list"), (False, "form")]
         return action
+
+    def action_open_scan_wizard(self):
+        """Open the barcode scan client action from list/kanban views.
+
+        Two entry shapes:
+        - Header button (0 selected): scan-first mode — ``picking_id``
+          left empty; the operator scans a transfer name to select a
+          picking.
+        - Row/card button (1 selected): per-picking mode — ``picking_id``
+          set to the row's picking, scan the source location next.
+
+        Returns an ``ir.actions.client`` pointing at the OWL
+        ``PickingScanApp`` component (fullscreen).
+        """
+        picking_id = self.id if len(self) == 1 else False
+        wiz = self.env["wiz.stock.barcodes.picking"].create(
+            {"picking_id": picking_id}
+        )
+        if picking_id:
+            wiz._set_default_values()
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "stock_barcodes_picking.action_picking_barcode_scan"
+        )
+        action["params"] = {"wiz_id": wiz.id}
+        action["views"] = [(False, "list"), (False, "form")]
+        return action

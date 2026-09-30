@@ -3,12 +3,13 @@
 {
     "name": "Stock Barcodes Picking",
     "summary": "Barcode scanning for delivery orders (outgoing pickings)",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "author": "OpenViking, Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/stock-logistics-barcode",
     "license": "AGPL-3",
     "category": "Warehouse",
     "depends": ["barcodes", "stock", "web"],
+    "post_init_hook": "post_init_hook",
     "data": [
         "security/ir.model.access.csv",
         "data/ir_actions_client.xml",

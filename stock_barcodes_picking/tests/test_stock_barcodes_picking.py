@@ -29,6 +29,11 @@ class TestStockBarcodesPicking(TransactionCase):
         cls.picking_type = cls.env["stock.picking.type"].search(
             [("code", "=", "outgoing")], limit=1
         )
+        # Tests assume source-location scanning is mandatory (the
+        # pre-feature default). Existing DB rows may carry NULL → False
+        # for the new config field, so set it explicitly.
+        cls.picking_type.barcode_scan_source_location = True
+        cls.picking_type.barcode_scan_dest_location = False
 
         # Product without tracking
         cls.product_simple = cls.Product.create({

@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-  Add a "Barcode Scan" button to the stock.picking form (header).
+  Add barcode-scan entry points to stock.picking:
+    - form header button (per-picking)
+    - list view header + row buttons
+    - kanban view header + card buttons
 -->
 <odoo>
+    <!-- Form header button -->
     <record id="view_picking_form_inherit_barcode" model="ir.ui.view">
         <field name="name">stock.picking.form.inherit.barcode</field>
         <field name="model">stock.picking</field>
@@ -14,6 +18,56 @@
                         string="Barcode Scan"
                         class="oe_highlight"
                         invisible="state not in ('assigned', 'confirmed', 'partially_available')"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- List view: header (scan-first) + per-row scan button -->
+    <record id="view_picking_list_inherit_barcode" model="ir.ui.view">
+        <field name="name">stock.picking.list.inherit.barcode</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list/header" position="inside">
+                <button name="action_open_scan_wizard"
+                        type="object"
+                        string="Scan"
+                        class="oe_highlight"
+                        display="always"/>
+            </xpath>
+            <xpath expr="//list/field[@name='priority']" position="before">
+                <button name="action_open_scan_wizard"
+                        type="object"
+                        string="Scan"
+                        icon="fa-barcode"
+                        class="btn btn-primary btn-sm"
+                        invisible="state not in ('confirmed', 'assigned', 'partially_available', 'waiting')"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Kanban view: header (scan-first) + per-card scan button -->
+    <record id="view_picking_kanban_inherit_barcode" model="ir.ui.view">
+        <field name="name">stock.picking.kanban.inherit.barcode</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.stock_picking_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='scheduled_date']" position="before">
+                <header>
+                    <button name="action_open_scan_wizard"
+                            type="object"
+                            string="Scan"
+                            class="oe_highlight"
+                            display="always"/>
+                </header>
+            </xpath>
+            <xpath expr="//field[@name='priority']" position="before">
+                <button name="action_open_scan_wizard"
+                        type="object"
+                        string="Scan"
+                        icon="fa-barcode"
+                        class="btn btn-primary me-2 flex-shrink-0 o_kanban_scan_btn"
+                        invisible="state not in ('confirmed', 'assigned', 'partially_available', 'waiting')"/>
             </xpath>
         </field>
     </record>
