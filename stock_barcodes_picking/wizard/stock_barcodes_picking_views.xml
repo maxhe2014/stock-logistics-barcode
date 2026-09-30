@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Wizard form for wiz.stock.barcodes.picking.
+
+  The primary UI is the OWL client action PickingScanApp; this form
+  exists to host the barcode_handler widget (_barcode_scanned field)
+  and the manual-entry barcode char field. Hidden force_save fields
+  persist the scan context across RPC calls.
+-->
+<odoo>
+    <record id="view_stock_barcodes_picking_form" model="ir.ui.view">
+        <field name="name">stock.barcodes.picking.form</field>
+        <field name="model">wiz.stock.barcodes.picking</field>
+        <field name="arch" type="xml">
+            <form string="Barcode Scanner (Picking)" class="h-100">
+                <div class="d-flex flex-column h-100">
+                    <!-- Barcode handler widget (hardware scanner bus) -->
+                    <field name="_barcode_scanned" widget="barcode_handler" invisible="1" />
+                    <!-- Manual entry box (tablet / browser without scanner) -->
+                    <field name="barcode" placeholder="Scan or type barcode…" />
+                    <!-- Persisted scan context (hidden, force_save) -->
+                    <field name="picking_id" invisible="1" force_save="1" />
+                    <field name="picking_state" invisible="1" />
+                    <field name="location_id" invisible="1" force_save="1" />
+                    <field name="product_id" invisible="1" force_save="1" />
+                    <field name="product_uom_id" invisible="1" force_save="1" />
+                    <field name="lot_id" invisible="1" force_save="1" />
+                    <field name="lot_name" invisible="1" force_save="1" />
+                    <field name="product_qty" invisible="1" force_save="1" />
+                    <field name="step" invisible="1" />
+                    <field name="active_move_id" invisible="1" force_save="1" />
+                    <field name="scan_progress_stash" invisible="1" />
+                    <field name="visible_switch_selector" invisible="1" />
+                    <field name="pending_switch_picking_ids" invisible="1" />
+                </div>
+            </form>
+        </field>
+    </record>
+</odoo>

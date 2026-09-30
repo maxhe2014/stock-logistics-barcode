@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ir.actions.client record for the PickingScanApp OWL client action.
+
+  action_barcode_scan() reads this record via _for_xml_id and merges the
+  dynamic wiz_id into params before returning. The record itself carries
+  no params (wiz_id is created at runtime).
+-->
+<odoo>
+    <record id="action_picking_barcode_scan" model="ir.actions.client">
+        <field name="name">Barcode Scan (Picking)</field>
+        <field name="tag">stock_barcodes_picking.PickingScanApp</field>
+        <field name="target">fullscreen</field>
+    </record>
+</odoo>

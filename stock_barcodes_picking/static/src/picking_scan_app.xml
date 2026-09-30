@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2026 OpenViking
+  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+
+  Template for the PickingScanApp client action (OWL).
+  Outgoing-picking barcode scan flow:
+    - scan input (hardware via barcode bus + manual Enter)
+    - message bar (status + active-scan target)
+    - picking info strip (name, source/dest locations, progress)
+    - step indicator (location → product → lot → qty)
+    - move checklist (per move: product, demand, picked, lots)
+    - candidate-picking selector overlay (multi-match)
+    - action buttons (confirm, consume by demand, force done, validate)
+-->
+<templates id="template" xml:space="preserve">
+    <t t-name="stock_barcodes_picking.PickingScanApp">
+        <div class="o_picking_scan_app d-flex flex-column h-100">
+            <!-- Header: manual scan input + back -->
+            <div class="o_picking_scan_header p-3 border-bottom">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <input
+                            type="text"
+                            class="form-control form-control-lg o_picking_scan_input"
+                            t-att-placeholder="state.visible_switch_selector ? 'Select a transfer below…' : 'Scan or type barcode…'"
+                            t-att-disabled="state.scanning or state.visible_switch_selector ? 'disabled' : ''"
+                            t-on-keydown="onManualScanEnter"
+                        />
+                    </div>
+                    <div class="col-auto">
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-lg o_picking_scan_back"
+                            t-on-click="onBack"
+                        >Back</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Consolidated message bar: status + active target -->
+            <div t-if="state.message || state.active_move_product_name || state.last_unmatched_barcode"
+                 class="o_picking_scan_message m-3">
+                <div t-att-class="'alert ' + (state.message ? alertClass : 'alert-info') + ' mb-0'">
+                    <t t-if="state.message"><t t-out="state.message" /></t>
+                    <t t-if="state.message &amp;&amp; state.active_move_product_name"><br/></t>
+                    <t t-if="state.active_move_product_name">
+                        <span class="text-primary">
+                            <i class="fa fa-hand-o-right me-1"/>Active:
+                            <t t-out="state.active_move_product_name" />
+                        </span>
+                    </t>
+                    <!-- Force-add offer for an unmatched barcode -->
+                    <t t-if="state.last_unmatched_barcode">
+                        <br/>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-primary mt-1"
+                            t-on-click="onForceAddFromBarcode"
+                        >
+                            <i class="fa fa-plus me-1"/>Force add "<t t-out="state.last_unmatched_barcode" />"
+                        </button>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Picking info strip -->
+            <div t-if="state.picking_id" class="o_picking_scan_info m-3 p-2 border rounded">
+                <div class="d-flex flex-wrap gap-3">
+                    <span><strong>Transfer:</strong> <t t-out="state.picking_name" /></span>
+                    <span t-if="state.location_name">
+                        <strong>From:</strong> <t t-out="state.location_name" />
+                    </span>
+                    <span t-if="state.location_dest_name">
+                        <strong>To:</strong> <t t-out="state.location_dest_name" />
+                    </span>
+                    <span>
+                        <strong>Progress:</strong>
+                        <t t-out="state.total_done" /> / <t t-out="state.total_demand" />
+                    </span>
+                </div>
+            </div>
+
+            <!-- Step indicator -->
+            <div t-if="state.scan_steps.length" class="o_picking_scan_steps px-3 pb-2">
+                <ul class="nav nav-pills nav-justified">
+                    <t t-foreach="state.scan_steps" t-as="s" t-key="s.key">
+                        <li class="nav-item">
+                            <span
+                                t-att-class="'nav-link ' + (state.step === s_index ? 'active' : (state.step > s_index ? 'text-success' : 'text-muted'))"
+                            >
+                                <t t-out="s.label" />
+                            </span>
+                        </li>
+                    </t>
+                </ul>
+            </div>
+
+            <!-- Candidate-picking selector overlay (multi-match) -->
+            <div t-if="state.visible_switch_selector"
+                 class="o_picking_scan_selector m-3 p-3 border rounded bg-warning bg-opacity-10">
+                <div class="fw-bold mb-2">
+                    <i class="fa fa-exclamation-triangle me-1"/>
+                    Multiple transfers match — select one:
+                </div>
+                <div class="list-group">
+                    <t t-foreach="state.pending_switch_pickings" t-as="p" t-key="p.id">
+                        <button
+                            type="button"
+                            class="list-group-item list-group-item-action"
+                            t-on-click="() => this.onSelectPickingCandidate(p.id)"
+                        >
+                            <i class="fa fa-file-text-o me-2"/>
+                            <t t-out="p.name" />
+                        </button>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Move checklist -->
+            <div class="o_picking_scan_moves flex-grow-1 overflow-auto p-3">
+                <div t-if="!state.move_ids.length" class="text-muted">
+                    No transfer selected. Scan a transfer name to begin.
+                </div>
+                <table t-else="" class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width:2rem"></th>
+                            <th>Product</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="state.move_ids" t-as="mv" t-key="mv.id">
+                            <tr
+                                t-att-class="!mv.picked ? 'table-danger' : 'table-success'"
+                                t-att-style="state.active_move_id === mv.id ? 'border-left:4px solid #0d6efd;' : ''"
+                                t-on-click="() => this.onSelectMove(mv.id)"
+                                role="button"
+                            >
+                                <td class="text-center align-middle">
+                                    <i
+                                        t-att-class="state.active_move_id === mv.id ? 'fa fa-hand-o-right text-primary' : 'fa fa-hand-o-right text-muted opacity-25'"
+                                    />
+                                </td>
+                                <td class="align-middle">
+                                    <div><t t-out="mv.product_name" /></div>
+                                    <div class="small text-muted lh-sm">
+                                        Demand <t t-out="mv.product_uom_qty" />
+                                        <span class="mx-1">·</span>
+                                        Picked <t t-out="mv.quantity" />
+                                        <t t-if="mv.tracking !== 'none'">
+                                            <span class="mx-1">·</span>
+                                            <t t-out="mv.tracking" />
+                                        </t>
+                                    </div>
+                                    <!-- Lots + actions -->
+                                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                                        <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
+                                            <span class="badge bg-secondary">
+                                                <i class="fa fa-barcode me-1"/>
+                                                <t t-out="lot.name" />
+                                            </span>
+                                        </t>
+                                        <!-- Inline qty edit (pencil) -->
+                                        <t t-if="state.editingQtyMoveId === mv.id">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                class="form-control form-control-sm"
+                                                style="width: 6rem;"
+                                                t-att-value="state.draftQty"
+                                                t-on-input="(ev) => this.onDraftQtyInput(ev)"
+                                                t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, mv.id)"
+                                                t-on-click.stop=""
+                                            />
+                                            <button type="button"
+                                                    class="btn btn-sm btn-success"
+                                                    title="Confirm quantity"
+                                                    t-on-click.stop="() => this.onConfirmMoveQty(mv.id)">
+                                                <i class="fa fa-check"/>
+                                            </button>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    title="Cancel"
+                                                    t-on-click.stop="() => this.onCancelMoveQty()">
+                                                <i class="fa fa-times"/>
+                                            </button>
+                                        </t>
+                                        <t t-else="">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    title="Edit quantity"
+                                                    t-on-click.stop="() => this.onEditMoveQty(mv.id)">
+                                                <i class="fa fa-pencil"/>
+                                            </button>
+                                        </t>
+                                    </div>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="o_picking_scan_actions p-3 border-top d-flex gap-2 flex-wrap justify-content-between">
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-lg"
+                    t-on-click="onBack"
+                >Back</button>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <button
+                        t-if="canConsumeByDemand"
+                        type="button"
+                        class="btn btn-outline-success btn-lg"
+                        t-on-click="onConsumeByDemand"
+                    >Consume by demand</button>
+
+                    <button
+                        t-if="canConfirm"
+                        type="button"
+                        class="btn btn-primary btn-lg"
+                        t-on-click="onConfirm"
+                    >Confirm</button>
+
+                    <button
+                        t-if="state.visible_force_done"
+                        type="button"
+                        class="btn btn-warning btn-lg"
+                        t-on-click="onForceDone"
+                    >Force Consume</button>
+
+                    <button
+                        t-if="canValidate"
+                        type="button"
+                        class="btn btn-success btn-lg"
+                        t-on-click="onValidatePicking"
+                    >Validate</button>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

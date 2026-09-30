@@ -1,0 +1,32 @@
+/* Copyright 2026 OpenViking
+   License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). */
+
+.o_picking_scan_app {
+    background-color: #f8f9fa;
+}
+
+.o_picking_scan_input {
+    font-family: monospace;
+    font-size: 1.25rem;
+}
+
+/* Picking info strip: compact, readable */
+.o_picking_scan_info {
+    background-color: #fff;
+}
+
+/* Step indicator pills */
+.o_picking_scan_steps .nav-link {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Move row: pointer cursor for row-click selection */
+.o_picking_scan_moves tbody tr {
+    cursor: pointer;
+}
+
+/* Candidate selector: distinct warning style */
+.o_picking_scan_selector .list-group-item {
+    cursor: pointer;
+}
