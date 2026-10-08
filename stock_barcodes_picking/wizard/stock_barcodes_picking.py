@@ -450,6 +450,9 @@ class WizStockBarcodesPicking(models.TransientModel):
             {"key": k, "label": step_labels.get(k, k)}
             for k in self._get_scan_steps()
         ]
+        show_reserved = bool(
+            picking.picking_type_id.barcode_show_reserved_sns
+        )
         moves = []
         for mv in self.move_ids.filtered(
             lambda m: m.state not in ("done", "cancel")
@@ -457,10 +460,23 @@ class WizStockBarcodesPicking(models.TransientModel):
             move_lines = mv.move_line_ids
             picked_all = bool(move_lines) and all(l.picked for l in move_lines)
             picked_lines = move_lines.filtered(lambda l: l.picked).sorted(key=lambda l: l.id)
+            # Picked lots (always shown)
             lots = [
-                {"id": l.lot_id.id, "name": l.lot_id.name}
+                {"id": l.lot_id.id, "name": l.lot_id.name, "picked": True}
                 for l in picked_lines
                 if l.lot_id
+            ]
+            # Reserved (unpicked) lots — shown only when configured
+            if show_reserved:
+                reserved_lines = move_lines.filtered(
+                    lambda l: not l.picked and l.lot_id
+                ).sorted(key=lambda l: l.id)
+                lots += [
+                    {"id": l.lot_id.id, "name": l.lot_id.name, "picked": False}
+                    for l in reserved_lines
+                ]
+            picked_lot_ids = [
+                l.lot_id.id for l in picked_lines if l.lot_id
             ]
             moves.append({
                 "id": mv.id,
@@ -470,7 +486,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 "picked": picked_all,
                 "tracking": mv.product_id.tracking or "none",
                 "lots": lots,
-                "latest_lot_id": lots[-1]["id"] if lots else False,
+                "latest_lot_id": picked_lot_ids[-1] if picked_lot_ids else False,
             })
         return {
             "wiz_id": self.id,
@@ -513,7 +529,21 @@ class WizStockBarcodesPicking(models.TransientModel):
                 if self.active_move_id else ""
             ),
             "move_ids": moves,
+            # Packaging config
+            "show_put_in_pack": self.env.user.has_group("stock.group_tracking_lot"),
+            "pack_required": picking.picking_type_id.barcode_require_pack == "mandatory",
+            "lines_need_pack": self._lines_need_pack(picking),
         }
+
+    def _lines_need_pack(self, picking):
+        """Whether validation requires all picked lines to be packed."""
+        pt = picking.picking_type_id
+        require = pt.barcode_require_pack
+        if require == "mandatory":
+            return True
+        if require == "optional" and pt.barcode_validation_all_packed:
+            return True
+        return False
 
     # --- Step index helper (方案 C 扩展点) ---
     def _step_index(self, key):
@@ -1253,6 +1283,18 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not picking:
             self._set_message("error", _("No transfer selected"))
             return False
+        # Pack check: if required, all picked lines must be in a package
+        if self._lines_need_pack(picking):
+            unpacked = picking.move_line_ids.filtered(
+                lambda l: l.picked and not l.result_package_id
+            )
+            if unpacked:
+                self._set_message(
+                    "error",
+                    _("All picked products must be put into a package "
+                      "before validation.")
+                )
+                return False
         result = picking.button_validate()
         if isinstance(result, dict):
             # Crash-guard only: core _action_generate_backorder_wizard
@@ -1266,6 +1308,43 @@ class WizStockBarcodesPicking(models.TransientModel):
             return result
         # result is True (picking validated) or None/False (already done)
         return result
+
+    def action_put_in_pack(self):
+        """Put all picked (and unpacked) move lines into a new package.
+
+        Calls picking.action_put_in_pack() with the barcode_view context
+        so the put-in-pack wizard is skipped. Odoo's standard method
+        automatically splits partially-picked lines so only the picked
+        quantity goes into the package.
+        """
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        picking = self.picking_id
+        if not picking:
+            self._set_message("error", _("No transfer selected"))
+            return False
+        if not picking.move_line_ids.filtered(
+            lambda l: l.picked and not l.result_package_id
+        ):
+            self._set_message(
+                "info",
+                _("No unpacked picked products to pack."),
+            )
+            return True
+        try:
+            picking.with_context(barcode_view=True).action_put_in_pack()
+        except Exception as exc:
+            self._set_message(
+                "error",
+                _("Failed to put in package: %(msg)s") % {"msg": str(exc)},
+            )
+            return False
+        self._set_message(
+            "success",
+            _("Products have been put into a package."),
+        )
+        return True
 
     def set_active_move(self, move_id):
         """Bind the operator's target move (RPC entry for row click).

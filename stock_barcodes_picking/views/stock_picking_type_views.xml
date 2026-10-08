@@ -10,14 +10,21 @@
         <field name="model">stock.picking.type</field>
         <field name="inherit_id" ref="stock.view_picking_type_form"/>
         <field name="arch" type="xml">
-            <page name="general" position="after">
+            <xpath expr="//page[@name='general']" position="after">
                 <page name="barcode" string="Barcode">
                     <group string="Location Scanning">
                         <field name="barcode_scan_source_location"/>
                         <field name="barcode_scan_dest_location"/>
                     </group>
+                    <group string="Serial Numbers">
+                        <field name="barcode_show_reserved_sns"/>
+                    </group>
+                    <group string="Packaging" groups="stock.group_tracking_lot">
+                        <field name="barcode_require_pack"/>
+                        <field name="barcode_validation_all_packed"/>
+                    </group>
                 </page>
-            </page>
+            </xpath>
         </field>
     </record>
 </odoo>

@@ -84,6 +84,13 @@ export class PickingScanApp extends Component {
             pendingScrollMoveId: false,
         });
 
+        // Sound alert for scan errors. Only an error tone is used
+        // (success is silent). Preloaded so the first error plays
+        // without a network round-trip.
+        this.soundKo = new Audio(
+            "/stock_barcodes_picking/static/src/sounds/error.wav"
+        );
+
         onWillStart(async () => {
             await this._refreshState();
         });
@@ -117,6 +124,68 @@ export class PickingScanApp extends Component {
             [[this.wizId]]
         );
         Object.assign(this.state, snapshot);
+        this._enrichMoves();
+    }
+
+    /**
+     * Add a `pickedLots` filtered array to each move so the template can
+     * distinguish picked (scanned) lots from reserved (unpicked) ones.
+     * Must be called after every state assignment from the backend.
+     */
+    _enrichMoves() {
+        for (const mv of (this.state.move_ids || [])) {
+            mv.pickedLots = (mv.lots || []).filter((l) => l.picked);
+        }
+    }
+
+    /**
+     * Play the error sound and (on mobile) vibrate.
+     *
+     * Triggered for error-class outcomes: message_type in
+     * {error, not_found, more_match}, and for RPC exceptions.
+     * Success is silent by design.
+     *
+     * Vibration caveats:
+     *   - iOS Safari does NOT implement the Vibration API at all
+     *     (navigator.vibrate is undefined) — nothing we can do.
+     *   - Android Chrome requires the call to happen within a user
+     *     activation window. Because the scan RPC is async, the
+     *     activation may have expired by the time we get here. We
+     *     still try; a 200ms single pulse is the most reliable
+     *     pattern on Android.
+     */
+    _playAlert() {
+        try {
+            this.soundKo.currentTime = 0;
+            this.soundKo.play().catch(() => {});
+        } catch (_e) {
+            /* audio element not ready */
+        }
+        this._vibrateError();
+    }
+
+    /**
+     * Trigger the error vibration pattern.
+     *
+     * Checks both property existence and type (some browsers expose
+     * `vibrate` as a non-callable). Silently no-ops on unsupported
+     * platforms (iOS Safari).
+     */
+    _vibrateError() {
+        const nav = navigator;
+        if (typeof nav.vibrate !== "function") {
+            console.warn("[barcode] vibrate not supported on this device/browser");
+            return;
+        }
+        try {
+            // Single 200ms pulse is the most widely supported pattern
+            // on Android Chrome; the [100,50,100] pattern can be
+            // ignored by some browser builds.
+            const ok = nav.vibrate(200);
+            console.log("[barcode] vibrate(200) returned:", ok, "userActivation:", nav.userActivation?.isActive);
+        } catch (e) {
+            console.warn("[barcode] vibrate threw:", e);
+        }
     }
 
     /**
@@ -134,11 +203,11 @@ export class PickingScanApp extends Component {
         // scan through — the backend guard only accepts picking-name
         // scans while the selector is open, and rejects everything else.
         this.state.scanning = true;
-        // Snapshot each move's lot count before the scan so we can detect
-        // which move received a new lot afterward (for auto-expand + scroll).
-        const lotCountBefore = {};
+        // Snapshot each move's picked-lot count before the scan so we can
+        // detect which move received a new picked lot afterward (for scroll).
+        const pickedCountBefore = {};
         for (const mv of this.state.move_ids) {
-            lotCountBefore[mv.id] = mv.lots ? mv.lots.length : 0;
+            pickedCountBefore[mv.id] = (mv.pickedLots || []).length;
         }
         try {
             const res = await this.orm.call(
@@ -147,13 +216,16 @@ export class PickingScanApp extends Component {
                 [[this.wizId], barcode]
             );
             Object.assign(this.state, res.state);
-            // Scroll to the move that gained a lot (quick jump).
-            // Do NOT auto-expand — the latest SN is already shown inline,
-            // the user expands manually via the "共 N 个" button.
+            this._enrichMoves();
+            // Error-class scan result → sound + vibrate alert.
+            if (["error", "not_found", "more_match"].includes(this.state.message_type)) {
+                this._playAlert();
+            }
+            // Scroll to the move that gained a picked lot (quick jump).
             let scannedMoveId = false;
             for (const mv of this.state.move_ids) {
-                const before = lotCountBefore[mv.id] || 0;
-                const after = mv.lots ? mv.lots.length : 0;
+                const before = pickedCountBefore[mv.id] || 0;
+                const after = (mv.pickedLots || []).length;
                 if (after > before) {
                     scannedMoveId = mv.id;
                     break;
@@ -179,6 +251,7 @@ export class PickingScanApp extends Component {
                 _t("Scan failed: %(err)s", { err: err?.message || String(err) }),
                 { type: "danger" }
             );
+            this._playAlert();
         } finally {
             this.state.scanning = false;
         }
@@ -219,6 +292,9 @@ export class PickingScanApp extends Component {
             // Guard or validation error — the backend sets the message;
             // refresh so the UI shows it.
             await this._refreshState();
+            if (["error", "not_found", "more_match"].includes(this.state.message_type)) {
+                this._playAlert();
+            }
             return;
         }
         if (res && typeof res === "object" && res.type) {
@@ -255,6 +331,7 @@ export class PickingScanApp extends Component {
                 }),
                 { type: "danger" }
             );
+            this._playAlert();
         } finally {
             this.state.scanning = false;
         }
@@ -292,6 +369,7 @@ export class PickingScanApp extends Component {
                 _t("Select row failed: %(err)s", { err: err?.message || String(err) }),
                 { type: "danger" }
             );
+            this._playAlert();
         }
     }
 
@@ -335,6 +413,7 @@ export class PickingScanApp extends Component {
             this.notification.add(_t("Please enter a positive quantity"), {
                 type: "danger",
             });
+            this._playAlert();
             return;
         }
         this.state.scanning = true;
@@ -347,6 +426,7 @@ export class PickingScanApp extends Component {
             );
             if (!ok) {
                 await this._refreshState();
+                this._playAlert();
                 return;
             }
             // 2. Consume with the entered quantity
@@ -365,6 +445,7 @@ export class PickingScanApp extends Component {
                 }),
                 { type: "danger" }
             );
+            this._playAlert();
         } finally {
             this.state.scanning = false;
         }
@@ -398,6 +479,7 @@ export class PickingScanApp extends Component {
                 }),
                 { type: "danger" }
             );
+            this._playAlert();
         }
     }
 
@@ -421,6 +503,16 @@ export class PickingScanApp extends Component {
         return this._callAction(
             "action_consume_by_demand",
             _t("Consume by demand")
+        );
+    }
+
+    /**
+     * Put all picked (unpacked) lines into a new package.
+     */
+    onPutInPack() {
+        return this._callAction(
+            "action_put_in_pack",
+            _t("Put in Pack")
         );
     }
 
@@ -466,6 +558,7 @@ export class PickingScanApp extends Component {
                 }),
                 { type: "danger" }
             );
+            this._playAlert();
         } finally {
             this.state.scanning = false;
         }
@@ -499,6 +592,7 @@ export class PickingScanApp extends Component {
                 }),
                 { type: "danger" }
             );
+            this._playAlert();
         } finally {
             this.state.scanning = false;
         }
@@ -544,6 +638,18 @@ export class PickingScanApp extends Component {
             !!this.state.product_id &&
             this.state.product_tracking === "none"
         );
+    }
+
+    /**
+     * Put in Pack: visible when the user has the packages group and there
+     * is at least one picked (unpacked) move line.
+     */
+    get canPutInPack() {
+        if (!this.state.show_put_in_pack || !this.state.picking_id) {
+            return false;
+        }
+        const moves = this.state.move_ids || [];
+        return moves.some((mv) => (mv.pickedLots || []).length > 0);
     }
 
     /** Step label for the current step index. */
