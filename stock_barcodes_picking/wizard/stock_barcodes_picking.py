@@ -462,7 +462,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             picked_lines = move_lines.filtered(lambda l: l.picked).sorted(key=lambda l: l.id)
             # Picked lots (always shown)
             lots = [
-                {"id": l.lot_id.id, "name": l.lot_id.name, "picked": True}
+                {
+                    "id": l.lot_id.id,
+                    "name": l.lot_id.name,
+                    "picked": True,
+                    "result_package_name": l.result_package_id.name or "",
+                }
                 for l in picked_lines
                 if l.lot_id
             ]
@@ -478,6 +483,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             picked_lot_ids = [
                 l.lot_id.id for l in picked_lines if l.lot_id
             ]
+            # Distinct package names of picked lines (for the package row)
+            result_package_names = list(dict.fromkeys(
+                l.result_package_id.name
+                for l in picked_lines
+                if l.result_package_id
+            ))
             moves.append({
                 "id": mv.id,
                 "product_name": mv.product_id.display_name or "",
@@ -487,6 +498,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 "tracking": mv.product_id.tracking or "none",
                 "lots": lots,
                 "latest_lot_id": picked_lot_ids[-1] if picked_lot_ids else False,
+                "result_package_names": result_package_names,
             })
         return {
             "wiz_id": self.id,

@@ -236,6 +236,16 @@
                                             </button>
                                         </t>
                                     </div>
+                                    <!-- Package info (after put-in-pack) -->
+                                    <div t-if="mv.result_package_names &amp;&amp; mv.result_package_names.length"
+                                         class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                        <i class="fa fa-archive text-primary" title="Package"/>
+                                        <t t-foreach="mv.result_package_names" t-as="pkg" t-key="pkg">
+                                            <span class="badge bg-light text-dark border border-secondary-subtle d-inline-flex align-items-center">
+                                                <t t-out="pkg" />
+                                            </span>
+                                        </t>
+                                    </div>
                                 </td>
                             </tr>
                             <!-- Multi-SN expansion row (accordion) -->
