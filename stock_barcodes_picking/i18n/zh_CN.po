@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 08:00+0000\n"
-"PO-Revision-Date: 2026-09-30 08:00+0000\n"
+"POT-Creation-Date: 2026-10-08 03:48+0000\n"
+"PO-Revision-Date: 2026-10-08 03:48+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: zh_CN\n"
@@ -75,6 +75,22 @@ msgstr "当前："
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Added & picked: %(prod)s x%(qty)s"
 msgstr "已添加并拣取：%(prod)s x%(qty)s"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__mandatory
+msgid "After Each Product"
+msgstr "每个产品后"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__optional
+msgid "After a Group of Products"
+msgstr "一组产品后"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "All picked products must be put into a package before validation."
+msgstr "验证前所有已拣产品必须放入包装。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -268,6 +284,12 @@ msgid "Error"
 msgstr "错误"
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Failed to put in package: %(msg)s"
+msgstr "放入包装失败：%(msg)s"
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_force_add
 msgid "Force Add"
 msgstr "强制添加"
@@ -298,6 +320,11 @@ msgid "Force add only supports non-tracked products"
 msgstr "强制添加仅支持非可追溯产品"
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_require_pack
+msgid "Force put in package"
+msgstr "强制放入包装"
+
+#. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "From:"
@@ -309,6 +336,35 @@ msgstr "来自："
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__id
 msgid "ID"
 msgstr "ID"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_require_pack
+msgid ""
+"If 'After Each Product', a package is mandatory after each product is "
+"scanned. If 'After a Group of Products', packages are optional but all "
+"products must be packed before validation."
+msgstr ""
+"选择「每个产品后」时，每扫描一个产品后必须装包；"
+"选择「一组产品后」时，装包为可选，但验证前所有产品必须已装包。"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_validation_all_packed
+msgid ""
+"If enabled, all picked products must be put into a package before the "
+"transfer can be validated. (Requires 'After a Group of Products' or 'After "
+"Each Product'.)"
+msgstr ""
+"启用后，验证调拨单前所有已拣产品必须放入包装。"
+"（需配合「一组产品后」或「每个产品后」。）"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
+msgid ""
+"If enabled, reserved (but not yet picked) serial numbers are displayed in "
+"the barcode scanner so the picker knows which serial numbers to scan."
+msgstr ""
+"启用后，在条码扫描器中显示已预留（但尚未拣取）的序列号，"
+"以便拣货员知道需要扫描哪些序列号。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_scan_dest_location
@@ -448,6 +504,11 @@ msgid "Multiple transfers match — select one:"
 msgstr "多个调拨单匹配，请选择一个："
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__no
+msgid "No Requirement"
+msgstr "无要求"
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "No barcode to add"
@@ -508,6 +569,12 @@ msgid "No transfer selected. Scan a transfer name to begin."
 msgstr "未选择调拨单。请扫描调拨单号开始。"
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "No unpacked picked products to pack."
+msgstr "没有未装包的已拣产品。"
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__message_type__not_found
 msgid "Not found"
 msgstr "未找到"
@@ -522,6 +589,11 @@ msgid ""
 msgstr ""
 "操作员选择的目标移动。设置后，扫描序列号/批次时会优先在此移动的产品中查找批次，"
 "从而自动解决跨产品序列号冲突。切换拣货单或扫描其他产品时清除。"
+
+#. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Packaging"
+msgstr "包装"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
@@ -589,10 +661,23 @@ msgid "Product: %s. Scan lot."
 msgstr "产品：%s。请扫描批次号。"
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Products have been put into a package."
+msgstr "产品已放入包装。"
+
+#. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Progress:"
 msgstr "进度："
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Put in Pack"
+msgstr "放入包装"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_qty
@@ -610,6 +695,17 @@ msgstr "数量超过需求（最大：%s）"
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Quantity must be positive"
 msgstr "数量必须为正数"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove lot failed: %(err)s"
+msgstr "移除批次失败：%(err)s"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_validation_all_packed
+msgid "Require All Products Packed Before Validation"
+msgstr "验证前要求所有产品已装包"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__res_id
@@ -727,9 +823,27 @@ msgid "Selected transfer is not in the candidate list"
 msgstr "所选调拨单不在候选列表中"
 
 #. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Serial Numbers"
+msgstr "序列号"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number/lot %(name)s does not exist. This operation type does not "
+"allow creating new ones."
+msgstr "序列号/批次 %(name)s 不存在，此作业类型不允许创建新序列号/批次。"
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_switch_selector
 msgid "Show Picking Selector"
 msgstr "显示拣货单选择器"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
+msgid "Show Reserved Serial Numbers"
+msgstr "显示已预留的序列号"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_force_add
@@ -867,15 +981,39 @@ msgid "Wizard to read barcode on pickings"
 msgstr "拣货条码读取向导"
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "个"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "个待拣"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "产品"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "共"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "库位"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "待拣"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -891,81 +1029,13 @@ msgid "数量"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "目的库位"
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "查看"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
-msgid "Show Reserved Serial Numbers"
-msgstr "显示已预留的序列号"
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_require_pack
-msgid "Force put in package"
-msgstr "强制放入包装"
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__mandatory
-msgid "After Each Product"
-msgstr "每个产品后"
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__optional
-msgid "After a Group of Products"
-msgstr "一组产品后"
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__no
-msgid "No Requirement"
-msgstr "无要求"
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_validation_all_packed
-msgid "Require All Products Packed Before Validation"
-msgstr "验证前要求所有产品已装包"
-
-#. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
-msgid "Serial Numbers"
-msgstr "序列号"
-
-#. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
-msgid "Packaging"
-msgstr "包装"
-
-#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "All picked products must be put into a package before validation."
-msgstr "验证前所有已拣产品必须放入包装。"
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "No unpacked picked products to pack."
-msgstr "没有未装包的已拣产品。"
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Products have been put into a package."
-msgstr "产品已放入包装。"
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Failed to put in package: %(msg)s"
-msgstr "放入包装失败：%(msg)s"
-
-#. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.picking_scan_app
-msgid "Put in Pack"
-msgstr "放入包装"
-
-#. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.picking_scan_app
-msgid "待拣"
+msgid "目的库位"
 msgstr ""

@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 08:00+0000\n"
-"PO-Revision-Date: 2026-09-30 08:00+0000\n"
+"POT-Creation-Date: 2026-10-08 03:48+0000\n"
+"PO-Revision-Date: 2026-10-08 03:48+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -63,6 +63,22 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Added & picked: %(prod)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__mandatory
+msgid "After Each Product"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__optional
+msgid "After a Group of Products"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "All picked products must be put into a package before validation."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -253,6 +269,12 @@ msgid "Error"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Failed to put in package: %(msg)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_force_add
 msgid "Force Add"
 msgstr ""
@@ -283,6 +305,11 @@ msgid "Force add only supports non-tracked products"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_require_pack
+msgid "Force put in package"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "From:"
@@ -293,6 +320,29 @@ msgstr ""
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__id
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__id
 msgid "ID"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_require_pack
+msgid ""
+"If 'After Each Product', a package is mandatory after each product is "
+"scanned. If 'After a Group of Products', packages are optional but all "
+"products must be packed before validation."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_validation_all_packed
+msgid ""
+"If enabled, all picked products must be put into a package before the "
+"transfer can be validated. (Requires 'After a Group of Products' or 'After "
+"Each Product'.)"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
+msgid ""
+"If enabled, reserved (but not yet picked) serial numbers are displayed in "
+"the barcode scanner so the picker knows which serial numbers to scan."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -429,6 +479,11 @@ msgid "Multiple transfers match — select one:"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__no
+msgid "No Requirement"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "No barcode to add"
@@ -489,6 +544,12 @@ msgid "No transfer selected. Scan a transfer name to begin."
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "No unpacked picked products to pack."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__message_type__not_found
 msgid "Not found"
 msgstr ""
@@ -500,6 +561,11 @@ msgid ""
 "lot lookup to this move's product first, so cross-product SN collisions "
 "resolve automatically. Cleared on picking switch or scanning a different "
 "product."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Packaging"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -568,9 +634,22 @@ msgid "Product: %s. Scan lot."
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Products have been put into a package."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Progress:"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Put in Pack"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -588,6 +667,17 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Quantity must be positive"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove lot failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_validation_all_packed
+msgid "Require All Products Packed Before Validation"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -706,8 +796,26 @@ msgid "Selected transfer is not in the candidate list"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Serial Numbers"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number/lot %(name)s does not exist. This operation type does not "
+"allow creating new ones."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_switch_selector
 msgid "Show Picking Selector"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
+msgid "Show Reserved Serial Numbers"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -846,15 +954,39 @@ msgid "Wizard to read barcode on pickings"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "个"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "个待拣"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "产品"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "共"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "库位"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "待拣"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -867,6 +999,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "数量"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "查看"
 msgstr ""
 
 #. module: stock_barcodes_picking
