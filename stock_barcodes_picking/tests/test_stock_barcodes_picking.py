@@ -34,6 +34,10 @@ class TestStockBarcodesPicking(TransactionCase):
         # for the new config field, so set it explicitly.
         cls.picking_type.barcode_scan_source_location = True
         cls.picking_type.barcode_scan_dest_location = False
+        # Tests create new lots/serials on the fly, so the operation
+        # type must allow it (use_create_lots). Without this the scan
+        # flow rejects unknown barcodes with "does not exist".
+        cls.picking_type.use_create_lots = True
 
         # Product without tracking
         cls.product_simple = cls.Product.create({

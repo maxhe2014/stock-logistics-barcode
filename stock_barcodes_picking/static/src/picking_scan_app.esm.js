@@ -139,7 +139,7 @@ export class PickingScanApp extends Component {
     }
 
     /**
-     * Play the error sound and (on mobile) vibrate.
+     * Play the error sound.
      *
      * Triggered for error-class outcomes: message_type in
      * {error, not_found, more_match}, and for RPC exceptions.
@@ -151,54 +151,6 @@ export class PickingScanApp extends Component {
             this.soundKo.play().catch(() => {});
         } catch (_e) {
             /* audio element not ready */
-        }
-        this._vibrateError();
-    }
-
-    /**
-     * Trigger the error vibration pattern.
-     *
-     * Supports two vibration channels:
-     *   1. DingTalk JSAPI (dd.device.vibrate) — used when Odoo is
-     *      embedded inside the DingTalk app (HarmonyOS / Android).
-     *      DingTalk's WebView does NOT expose the standard
-     *      navigator.vibrate, so we must use dd.* instead.
-     *   2. Web Vibration API (navigator.vibrate) — fallback for
-     *      standard mobile browsers (Android Chrome). iOS Safari
-     *      does not implement it.
-     */
-    _vibrateError() {
-        const DURATION = 200;
-        // --- Channel 1: DingTalk JSAPI ---
-        const dd = window.dd;
-        if (dd && dd.device) {
-            // Try dd.device.vibrate first, then dd.device.notification.vibrate
-            const vibrateFn = dd.device.vibrate
-                || (dd.device.notification && dd.device.notification.vibrate);
-            if (typeof vibrateFn === "function") {
-                try {
-                    vibrateFn.call(dd.device, {
-                        duration: DURATION,
-                        onSuccess: () => console.log("[barcode] dd vibrate ok"),
-                        onFail: (err) => console.warn("[barcode] dd vibrate fail:", err),
-                    });
-                    return;
-                } catch (e) {
-                    console.warn("[barcode] dd vibrate threw:", e);
-                    // fall through to web API
-                }
-            }
-        }
-        // --- Channel 2: Web Vibration API (fallback) ---
-        const nav = navigator;
-        if (typeof nav.vibrate !== "function") {
-            console.warn("[barcode] vibrate not supported (no dd, no navigator.vibrate)");
-            return;
-        }
-        try {
-            nav.vibrate(DURATION);
-        } catch (e) {
-            console.warn("[barcode] navigator.vibrate threw:", e);
         }
     }
 
@@ -231,7 +183,7 @@ export class PickingScanApp extends Component {
             );
             Object.assign(this.state, res.state);
             this._enrichMoves();
-            // Error-class scan result → sound + vibrate alert.
+            // Error-class scan result → sound alert.
             if (["error", "not_found", "more_match"].includes(this.state.message_type)) {
                 this._playAlert();
             }

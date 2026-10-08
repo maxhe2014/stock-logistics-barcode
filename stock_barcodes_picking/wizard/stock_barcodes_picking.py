@@ -896,7 +896,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         return self._create_new_lot_flow(barcode)
 
     def _create_new_lot_flow(self, barcode):
-        """Treat an unknown barcode as a new lot for the current product."""
+        """Treat an unknown barcode as a new lot for the current product.
+
+        When the picking's operation type does not allow creating new
+        lots/serial numbers (``use_create_lots`` is False), unknown
+        barcodes are rejected immediately with a clear error instead of
+        silently creating a lot that would only fail at validation time.
+        """
         self.ensure_one()
         if not self.product_id and self.active_move_id:
             self.product_id = self.active_move_id.product_id
@@ -905,6 +911,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message(
                 "error",
                 _("Scan a product barcode or click a product row first."),
+            )
+            return True
+        if not self.picking_id.use_create_lots:
+            self._set_message(
+                "error",
+                _("Serial number/lot %(name)s does not exist. This "
+                  "operation type does not allow creating new ones.")
+                % {"name": barcode},
             )
             return True
         self.lot_name = barcode
