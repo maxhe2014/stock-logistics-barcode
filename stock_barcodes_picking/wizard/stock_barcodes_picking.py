@@ -1326,10 +1326,18 @@ class WizStockBarcodesPicking(models.TransientModel):
     def action_put_in_pack(self):
         """Put all picked (and unpacked) move lines into a new package.
 
-        Calls picking.action_put_in_pack() with the barcode_view context
-        so the put-in-pack wizard is skipped. Odoo's standard method
-        automatically splits partially-picked lines so only the picked
-        quantity goes into the package.
+        Calls picking.action_put_in_pack() with the barcode_view context.
+
+        Return value contract (forwarded to the frontend's three-state
+        handler ``_handleActionResult``):
+          - False: guard blocked it / no transfer / exception
+          - True:  packed directly (operation type does not require a
+                   package type)
+          - dict:  Odoo's ``stock.put.in.pack`` wizard action — the
+                   operation type requires a package type
+                   (``set_package_type``). The frontend opens it; once
+                   the operator picks a package type and confirms, Odoo
+                   creates the package and the frontend refreshes.
         """
         self.ensure_one()
         if not self._check_selector_resolved():
@@ -1347,13 +1355,17 @@ class WizStockBarcodesPicking(models.TransientModel):
             )
             return True
         try:
-            picking.with_context(barcode_view=True).action_put_in_pack()
+            result = picking.with_context(barcode_view=True).action_put_in_pack()
         except Exception as exc:
             self._set_message(
                 "error",
                 _("Failed to put in package: %(msg)s") % {"msg": str(exc)},
             )
             return False
+        # If Odoo returned a wizard action (package type required),
+        # forward it to the frontend so the operator can choose.
+        if isinstance(result, dict) and result.get("type"):
+            return result
         self._set_message(
             "success",
             _("Products have been put into a package."),
