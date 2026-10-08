@@ -144,15 +144,6 @@ export class PickingScanApp extends Component {
      * Triggered for error-class outcomes: message_type in
      * {error, not_found, more_match}, and for RPC exceptions.
      * Success is silent by design.
-     *
-     * Vibration caveats:
-     *   - iOS Safari does NOT implement the Vibration API at all
-     *     (navigator.vibrate is undefined) — nothing we can do.
-     *   - Android Chrome requires the call to happen within a user
-     *     activation window. Because the scan RPC is async, the
-     *     activation may have expired by the time we get here. We
-     *     still try; a 200ms single pulse is the most reliable
-     *     pattern on Android.
      */
     _playAlert() {
         try {
@@ -167,24 +158,47 @@ export class PickingScanApp extends Component {
     /**
      * Trigger the error vibration pattern.
      *
-     * Checks both property existence and type (some browsers expose
-     * `vibrate` as a non-callable). Silently no-ops on unsupported
-     * platforms (iOS Safari).
+     * Supports two vibration channels:
+     *   1. DingTalk JSAPI (dd.device.vibrate) — used when Odoo is
+     *      embedded inside the DingTalk app (HarmonyOS / Android).
+     *      DingTalk's WebView does NOT expose the standard
+     *      navigator.vibrate, so we must use dd.* instead.
+     *   2. Web Vibration API (navigator.vibrate) — fallback for
+     *      standard mobile browsers (Android Chrome). iOS Safari
+     *      does not implement it.
      */
     _vibrateError() {
+        const DURATION = 200;
+        // --- Channel 1: DingTalk JSAPI ---
+        const dd = window.dd;
+        if (dd && dd.device) {
+            // Try dd.device.vibrate first, then dd.device.notification.vibrate
+            const vibrateFn = dd.device.vibrate
+                || (dd.device.notification && dd.device.notification.vibrate);
+            if (typeof vibrateFn === "function") {
+                try {
+                    vibrateFn.call(dd.device, {
+                        duration: DURATION,
+                        onSuccess: () => console.log("[barcode] dd vibrate ok"),
+                        onFail: (err) => console.warn("[barcode] dd vibrate fail:", err),
+                    });
+                    return;
+                } catch (e) {
+                    console.warn("[barcode] dd vibrate threw:", e);
+                    // fall through to web API
+                }
+            }
+        }
+        // --- Channel 2: Web Vibration API (fallback) ---
         const nav = navigator;
         if (typeof nav.vibrate !== "function") {
-            console.warn("[barcode] vibrate not supported on this device/browser");
+            console.warn("[barcode] vibrate not supported (no dd, no navigator.vibrate)");
             return;
         }
         try {
-            // Single 200ms pulse is the most widely supported pattern
-            // on Android Chrome; the [100,50,100] pattern can be
-            // ignored by some browser builds.
-            const ok = nav.vibrate(200);
-            console.log("[barcode] vibrate(200) returned:", ok, "userActivation:", nav.userActivation?.isActive);
+            nav.vibrate(DURATION);
         } catch (e) {
-            console.warn("[barcode] vibrate threw:", e);
+            console.warn("[barcode] navigator.vibrate threw:", e);
         }
     }
 
