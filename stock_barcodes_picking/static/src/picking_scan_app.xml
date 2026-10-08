@@ -81,21 +81,6 @@
                 </div>
             </div>
 
-            <!-- Step indicator -->
-            <div t-if="state.scan_steps.length" class="o_picking_scan_steps px-3 pb-2">
-                <ul class="nav nav-pills nav-justified">
-                    <t t-foreach="state.scan_steps" t-as="s" t-key="s.key">
-                        <li class="nav-item">
-                            <span
-                                t-att-class="'nav-link ' + (state.step === s_index ? 'active' : (state.step > s_index ? 'text-success' : 'text-muted'))"
-                            >
-                                <t t-out="s.label" />
-                            </span>
-                        </li>
-                    </t>
-                </ul>
-            </div>
-
             <!-- Candidate-picking selector overlay (multi-match) -->
             <div t-if="state.visible_switch_selector"
                  class="o_picking_scan_selector m-3 p-3 border rounded bg-warning bg-opacity-10">
@@ -132,6 +117,7 @@
                     <tbody>
                         <t t-foreach="state.move_ids" t-as="mv" t-key="mv.id">
                             <tr
+                                t-att-data-move-row="mv.id"
                                 t-att-class="!mv.picked ? 'table-danger' : 'table-success'"
                                 t-att-style="state.active_move_id === mv.id ? 'border-left:4px solid #0d6efd;' : ''"
                                 t-on-click="() => this.onSelectMove(mv.id)"
@@ -155,17 +141,39 @@
                                     </div>
                                     <!-- Lots + actions -->
                                     <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                                        <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
+                                        <!-- Single SN: show inline with delete -->
+                                        <t t-if="mv.lots.length === 1">
                                             <span class="badge bg-secondary d-inline-flex align-items-center gap-1">
                                                 <i class="fa fa-barcode"/>
-                                                <t t-out="lot.name" />
+                                                <t t-out="mv.lots[0].name" />
                                                 <button type="button"
                                                         class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
-                                                        t-att-title="'Remove ' + lot.name"
-                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
+                                                        t-att-title="'Remove ' + mv.lots[0].name"
+                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.lots[0].id)">
                                                     <i class="fa fa-trash"/>
                                                 </button>
                                             </span>
+                                        </t>
+                                        <!-- Multi-SN: show the LATEST SN inline + count badge to expand all -->
+                                        <t t-if="mv.lots.length > 1">
+                                            <span class="badge bg-primary d-inline-flex align-items-center gap-1"
+                                                  style="border-left:4px solid #0d6efd;">
+                                                <i class="fa fa-barcode"/>
+                                                <t t-out="mv.lots[mv.lots.length - 1].name" />
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
+                                                        t-att-title="'Remove ' + mv.lots[mv.lots.length - 1].name"
+                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.lots[mv.lots.length - 1].id)">
+                                                    <i class="fa fa-trash"/>
+                                                </button>
+                                            </span>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                                                    t-att-title="state.expandedMoveId === mv.id ? '收起全部' : '展开全部'"
+                                                    t-on-click.stop="() => this.onToggleMoveLots(mv.id)">
+                                                <i t-att-class="state.expandedMoveId === mv.id ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
+                                                共 <t t-out="mv.lots.length" /> 个
+                                            </button>
                                         </t>
                                         <!-- Inline qty edit (pencil) -->
                                         <t t-if="state.editingQtyMoveId === mv.id">
@@ -200,6 +208,29 @@
                                                     t-on-click.stop="() => this.onEditMoveQty(mv.id)">
                                                 <i class="fa fa-pencil"/>
                                             </button>
+                                        </t>
+                                    </div>
+                                </td>
+                            </tr>
+                            <!-- Multi-SN expansion row (accordion) -->
+                            <tr t-if="state.expandedMoveId === mv.id and mv.lots.length > 1"
+                                class="o_picking_scan_lot_expand">
+                                <td colspan="2" class="p-0">
+                                    <div class="d-flex flex-wrap gap-2 p-2 bg-light border-top">
+                                        <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
+                                            <span
+                                                t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-primary' : 'bg-secondary')"
+                                                t-att-style="lot.id === mv.latest_lot_id ? 'border-left:4px solid #0d6efd;' : ''"
+                                            >
+                                                <i class="fa fa-barcode"/>
+                                                <t t-out="lot.name" />
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
+                                                        t-att-title="'Remove ' + lot.name"
+                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
+                                                    <i class="fa fa-trash"/>
+                                                </button>
+                                            </span>
                                         </t>
                                     </div>
                                 </td>

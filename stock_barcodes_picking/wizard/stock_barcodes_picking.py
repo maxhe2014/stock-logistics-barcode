@@ -456,7 +456,12 @@ class WizStockBarcodesPicking(models.TransientModel):
         ):
             move_lines = mv.move_line_ids
             picked_all = bool(move_lines) and all(l.picked for l in move_lines)
-            picked_lines = move_lines.filtered(lambda l: l.picked)
+            picked_lines = move_lines.filtered(lambda l: l.picked).sorted(key=lambda l: l.id)
+            lots = [
+                {"id": l.lot_id.id, "name": l.lot_id.name}
+                for l in picked_lines
+                if l.lot_id
+            ]
             moves.append({
                 "id": mv.id,
                 "product_name": mv.product_id.display_name or "",
@@ -464,11 +469,8 @@ class WizStockBarcodesPicking(models.TransientModel):
                 "quantity": sum(picked_lines.mapped("quantity")),
                 "picked": picked_all,
                 "tracking": mv.product_id.tracking or "none",
-                "lots": [
-                    {"id": l.lot_id.id, "name": l.lot_id.name}
-                    for l in picked_lines
-                    if l.lot_id
-                ],
+                "lots": lots,
+                "latest_lot_id": lots[-1]["id"] if lots else False,
             })
         return {
             "wiz_id": self.id,

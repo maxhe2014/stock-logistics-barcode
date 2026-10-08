@@ -1,7 +1,7 @@
 // Copyright 2026 OpenViking
 // License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, onWillStart, onPatched } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
@@ -77,10 +77,32 @@ export class PickingScanApp extends Component {
             last_unmatched_barcode: "",
             editingQtyMoveId: false,
             draftQty: "",
+            // Multi-SN accordion: the move id whose lot list is expanded,
+            // or false when all are collapsed (default).
+            expandedMoveId: false,
+            // Move id to scroll into view after the next render patch.
+            pendingScrollMoveId: false,
         });
 
         onWillStart(async () => {
             await this._refreshState();
+        });
+
+        // After every render patch, if a scan asked us to jump to a move
+        // row, scroll it into the middle of the move-list viewport.
+        // Uses direct (non-smooth) scrolling for fast scanner response.
+        onPatched(() => {
+            const moveId = this.state.pendingScrollMoveId;
+            if (!moveId) {
+                return;
+            }
+            this.state.pendingScrollMoveId = false;
+            const el = document.querySelector(
+                `[data-move-row="${moveId}"]`
+            );
+            if (el && el.scrollIntoView) {
+                el.scrollIntoView({ block: "center", inline: "nearest" });
+            }
         });
     }
 
@@ -112,6 +134,12 @@ export class PickingScanApp extends Component {
         // scan through — the backend guard only accepts picking-name
         // scans while the selector is open, and rejects everything else.
         this.state.scanning = true;
+        // Snapshot each move's lot count before the scan so we can detect
+        // which move received a new lot afterward (for auto-expand + scroll).
+        const lotCountBefore = {};
+        for (const mv of this.state.move_ids) {
+            lotCountBefore[mv.id] = mv.lots ? mv.lots.length : 0;
+        }
         try {
             const res = await this.orm.call(
                 "wiz.stock.barcodes.picking",
@@ -119,6 +147,21 @@ export class PickingScanApp extends Component {
                 [[this.wizId], barcode]
             );
             Object.assign(this.state, res.state);
+            // Scroll to the move that gained a lot (quick jump).
+            // Do NOT auto-expand — the latest SN is already shown inline,
+            // the user expands manually via the "共 N 个" button.
+            let scannedMoveId = false;
+            for (const mv of this.state.move_ids) {
+                const before = lotCountBefore[mv.id] || 0;
+                const after = mv.lots ? mv.lots.length : 0;
+                if (after > before) {
+                    scannedMoveId = mv.id;
+                    break;
+                }
+            }
+            if (scannedMoveId) {
+                this.state.pendingScrollMoveId = scannedMoveId;
+            }
             // Remember the barcode when it was not found, so the
             // operator can force-add it. Clear on any other outcome.
             if (this.state.message_type === "not_found") {
@@ -355,6 +398,18 @@ export class PickingScanApp extends Component {
                 }),
                 { type: "danger" }
             );
+        }
+    }
+
+    /**
+     * Accordion toggle for a move's multi-SN list. Opening one move
+     * collapses any other. Clicking the already-open move collapses it.
+     */
+    onToggleMoveLots(moveId) {
+        if (this.state.expandedMoveId === moveId) {
+            this.state.expandedMoveId = false;
+        } else {
+            this.state.expandedMoveId = moveId;
         }
     }
 
