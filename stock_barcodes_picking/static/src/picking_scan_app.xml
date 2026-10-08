@@ -156,12 +156,13 @@
                                         </t>
                                         <!-- Multi-SN: show the LATEST SN inline + count badge to expand all -->
                                         <t t-if="mv.lots.length > 1">
-                                            <span class="badge bg-primary d-inline-flex align-items-center gap-1"
-                                                  style="border-left:4px solid #0d6efd;">
+                                            <span class="badge d-inline-flex align-items-center gap-1"
+                                                  style="background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;">
                                                 <i class="fa fa-barcode"/>
                                                 <t t-out="mv.lots[mv.lots.length - 1].name" />
                                                 <button type="button"
-                                                        class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
+                                                        class="btn btn-link btn-sm p-0 ms-1 opacity-75"
+                                                        style="color:#000;"
                                                         t-att-title="'Remove ' + mv.lots[mv.lots.length - 1].name"
                                                         t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.lots[mv.lots.length - 1].id)">
                                                     <i class="fa fa-trash"/>
@@ -219,13 +220,14 @@
                                     <div class="d-flex flex-wrap gap-2 p-2 bg-light border-top">
                                         <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
                                             <span
-                                                t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-primary' : 'bg-secondary')"
-                                                t-att-style="lot.id === mv.latest_lot_id ? 'border-left:4px solid #0d6efd;' : ''"
+                                                t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? '' : 'bg-secondary')"
+                                                t-att-style="lot.id === mv.latest_lot_id ? 'background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;' : ''"
                                             >
                                                 <i class="fa fa-barcode"/>
                                                 <t t-out="lot.name" />
                                                 <button type="button"
-                                                        class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
+                                                        t-att-class="'btn btn-link btn-sm p-0 ms-1 opacity-75 ' + (lot.id === mv.latest_lot_id ? '' : 'text-white')"
+                                                        t-att-style="lot.id === mv.latest_lot_id ? 'color:#000;' : ''"
                                                         t-att-title="'Remove ' + lot.name"
                                                         t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
                                                     <i class="fa fa-trash"/>
