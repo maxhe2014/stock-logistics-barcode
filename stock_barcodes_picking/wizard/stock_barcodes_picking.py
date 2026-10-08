@@ -248,7 +248,8 @@ class WizStockBarcodesPicking(models.TransientModel):
             ):
                 rec.total_demand += move.product_uom_qty
                 rec.total_done += sum(
-                    line.quantity for line in move.move_line_ids if line.picked
+                    line.quantity for line in move.move_line_ids
+                    if line.quantity > 0
                 )
 
     # --- Default values ---
@@ -458,48 +459,59 @@ class WizStockBarcodesPicking(models.TransientModel):
             lambda m: m.state not in ("done", "cancel")
         ):
             move_lines = mv.move_line_ids
-            picked_all = bool(move_lines) and all(l.picked for l in move_lines)
-            picked_lines = move_lines.filtered(lambda l: l.picked).sorted(key=lambda l: l.id)
-            # Picked lots (always shown)
-            lots = [
-                {
-                    "id": l.lot_id.id,
-                    "name": l.lot_id.name,
-                    "picked": True,
-                    "result_package_name": l.result_package_id.name or "",
-                }
-                for l in picked_lines
-                if l.lot_id
-            ]
-            # Reserved (unpicked) lots — shown only when configured
-            if show_reserved:
-                reserved_lines = move_lines.filtered(
-                    lambda l: not l.picked and l.lot_id
-                ).sorted(key=lambda l: l.id)
-                lots += [
-                    {"id": l.lot_id.id, "name": l.lot_id.name, "picked": False}
-                    for l in reserved_lines
+            picked_all = bool(move_lines) and all(
+                l.quantity > 0 for l in move_lines
+            )
+            picked_lines = move_lines.filtered(
+                lambda l: l.quantity > 0
+            ).sorted(key=lambda l: l.id)
+            # Group picked lines by result_package_id so each package becomes
+            # its own product row (with the SNs belonging to that package).
+            package_groups = {}  # (package_id, package_name) -> [lines]
+            for l in picked_lines:
+                pkg_id = l.result_package_id.id or False
+                pkg_name = l.result_package_id.name or ""
+                key = (pkg_id, pkg_name)
+                if key not in package_groups:
+                    package_groups[key] = []
+                package_groups[key].append(l)
+            if not package_groups:
+                package_groups[(False, "")] = []
+            # Whether the move has any packaged group (to decide showing
+            # the "未装包" label on the unpacked group).
+            has_packaged = any(k[0] for k in package_groups)
+            for (pkg_id, pkg_name), lines in package_groups.items():
+                lots = [
+                    {"id": l.lot_id.id, "name": l.lot_id.name, "picked": True}
+                    for l in lines
+                    if l.lot_id
                 ]
-            picked_lot_ids = [
-                l.lot_id.id for l in picked_lines if l.lot_id
-            ]
-            # Distinct package names of picked lines (for the package row)
-            result_package_names = list(dict.fromkeys(
-                l.result_package_id.name
-                for l in picked_lines
-                if l.result_package_id
-            ))
-            moves.append({
-                "id": mv.id,
-                "product_name": mv.product_id.display_name or "",
-                "product_uom_qty": mv.product_uom_qty,
-                "quantity": sum(picked_lines.mapped("quantity")),
-                "picked": picked_all,
-                "tracking": mv.product_id.tracking or "none",
-                "lots": lots,
-                "latest_lot_id": picked_lot_ids[-1] if picked_lot_ids else False,
-                "result_package_names": result_package_names,
-            })
+                # Reserved (unpicked) lots go to the unpacked group only.
+                if show_reserved and not pkg_id:
+                    reserved_lines = move_lines.filtered(
+                        lambda l: l.quantity == 0 and l.lot_id
+                    ).sorted(key=lambda l: l.id)
+                    lots += [
+                        {"id": l.lot_id.id, "name": l.lot_id.name, "picked": False}
+                        for l in reserved_lines
+                    ]
+                picked_lot_ids = [
+                    l.lot_id.id for l in lines if l.lot_id
+                ]
+                show_package_label = bool(pkg_name) or (not pkg_id and has_packaged)
+                moves.append({
+                    "id": mv.id,
+                    "product_name": mv.product_id.display_name or "",
+                    "product_uom_qty": mv.product_uom_qty,
+                    "quantity": sum(l.quantity for l in lines),
+                    "picked": picked_all,
+                    "tracking": mv.product_id.tracking or "none",
+                    "lots": lots,
+                    "latest_lot_id": picked_lot_ids[-1] if picked_lot_ids else False,
+                    "package_id": pkg_id,
+                    "package_name": pkg_name,
+                    "show_package_label": show_package_label,
+                })
         return {
             "wiz_id": self.id,
             "step": self.step,
@@ -627,6 +639,8 @@ class WizStockBarcodesPicking(models.TransientModel):
         if self._scan_product(barcode):
             return True
         if self._scan_lot(barcode):
+            return True
+        if self._scan_package(barcode):
             return True
         self._set_message("not_found", _("Barcode not found: %s") % barcode)
         return True
@@ -950,6 +964,52 @@ class WizStockBarcodesPicking(models.TransientModel):
         self._set_message_step()
         return True
 
+    def _scan_package(self, barcode):
+        """Scan a package barcode and bind unpacked picked lines to it.
+
+        Returns False (let other scanners try) when the barcode does
+        not match any ``stock.package`` name.
+        """
+        self.ensure_one()
+        if not self.picking_id:
+            return False
+        package = self.env["stock.package"].search(
+            [("name", "=", barcode)], limit=1
+        )
+        if not package:
+            return False
+        return self._bind_to_package(package)
+
+    def _bind_to_package(self, package):
+        """Bind all picked-but-unpacked move lines to ``package``."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        # Use a fresh search instead of self.picking_id.move_line_ids to
+        # avoid stale cached values of the stored+computed ``picked``
+        # field. Use quantity > 0 because scanned lines may have quantity
+        # set but picked=False when source location does not match the
+        # reserved move line.
+        all_lines = self.env["stock.move.line"].search([
+            ("picking_id", "=", self.picking_id.id),
+            ("state", "not in", ("done", "cancel")),
+            ("quantity", ">", 0),
+        ])
+        unpacked = all_lines.filtered(lambda l: not l.result_package_id)
+        if not unpacked:
+            self._set_message(
+                "info",
+                _("No unpacked picked products to bind."),
+            )
+            return True
+        unpacked.write({"picked": True})
+        unpacked.result_package_id = package.id
+        self._set_message(
+            "success",
+            _("Products bound to package %s.") % package.name,
+        )
+        return True
+
     def _resolve_lot_owner(self, lot, product):
         """Identify whether ``product`` belongs to this picking.
 
@@ -1168,7 +1228,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             excess = other_lines_qty + self.product_qty - total_demand
             if excess > 0:
                 for line in other_lines.sorted(key=lambda l: l.id):
-                    if is_serial and line.picked:
+                    if is_serial and line.quantity > 0:
                         continue
                     take = min(line.quantity, excess)
                     line.quantity = line.quantity - take
@@ -1188,6 +1248,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             move = moves[:1]
             sml_vals = {
                 "move_id": move.id,
+                "picking_id": self.picking_id.id,
                 "product_id": self.product_id.id,
                 "product_uom_id": move.product_uom.id or self.product_id.uom_id.id,
                 "quantity": self.product_qty,
@@ -1309,10 +1370,12 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not picking:
             self._set_message("error", _("No transfer selected"))
             return False
-        # Pack check: if required, all picked lines must be in a package
+        # Pack check: if required, all picked lines must be in a package.
+        # Use quantity > 0 instead of picked because scanned lines may have
+        # quantity set but picked=False when source location does not match.
         if self._lines_need_pack(picking):
             unpacked = picking.move_line_ids.filtered(
-                lambda l: l.picked and not l.result_package_id
+                lambda l: l.quantity > 0 and not l.result_package_id
             )
             if unpacked:
                 self._set_message(
@@ -1358,16 +1421,32 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not picking:
             self._set_message("error", _("No transfer selected"))
             return False
-        if not picking.move_line_ids.filtered(
-            lambda l: l.picked and not l.result_package_id
-        ):
+        # Fresh search to avoid stale cached picked values.
+        # NOTE: use quantity > 0 instead of picked, because scanned lines
+        # may have quantity set but picked=False when the source location
+        # does not match the reserved move line (a new line is created).
+        # Odoo's native action_put_in_pack only packs picked=True lines,
+        # so we explicitly set picked=True on all unpacked lines first.
+        unpacked = self.env["stock.move.line"].search([
+            ("picking_id", "=", picking.id),
+            ("state", "not in", ("done", "cancel")),
+            ("quantity", ">", 0),
+        ]).filtered(lambda l: not l.result_package_id)
+        if not unpacked:
             self._set_message(
                 "info",
                 _("No unpacked picked products to pack."),
             )
             return True
+        # Ensure picked=True so Odoo's native pack logic picks them up.
+        unpacked.write({"picked": True})
         try:
-            result = picking.with_context(barcode_view=True).action_put_in_pack()
+            # Call action_put_in_pack directly on the filtered lines
+            # instead of picking.action_put_in_pack() to avoid stale
+            # picking.move_line_ids cache.
+            result = unpacked.with_context(
+                barcode_view=True
+            ).action_put_in_pack()
         except Exception as exc:
             self._set_message(
                 "error",
@@ -1383,6 +1462,113 @@ class WizStockBarcodesPicking(models.TransientModel):
             _("Products have been put into a package."),
         )
         return True
+
+    def action_edit_package_name(self, package_id, new_name):
+        """Rename a package (used by the inline edit button)."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        new_name = (new_name or "").strip()
+        if not new_name:
+            self._set_message("error", _("Package name cannot be empty."))
+            return False
+        package = self.env["stock.package"].browse(package_id)
+        if not package.exists():
+            self._set_message("error", _("Package not found."))
+            return False
+        package.name = new_name
+        self._set_message(
+            "success",
+            _("Package renamed to %s.") % new_name,
+        )
+        return True
+
+    def action_unpack_package(self, package_id):
+        """Remove a package from all picked lines that use it.
+
+        Clears ``result_package_id`` on every picked move line of the
+        current picking that points at this package.
+        """
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        lines = self.env["stock.move.line"].search([
+            ("picking_id", "=", self.picking_id.id),
+            ("result_package_id", "=", package_id),
+            ("state", "not in", ("done", "cancel")),
+            ("quantity", ">", 0),
+        ])
+        if not lines:
+            self._set_message("info", _("No picked lines in this package."))
+            return True
+        lines.result_package_id = False
+        self._set_message(
+            "info",
+            _("Package removed; products are now unpacked."),
+        )
+        return True
+
+    def action_select_existing_package(self, package_id):
+        """Bind all unpacked picked lines to an existing package."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        package = self.env["stock.package"].browse(package_id)
+        if not package.exists():
+            self._set_message("error", _("Package not found."))
+            return False
+        unpacked = self.picking_id.move_line_ids.filtered(
+            lambda l: l.quantity > 0 and not l.result_package_id
+        )
+        if not unpacked:
+            self._set_message(
+                "info",
+                _("No unpacked picked products to bind."),
+            )
+            return True
+        unpacked.write({"picked": True})
+        unpacked.result_package_id = package.id
+        self._set_message(
+            "success",
+            _("Products added to package %s.") % package.name,
+        )
+        return True
+
+    def action_select_existing_package_by_name(self, name):
+        """Look up a package by name and bind unpacked picked lines to it.
+
+        Used by the frontend's "Select Package" prompt.
+        """
+        self.ensure_one()
+        name = (name or "").strip()
+        if not name:
+            self._set_message("error", _("Package name cannot be empty."))
+            return False
+        package = self.env["stock.package"].search(
+            [("name", "=", name)], limit=1
+        )
+        if not package:
+            self._set_message(
+                "error",
+                _("Package %s does not exist.") % name,
+            )
+            return False
+        return self._bind_to_package(package)
+
+    def action_open_package_selector(self):
+        """Return an act_window action to pick an existing package.
+
+        The frontend opens it and calls ``action_select_existing_package``
+        with the chosen package id.
+        """
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "stock.package",
+            "view_mode": "list,form",
+            "target": "current",
+            "name": _("Select Package"),
+        }
 
     def set_active_move(self, move_id):
         """Bind the operator's target move (RPC entry for row click).
@@ -1539,12 +1725,20 @@ class WizStockBarcodesPicking(models.TransientModel):
         """
         self.ensure_one()
         if not self.picking_id:
+            self._set_message("error", _("No transfer selected"))
             return False
         move = self.picking_id.move_ids.filtered(lambda m: m.id == move_id)
         if not move:
+            self._set_message("error", _("Move not found in this transfer"))
             return False
-        lines = move.move_line_ids.filtered(lambda l: l.lot_id.id == lot_id)
+        # Use search instead of move.move_line_ids to avoid stale cache.
+        lines = self.env["stock.move.line"].search([
+            ("move_id", "=", move_id),
+            ("lot_id", "=", lot_id),
+            ("state", "not in", ("done", "cancel")),
+        ])
         if not lines:
+            self._set_message("error", _("Lot/SN not found on this move"))
             return False
         line = lines[0]
         if line.quantity > 1:
@@ -1553,6 +1747,10 @@ class WizStockBarcodesPicking(models.TransientModel):
                 line.unlink()
         else:
             line.unlink()
+        self._set_message(
+            "success",
+            _("Removed lot/SN from the transfer.")
+        )
         return True
 
     # --- Cleanup ---

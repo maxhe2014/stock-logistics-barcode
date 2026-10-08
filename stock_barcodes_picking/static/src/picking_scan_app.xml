@@ -129,7 +129,38 @@
                                     />
                                 </td>
                                 <td class="align-middle">
-                                    <div><t t-out="mv.product_name" /></div>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <!-- Package label (only when this move row is split by package) -->
+                                        <t t-if="mv.show_package_label">
+                                            <span t-if="mv.package_name"
+                                                  class="badge d-inline-flex align-items-center gap-1"
+                                                  style="background-color:#e3f2fd;color:#0d47a1;border:1px solid #90caf9;">
+                                                <i class="fa fa-archive"/>
+                                                <t t-out="mv.package_name" />
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0 ms-1"
+                                                        style="color:#0d47a1;"
+                                                        title="Rename package"
+                                                        t-on-click.stop="() => this.onEditPackageName(mv.package_id, mv.package_name)">
+                                                    <i class="fa fa-pencil"/>
+                                                </button>
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0"
+                                                        style="color:#c62828;"
+                                                        title="Remove package (unpack)"
+                                                        t-on-click.stop="() => this.onUnpackPackage(mv.package_id)">
+                                                    <i class="fa fa-trash"/>
+                                                </button>
+                                            </span>
+                                            <span t-else=""
+                                                  class="badge d-inline-flex align-items-center gap-1"
+                                                  style="background-color:#f5f5f5;color:#757575;border:1px dashed #bdbdbd;">
+                                                <i class="fa fa-inbox"/>
+                                                未装包
+                                            </span>
+                                        </t>
+                                        <t t-out="mv.product_name" />
+                                    </div>
                                     <div class="small text-muted lh-sm">
                                         Demand <t t-out="mv.product_uom_qty" />
                                         <span class="mx-1">·</span>
@@ -236,16 +267,6 @@
                                             </button>
                                         </t>
                                     </div>
-                                    <!-- Package info (after put-in-pack) -->
-                                    <div t-if="mv.result_package_names &amp;&amp; mv.result_package_names.length"
-                                         class="d-flex align-items-center gap-1 mt-1 flex-wrap">
-                                        <i class="fa fa-archive text-primary" title="Package"/>
-                                        <t t-foreach="mv.result_package_names" t-as="pkg" t-key="pkg">
-                                            <span class="badge bg-light text-dark border border-secondary-subtle d-inline-flex align-items-center">
-                                                <t t-out="pkg" />
-                                            </span>
-                                        </t>
-                                    </div>
                                 </td>
                             </tr>
                             <!-- Multi-SN expansion row (accordion) -->
@@ -301,6 +322,13 @@
                         class="btn btn-outline-info btn-lg"
                         t-on-click="onPutInPack"
                     >Put in Pack</button>
+
+                    <button
+                        t-if="canPutInPack"
+                        type="button"
+                        class="btn btn-outline-primary btn-lg"
+                        t-on-click="onSelectPackage"
+                    >Select Package</button>
 
                     <button
                         t-if="canConsumeByDemand"

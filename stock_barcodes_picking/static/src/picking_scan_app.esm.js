@@ -483,6 +483,110 @@ export class PickingScanApp extends Component {
     }
 
     /**
+     * Rename a package via a prompt dialog.
+     */
+    async onEditPackageName(packageId, currentName) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        const newName = window.prompt(
+            _t("Enter new package name:"),
+            currentName || ""
+        );
+        if (newName === null) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_edit_package_name",
+                [[this.wizId], packageId, newName]
+            );
+            await this._handleActionResult(res, "Rename package");
+        } catch (err) {
+            this.notification.add(
+                _t("Rename failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /**
+     * Unpack a package (clear result_package_id on its picked lines).
+     */
+    async onUnpackPackage(packageId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        if (!window.confirm(_t("Remove this package? Products will be unpacked."))) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_unpack_package",
+                [[this.wizId], packageId]
+            );
+            await this._handleActionResult(res, "Unpack");
+        } catch (err) {
+            this.notification.add(
+                _t("Unpack failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /**
+     * Bind unpacked picked lines to an existing package.
+     * Opens the package list view so the operator can pick one; on close
+     * the state refreshes. The actual binding is done by scanning the
+     * package barcode (handled by _scan_package on the backend).
+     */
+    async onSelectPackage() {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        const name = window.prompt(
+            _t("Enter the package name to bind unpacked products to:")
+        );
+        if (name === null) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            // Reuse the scan logic: lookup package by name and bind.
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_select_existing_package_by_name",
+                [[this.wizId], name]
+            );
+            await this._handleActionResult(res, "Select package");
+        } catch (err) {
+            this.notification.add(
+                _t("Select package failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /**
      * Validate the picking. Three-state:
      *   false → guard / no picking → show error
      *   true  → validated, no backorder → refresh
