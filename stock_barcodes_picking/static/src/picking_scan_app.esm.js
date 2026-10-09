@@ -601,8 +601,12 @@ export class PickingScanApp extends Component {
 
     /**
      * Unpack a package (clear result_package_id on its picked lines).
+     *
+     * @param {number} packageId - the package to remove
+     * @param {number} [moveId] - scope the removal to lines of this move;
+     *   prevents stripping a shared package from other products.
      */
-    async onUnpackPackage(packageId) {
+    async onUnpackPackage(packageId, moveId) {
         if (this.state.scanning || !this.wizId) {
             return;
         }
@@ -614,7 +618,7 @@ export class PickingScanApp extends Component {
             const res = await this.orm.call(
                 "wiz.stock.barcodes.picking",
                 "action_unpack_package",
-                [[this.wizId], packageId]
+                [[this.wizId], packageId, moveId || false]
             );
             await this._handleActionResult(res, "Unpack");
         } catch (err) {

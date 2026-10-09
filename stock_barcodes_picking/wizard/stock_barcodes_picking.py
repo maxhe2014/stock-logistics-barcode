@@ -1545,21 +1545,30 @@ class WizStockBarcodesPicking(models.TransientModel):
         )
         return True
 
-    def action_unpack_package(self, package_id):
-        """Remove a package from all picked lines that use it.
+    def action_unpack_package(self, package_id, move_id=False):
+        """Remove a package from the picked lines of a specific move.
 
-        Clears ``result_package_id`` on every picked move line of the
-        current picking that points at this package.
+        Clears ``result_package_id`` on the picked move lines of the current
+        picking that point at ``package_id`` AND belong to ``move_id``. When
+        ``move_id`` is omitted, all picked lines using the package are
+        cleared (legacy behaviour).
+
+        Scoping by move ensures that removing a shared package name from one
+        product does not also strip it from other products that happen to use
+        the same package.
         """
         self.ensure_one()
         if not self._check_selector_resolved():
             return False
-        lines = self.env["stock.move.line"].search([
+        domain = [
             ("picking_id", "=", self.picking_id.id),
             ("result_package_id", "=", package_id),
             ("state", "not in", ("done", "cancel")),
             ("picked", "=", True),
-        ])
+        ]
+        if move_id:
+            domain.append(("move_id", "=", move_id))
+        lines = self.env["stock.move.line"].search(domain)
         if not lines:
             self._set_message("info", _("No picked lines in this package."))
             return True
