@@ -934,6 +934,32 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self.product_id and self.active_move_id:
             self.product_id = self.active_move_id.product_id
             self.product_uom_id = self.product_id.uom_id
+        # If the current product is already fully picked (or over), the
+        # unknown barcode almost certainly belongs to a *different*
+        # product. Don't create a new lot under the stale product — that
+        # would trigger a spurious "quantity exceeds demand" against the
+        # full product's demand. Clear the stale context and ask the
+        # operator to scan the product barcode first.
+        if self.product_id:
+            move = self.picking_id.move_ids.filtered(
+                lambda m: m.product_id == self.product_id and m.state != "cancel"
+            )[:1]
+            if move:
+                picked = sum(
+                    l.quantity for l in move.move_line_ids if l.picked
+                )
+                if picked >= move.product_uom_qty:
+                    self.product_id = False
+                    self.lot_id = False
+                    self.lot_name = False
+                    self.active_move_id = False
+                    self._set_message(
+                        "info",
+                        _("Product %(name)s is fully picked. Scan the "
+                          "next product barcode, then scan its lot.")
+                        % {"name": move.product_id.name},
+                    )
+                    return True
         if not self.product_id:
             self._set_message(
                 "error",
@@ -1774,6 +1800,12 @@ class WizStockBarcodesPicking(models.TransientModel):
 
         product_id is cleared, which cascades to product_tracking
         (related field) and re-enables the lot step in the UI.
+
+        active_move_id is also cleared: otherwise a subsequent scan of a
+        new lot/serial for a *different* product would be attributed to
+        the previously active move (via _create_new_lot_flow's fallback),
+        causing spurious "quantity exceeds demand" errors against the
+        old product's demand.
         """
         self.product_id = False
         self.lot_id = False
@@ -1782,5 +1814,6 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.qty_available = 0.0
         self.visible_force_done = False
         self.visible_force_add = False
+        self.active_move_id = False
         self.step = self._step_index("product")
         self._set_message_step()
