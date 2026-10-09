@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-08 03:48+0000\n"
-"PO-Revision-Date: 2026-10-08 03:48+0000\n"
+"POT-Creation-Date: 2026-10-09 02:13+0000\n"
+"PO-Revision-Date: 2026-10-09 02:13+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -46,6 +46,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "%s is not a valid destination location"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "(no existing package)"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -377,6 +383,12 @@ msgid "Last Updated on"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Loading..."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
 msgid "Location Scanning"
 msgstr ""
@@ -396,6 +408,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Lot required for tracked product"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Lot/SN not found on this move"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -427,6 +445,12 @@ msgstr ""
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__message_type
 msgid "Message Type"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Move not found in this transfer"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -498,6 +522,12 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "No picked lines in this package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "No product found for barcode: %s"
 msgstr ""
 
@@ -546,6 +576,12 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "No unpacked picked products to bind."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "No unpacked picked products to pack."
 msgstr ""
 
@@ -561,6 +597,32 @@ msgid ""
 "lot lookup to this move's product first, so cross-product SN collisions "
 "resolve automatically. Cleared on picking switch or scanning a different "
 "product."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#. odoo-python
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Package name cannot be empty."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Package not found."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Package removed; products are now unpacked."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Package renamed to %s."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -606,6 +668,14 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Product %(name)s is fully picked. Scan the next product barcode, then scan "
+"its lot."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Product %(name)s is not part of this transfer"
 msgstr ""
 
@@ -631,6 +701,18 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Product: %s. Scan lot."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Products added to package %s."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Products bound to package %s."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -673,6 +755,36 @@ msgstr ""
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 msgid "Remove lot failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Remove package (unpack)"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove this package? Products will be unpacked."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Removed lot/SN from the transfer."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Rename failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Rename package"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -766,6 +878,14 @@ msgid "Scanned Source Location"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#. odoo-python
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Select Package"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Select a transfer first before continuing"
@@ -775,6 +895,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Select a transfer or scan a transfer name to continue"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Select package failed: %(err)s"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -913,15 +1039,26 @@ msgid "Type of Operation"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Unpack failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_uom_id
 msgid "UoM"
 msgstr ""
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Validate"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Validate failed: %(err)s"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -999,6 +1136,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "数量"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "未装包"
 msgstr ""
 
 #. module: stock_barcodes_picking
