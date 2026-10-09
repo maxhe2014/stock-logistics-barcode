@@ -249,7 +249,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 rec.total_demand += move.product_uom_qty
                 rec.total_done += sum(
                     line.quantity for line in move.move_line_ids
-                    if line.quantity > 0
+                    if line.picked
                 )
 
     # --- Default values ---
@@ -460,10 +460,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         ):
             move_lines = mv.move_line_ids
             picked_all = bool(move_lines) and all(
-                l.quantity > 0 for l in move_lines
+                l.picked for l in move_lines
             )
             picked_lines = move_lines.filtered(
-                lambda l: l.quantity > 0
+                lambda l: l.picked
             ).sorted(key=lambda l: l.id)
             # Group picked lines by result_package_id so each package becomes
             # its own product row (with the SNs belonging to that package).
@@ -489,7 +489,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 # Reserved (unpicked) lots go to the unpacked group only.
                 if show_reserved and not pkg_id:
                     reserved_lines = move_lines.filtered(
-                        lambda l: l.quantity == 0 and l.lot_id
+                        lambda l: not l.picked and l.lot_id
                     ).sorted(key=lambda l: l.id)
                     lots += [
                         {"id": l.lot_id.id, "name": l.lot_id.name, "picked": False}
@@ -501,6 +501,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 show_package_label = bool(pkg_name) or (not pkg_id and has_packaged)
                 moves.append({
                     "id": mv.id,
+                    "row_key": "%s_%s" % (mv.id, pkg_id or "nopkg"),
                     "product_name": mv.product_id.display_name or "",
                     "product_uom_qty": mv.product_uom_qty,
                     "quantity": sum(l.quantity for l in lines),
@@ -987,13 +988,11 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         # Use a fresh search instead of self.picking_id.move_line_ids to
         # avoid stale cached values of the stored+computed ``picked``
-        # field. Use quantity > 0 because scanned lines may have quantity
-        # set but picked=False when source location does not match the
-        # reserved move line.
+        # field. picked=True is the source of truth for scanned lines.
         all_lines = self.env["stock.move.line"].search([
             ("picking_id", "=", self.picking_id.id),
             ("state", "not in", ("done", "cancel")),
-            ("quantity", ">", 0),
+            ("picked", "=", True),
         ])
         unpacked = all_lines.filtered(lambda l: not l.result_package_id)
         if not unpacked:
@@ -1179,8 +1178,29 @@ class WizStockBarcodesPicking(models.TransientModel):
                 and (not self.lot_id or l.lot_id == self.lot_id)
             )
         )
+        # For serial-tracked products on receptions, Odoo pre-creates
+        # placeholder lines (one per unit) with quantity set but no lot
+        # and picked=False. When scanning a serial, no line matches by
+        # lot, so reuse the first unpicked placeholder instead of
+        # creating a new line (which would exceed demand).
+        if (
+            not existing_lines
+            and self.product_id.tracking == "serial"
+            and self.lot_id
+        ):
+            existing_lines = moves.mapped("move_line_ids").filtered(
+                lambda l: (
+                    l.product_id == self.product_id
+                    and (not self.location_id or l.location_id == self.location_id)
+                    and not l.lot_id
+                    and not l.picked
+                )
+            )
         other_lines = moves.mapped("move_line_ids") - existing_lines
-        other_lines_qty = sum(other_lines.mapped("quantity"))
+        # Only already-picked lines count against demand. Pre-filled
+        # reception lines (quantity set, picked=False) must not block
+        # scanning.
+        other_lines_qty = sum(l.quantity for l in other_lines if l.picked)
         total_demand = sum(m.product_uom_qty for m in moves)
         force = self.env.context.get("force_create_move", False)
         rounding = self.product_id.uom_id.rounding
@@ -1371,11 +1391,9 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("error", _("No transfer selected"))
             return False
         # Pack check: if required, all picked lines must be in a package.
-        # Use quantity > 0 instead of picked because scanned lines may have
-        # quantity set but picked=False when source location does not match.
         if self._lines_need_pack(picking):
             unpacked = picking.move_line_ids.filtered(
-                lambda l: l.quantity > 0 and not l.result_package_id
+                lambda l: l.picked and not l.result_package_id
             )
             if unpacked:
                 self._set_message(
@@ -1397,6 +1415,25 @@ class WizStockBarcodesPicking(models.TransientModel):
             return result
         # result is True (picking validated) or None/False (already done)
         return result
+
+    def switch_to_backorder_if_any(self):
+        """After validating a picking that generated a backorder, switch
+        the wizard to the newly created backorder so the operator can
+        continue picking the remaining quantity.
+
+        Called from the frontend once the backorder confirmation wizard
+        has closed. Returns True if switched to a backorder, False if
+        there is none (e.g. the picking was fully processed).
+        """
+        self.ensure_one()
+        picking = self.picking_id
+        if not picking or picking.state != "done":
+            return False
+        backorder = picking.backorder_ids[:1]
+        if backorder:
+            self._switch_picking(backorder)
+            return True
+        return False
 
     def action_put_in_pack(self):
         """Put all picked (and unpacked) move lines into a new package.
@@ -1422,15 +1459,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("error", _("No transfer selected"))
             return False
         # Fresh search to avoid stale cached picked values.
-        # NOTE: use quantity > 0 instead of picked, because scanned lines
-        # may have quantity set but picked=False when the source location
-        # does not match the reserved move line (a new line is created).
-        # Odoo's native action_put_in_pack only packs picked=True lines,
-        # so we explicitly set picked=True on all unpacked lines first.
+        # Use picked=True as the source of truth: scanned lines always
+        # have picked=True set by _process_stock_move_line. Pre-filled
+        # reception lines (quantity set, picked=False) must not be
+        # packed before they are actually scanned.
         unpacked = self.env["stock.move.line"].search([
             ("picking_id", "=", picking.id),
             ("state", "not in", ("done", "cancel")),
-            ("quantity", ">", 0),
+            ("picked", "=", True),
         ]).filtered(lambda l: not l.result_package_id)
         if not unpacked:
             self._set_message(
@@ -1496,7 +1532,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             ("picking_id", "=", self.picking_id.id),
             ("result_package_id", "=", package_id),
             ("state", "not in", ("done", "cancel")),
-            ("quantity", ">", 0),
+            ("picked", "=", True),
         ])
         if not lines:
             self._set_message("info", _("No picked lines in this package."))
@@ -1518,7 +1554,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("error", _("Package not found."))
             return False
         unpacked = self.picking_id.move_line_ids.filtered(
-            lambda l: l.quantity > 0 and not l.result_package_id
+            lambda l: l.picked and not l.result_package_id
         )
         if not unpacked:
             self._set_message(
@@ -1533,27 +1569,6 @@ class WizStockBarcodesPicking(models.TransientModel):
             _("Products added to package %s.") % package.name,
         )
         return True
-
-    def action_select_existing_package_by_name(self, name):
-        """Look up a package by name and bind unpacked picked lines to it.
-
-        Used by the frontend's "Select Package" prompt.
-        """
-        self.ensure_one()
-        name = (name or "").strip()
-        if not name:
-            self._set_message("error", _("Package name cannot be empty."))
-            return False
-        package = self.env["stock.package"].search(
-            [("name", "=", name)], limit=1
-        )
-        if not package:
-            self._set_message(
-                "error",
-                _("Package %s does not exist.") % name,
-            )
-            return False
-        return self._bind_to_package(package)
 
     def action_open_package_selector(self):
         """Return an act_window action to pick an existing package.

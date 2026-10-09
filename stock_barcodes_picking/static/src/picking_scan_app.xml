@@ -115,193 +115,236 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <t t-foreach="state.move_ids" t-as="mv" t-key="mv.id">
+                        <t t-foreach="groupedMoves" t-as="group" t-key="group.move.id">
+                            <!-- Product header row: rendered once per product -->
                             <tr
-                                t-att-data-move-row="mv.id"
-                                t-att-class="!mv.picked ? 'table-danger' : 'table-success'"
-                                t-att-style="state.active_move_id === mv.id ? 'border-left:4px solid #0d6efd;' : ''"
-                                t-on-click="() => this.onSelectMove(mv.id)"
+                                t-att-data-move-row="group.move.id"
+                                t-att-style="state.active_move_id === group.move.id ? 'border-left:4px solid #0d6efd;' : ''"
+                                t-on-click="() => this.onSelectMove(group.move.id)"
                                 role="button"
                             >
                                 <td class="text-center align-middle">
                                     <i
-                                        t-att-class="state.active_move_id === mv.id ? 'fa fa-hand-o-right text-primary' : 'fa fa-hand-o-right text-muted opacity-25'"
+                                        t-att-class="state.active_move_id === group.move.id ? 'fa fa-hand-o-right text-primary' : 'fa fa-hand-o-right text-muted opacity-25'"
                                     />
                                 </td>
                                 <td class="align-middle">
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <!-- Package label (only when this move row is split by package) -->
-                                        <t t-if="mv.show_package_label">
-                                            <span t-if="mv.package_name"
-                                                  class="badge d-inline-flex align-items-center gap-1"
-                                                  style="background-color:#e3f2fd;color:#0d47a1;border:1px solid #90caf9;">
-                                                <i class="fa fa-archive"/>
-                                                <t t-out="mv.package_name" />
-                                                <button type="button"
-                                                        class="btn btn-link btn-sm p-0 ms-1"
-                                                        style="color:#0d47a1;"
-                                                        title="Rename package"
-                                                        t-on-click.stop="() => this.onEditPackageName(mv.package_id, mv.package_name)">
-                                                    <i class="fa fa-pencil"/>
-                                                </button>
-                                                <button type="button"
-                                                        class="btn btn-link btn-sm p-0"
-                                                        style="color:#c62828;"
-                                                        title="Remove package (unpack)"
-                                                        t-on-click.stop="() => this.onUnpackPackage(mv.package_id)">
-                                                    <i class="fa fa-trash"/>
-                                                </button>
-                                            </span>
-                                            <span t-else=""
-                                                  class="badge d-inline-flex align-items-center gap-1"
-                                                  style="background-color:#f5f5f5;color:#757575;border:1px dashed #bdbdbd;">
-                                                <i class="fa fa-inbox"/>
-                                                未装包
-                                            </span>
-                                        </t>
-                                        <t t-out="mv.product_name" />
+                                        <strong><t t-out="group.move.product_name" /></strong>
                                     </div>
                                     <div class="small text-muted lh-sm">
-                                        Demand <t t-out="mv.product_uom_qty" />
+                                        Demand <t t-out="group.move.product_uom_qty" />
                                         <span class="mx-1">·</span>
-                                        Picked <t t-out="mv.quantity" />
-                                        <t t-if="mv.tracking !== 'none'">
+                                        Picked <t t-out="group.totalPicked" />
+                                        <t t-if="group.move.tracking !== 'none'">
                                             <span class="mx-1">·</span>
-                                            <t t-out="mv.tracking" />
-                                        </t>
-                                    </div>
-                                    <!-- Lots + actions -->
-                                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                                        <!-- Single SN: show inline with delete -->
-                                        <t t-if="mv.lots.length === 1">
-                                            <!-- Picked SN -->
-                                            <span t-if="mv.lots[0].picked"
-                                                  class="badge bg-secondary d-inline-flex align-items-center gap-1">
-                                                <i class="fa fa-barcode"/>
-                                                <t t-out="mv.lots[0].name" />
-                                                <button type="button"
-                                                        class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
-                                                        t-att-title="'Remove ' + mv.lots[0].name"
-                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.lots[0].id)">
-                                                    <i class="fa fa-trash"/>
-                                                </button>
-                                            </span>
-                                            <!-- Reserved (unpicked) SN: greyed "pending", no delete -->
-                                            <span t-else=""
-                                                  class="badge d-inline-flex align-items-center gap-1"
-                                                  style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
-                                                <i class="fa fa-clock-o"/>
-                                                <t t-out="mv.lots[0].name" />
-                                                <span class="small opacity-75">待拣</span>
-                                            </span>
-                                        </t>
-                                        <!-- Multi-SN: show the LATEST PICKED SN inline + count badge to expand all -->
-                                        <t t-if="mv.pickedLots.length > 0 and (mv.pickedLots.length > 1 or mv.lots.length > mv.pickedLots.length)">
-                                            <span class="badge d-inline-flex align-items-center gap-1"
-                                                  style="background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;">
-                                                <i class="fa fa-barcode"/>
-                                                <t t-out="mv.pickedLots[mv.pickedLots.length - 1].name" />
-                                                <button type="button"
-                                                        class="btn btn-link btn-sm p-0 ms-1 opacity-75"
-                                                        style="color:#000;"
-                                                        t-att-title="'Remove ' + mv.pickedLots[mv.pickedLots.length - 1].name"
-                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.pickedLots[mv.pickedLots.length - 1].id)">
-                                                    <i class="fa fa-trash"/>
-                                                </button>
-                                            </span>
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                                                    t-att-title="state.expandedMoveId === mv.id ? '收起全部' : '展开全部'"
-                                                    t-on-click.stop="() => this.onToggleMoveLots(mv.id)">
-                                                <i t-att-class="state.expandedMoveId === mv.id ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
-                                                共 <t t-out="mv.lots.length" /> 个
-                                            </button>
-                                        </t>
-                                        <!-- Reserved SNs only (none picked yet) -->
-                                        <t t-if="mv.pickedLots.length === 0 and mv.lots.length > 0">
-                                            <span class="badge d-inline-flex align-items-center gap-1"
-                                                  style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
-                                                <i class="fa fa-clock-o"/>
-                                                <t t-out="mv.lots.length" /> 个待拣
-                                            </span>
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                                                    t-att-title="state.expandedMoveId === mv.id ? '收起全部' : '展开全部'"
-                                                    t-on-click.stop="() => this.onToggleMoveLots(mv.id)">
-                                                <i t-att-class="state.expandedMoveId === mv.id ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
-                                                查看
-                                            </button>
-                                        </t>
-                                        <!-- Inline qty edit (pencil) -->
-                                        <t t-if="state.editingQtyMoveId === mv.id">
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="any"
-                                                class="form-control form-control-sm"
-                                                style="width: 6rem;"
-                                                t-att-value="state.draftQty"
-                                                t-on-input="(ev) => this.onDraftQtyInput(ev)"
-                                                t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, mv.id)"
-                                                t-on-click.stop=""
-                                            />
-                                            <button type="button"
-                                                    class="btn btn-sm btn-success"
-                                                    title="Confirm quantity"
-                                                    t-on-click.stop="() => this.onConfirmMoveQty(mv.id)">
-                                                <i class="fa fa-check"/>
-                                            </button>
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-secondary"
-                                                    title="Cancel"
-                                                    t-on-click.stop="() => this.onCancelMoveQty()">
-                                                <i class="fa fa-times"/>
-                                            </button>
-                                        </t>
-                                        <t t-else="">
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-primary"
-                                                    title="Edit quantity"
-                                                    t-on-click.stop="() => this.onEditMoveQty(mv.id)">
-                                                <i class="fa fa-pencil"/>
-                                            </button>
+                                            <t t-out="group.move.tracking" />
                                         </t>
                                     </div>
                                 </td>
                             </tr>
-                            <!-- Multi-SN expansion row (accordion) -->
-                            <tr t-if="state.expandedMoveId === mv.id and mv.lots.length > 1"
-                                class="o_picking_scan_lot_expand">
-                                <td colspan="2" class="p-0">
-                                    <div class="d-flex flex-wrap gap-2 p-2 bg-light border-top">
-                                        <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
-                                            <!-- Picked lots: latest highlighted blue, others grey -->
-                                            <span t-if="lot.picked"
-                                                t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? '' : 'bg-secondary')"
-                                                t-att-style="lot.id === mv.latest_lot_id ? 'background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;' : ''"
-                                            >
-                                                <i class="fa fa-barcode"/>
-                                                <t t-out="lot.name" />
+                            <!-- Package rows under this product -->
+                            <t t-foreach="group.rows" t-as="mv" t-key="mv.row_key">
+                                <tr
+                                    t-att-class="!mv.picked ? 'table-danger' : 'table-success'"
+                                >
+                                    <td></td>
+                                    <td class="align-middle ps-4">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <!-- Package label (only when this move row is split by package) -->
+                                            <t t-if="mv.show_package_label">
+                                                <t t-if="state.editingPackageMoveId === mv.row_key">
+                                                    <span class="d-inline-flex align-items-center gap-1"
+                                                          t-on-keydown="(ev) => this.onPackageNameKeydown(ev)">
+                                                        <i class="fa fa-archive" style="color:#0d47a1;"/>
+                                                        <AutoComplete
+                                                            value="state.packageDraftName"
+                                                            sources="packageNameSources"
+                                                            placeholder="'Package name...'"
+                                                            autofocus="true"
+                                                            onChange="(val) => this.onPackageNameChange(val)"
+                                                            onInput="(val) => this.onPackageNameInput(val)"
+                                                            class="'o_package_rename_ac'"
+                                                        />
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-success p-0 px-1"
+                                                                title="Confirm"
+                                                                t-on-click.stop="() => this._confirmPackageRename(state.packageDraftName)">
+                                                            <i class="fa fa-check"/>
+                                                        </button>
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-secondary p-0 px-1"
+                                                                title="Cancel"
+                                                                t-on-click.stop="() => this._cancelPackageRename()">
+                                                            <i class="fa fa-times"/>
+                                                        </button>
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span t-if="mv.package_name"
+                                                          class="badge d-inline-flex align-items-center gap-1"
+                                                          style="background-color:#e3f2fd;color:#0d47a1;border:1px solid #90caf9;">
+                                                        <i class="fa fa-archive"/>
+                                                        <t t-out="mv.package_name" />
+                                                        <button type="button"
+                                                                class="btn btn-link btn-sm p-0 ms-1"
+                                                                style="color:#0d47a1;"
+                                                                title="Rename package"
+                                                                t-on-click.stop="() => this.onEditPackageName(mv.package_id, mv.row_key, mv.package_name)">
+                                                            <i class="fa fa-pencil"/>
+                                                        </button>
+                                                        <button type="button"
+                                                                class="btn btn-link btn-sm p-0"
+                                                                style="color:#c62828;"
+                                                                title="Remove package (unpack)"
+                                                                t-on-click.stop="() => this.onUnpackPackage(mv.package_id)">
+                                                            <i class="fa fa-trash"/>
+                                                        </button>
+                                                    </span>
+                                                    <span t-else=""
+                                                          class="badge d-inline-flex align-items-center gap-1"
+                                                          style="background-color:#f5f5f5;color:#757575;border:1px dashed #bdbdbd;">
+                                                        <i class="fa fa-inbox"/>
+                                                        未装包
+                                                    </span>
+                                                </t>
+                                            </t>
+                                        </div>
+                                        <!-- Lots + actions -->
+                                        <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                                            <!-- Single SN: show inline with delete -->
+                                            <t t-if="mv.lots.length === 1">
+                                                <!-- Picked SN -->
+                                                <span t-if="mv.lots[0].picked"
+                                                      class="badge bg-secondary d-inline-flex align-items-center gap-1">
+                                                    <i class="fa fa-barcode"/>
+                                                    <t t-out="mv.lots[0].name" />
+                                                    <button type="button"
+                                                            class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
+                                                            t-att-title="'Remove ' + mv.lots[0].name"
+                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.lots[0].id)">
+                                                        <i class="fa fa-trash"/>
+                                                    </button>
+                                                </span>
+                                                <!-- Reserved (unpicked) SN: greyed "pending", no delete -->
+                                                <span t-else=""
+                                                      class="badge d-inline-flex align-items-center gap-1"
+                                                      style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
+                                                    <i class="fa fa-clock-o"/>
+                                                    <t t-out="mv.lots[0].name" />
+                                                    <span class="small opacity-75">待拣</span>
+                                                </span>
+                                            </t>
+                                            <!-- Multi-SN: show the LATEST PICKED SN inline + count badge to expand all -->
+                                            <t t-if="mv.pickedLots.length > 0 and (mv.pickedLots.length > 1 or mv.lots.length > mv.pickedLots.length)">
+                                                <span class="badge d-inline-flex align-items-center gap-1"
+                                                      style="background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;">
+                                                    <i class="fa fa-barcode"/>
+                                                    <t t-out="mv.pickedLots[mv.pickedLots.length - 1].name" />
+                                                    <button type="button"
+                                                            class="btn btn-link btn-sm p-0 ms-1 opacity-75"
+                                                            style="color:#000;"
+                                                            t-att-title="'Remove ' + mv.pickedLots[mv.pickedLots.length - 1].name"
+                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.pickedLots[mv.pickedLots.length - 1].id)">
+                                                        <i class="fa fa-trash"/>
+                                                    </button>
+                                                </span>
                                                 <button type="button"
-                                                        t-att-class="'btn btn-link btn-sm p-0 ms-1 opacity-75 ' + (lot.id === mv.latest_lot_id ? '' : 'text-white')"
-                                                        t-att-style="lot.id === mv.latest_lot_id ? 'color:#000;' : ''"
-                                                        t-att-title="'Remove ' + lot.name"
-                                                        t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
-                                                    <i class="fa fa-trash"/>
+                                                        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                                                        t-att-title="state.expandedMoveId === mv.row_key ? '收起全部' : '展开全部'"
+                                                        t-on-click.stop="() => this.onToggleMoveLots(mv.row_key)">
+                                                    <i t-att-class="state.expandedMoveId === mv.row_key ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
+                                                    共 <t t-out="mv.lots.length" /> 个
                                                 </button>
-                                            </span>
-                                            <!-- Reserved (unpicked) lots: greyed "pending", no delete -->
-                                            <span t-else=""
-                                                  class="badge d-inline-flex align-items-center gap-1"
-                                                  style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
-                                                <i class="fa fa-clock-o"/>
-                                                <t t-out="lot.name" />
-                                                <span class="small opacity-75">待拣</span>
-                                            </span>
-                                        </t>
-                                    </div>
-                                </td>
-                            </tr>
+                                            </t>
+                                            <!-- Reserved SNs only (none picked yet) -->
+                                            <t t-if="mv.pickedLots.length === 0 and mv.lots.length > 0">
+                                                <span class="badge d-inline-flex align-items-center gap-1"
+                                                      style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
+                                                    <i class="fa fa-clock-o"/>
+                                                    <t t-out="mv.lots.length" /> 个待拣
+                                                </span>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                                                        t-att-title="state.expandedMoveId === mv.row_key ? '收起全部' : '展开全部'"
+                                                        t-on-click.stop="() => this.onToggleMoveLots(mv.row_key)">
+                                                    <i t-att-class="state.expandedMoveId === mv.row_key ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
+                                                    查看
+                                                </button>
+                                            </t>
+                                            <!-- Inline qty edit (pencil) — only for non-serial tracking -->
+                                            <t t-if="group.move.tracking !== 'serial'">
+                                                <t t-if="state.editingQtyMoveId === mv.row_key">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        class="form-control form-control-sm"
+                                                        style="width: 6rem;"
+                                                        t-att-value="state.draftQty"
+                                                        t-on-input="(ev) => this.onDraftQtyInput(ev)"
+                                                        t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, mv.row_key)"
+                                                        t-on-click.stop=""
+                                                    />
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-success"
+                                                            title="Confirm quantity"
+                                                            t-on-click.stop="() => this.onConfirmMoveQty(mv.row_key)">
+                                                        <i class="fa fa-check"/>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            title="Cancel"
+                                                            t-on-click.stop="() => this.onCancelMoveQty()">
+                                                        <i class="fa fa-times"/>
+                                                    </button>
+                                                </t>
+                                                <t t-else="">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary"
+                                                            title="Edit quantity"
+                                                            t-on-click.stop="() => this.onEditMoveQty(mv.row_key)">
+                                                        <i class="fa fa-pencil"/>
+                                                    </button>
+                                                </t>
+                                            </t>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Multi-SN expansion row (accordion) -->
+                                <tr t-if="state.expandedMoveId === mv.row_key and mv.lots.length > 1"
+                                    class="o_picking_scan_lot_expand">
+                                    <td colspan="2" class="p-0">
+                                        <div class="d-flex flex-wrap gap-2 p-2 bg-light border-top">
+                                            <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
+                                                <!-- Picked lots: latest highlighted blue, others grey -->
+                                                <span t-if="lot.picked"
+                                                    t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? '' : 'bg-secondary')"
+                                                    t-att-style="lot.id === mv.latest_lot_id ? 'background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;' : ''"
+                                                >
+                                                    <i class="fa fa-barcode"/>
+                                                    <t t-out="lot.name" />
+                                                    <button type="button"
+                                                            t-att-class="'btn btn-link btn-sm p-0 ms-1 opacity-75 ' + (lot.id === mv.latest_lot_id ? '' : 'text-white')"
+                                                            t-att-style="lot.id === mv.latest_lot_id ? 'color:#000;' : ''"
+                                                            t-att-title="'Remove ' + lot.name"
+                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
+                                                        <i class="fa fa-trash"/>
+                                                    </button>
+                                                </span>
+                                                <!-- Reserved (unpicked) lots: greyed "pending", no delete -->
+                                                <span t-else=""
+                                                      class="badge d-inline-flex align-items-center gap-1"
+                                                      style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
+                                                    <i class="fa fa-clock-o"/>
+                                                    <t t-out="lot.name" />
+                                                    <span class="small opacity-75">待拣</span>
+                                                </span>
+                                            </t>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </t>
                         </t>
                     </tbody>
                 </table>
@@ -323,12 +366,30 @@
                         t-on-click="onPutInPack"
                     >Put in Pack</button>
 
-                    <button
-                        t-if="canPutInPack"
-                        type="button"
-                        class="btn btn-outline-primary btn-lg"
-                        t-on-click="onSelectPackage"
-                    >Select Package</button>
+                    <t t-if="state.selectingPackage">
+                        <div class="d-flex align-items-center gap-1 bg-white border rounded p-1">
+                            <AutoComplete
+                                value="''"
+                                sources="packageSelectSources"
+                                placeholder="'Search a package...'"
+                                autofocus="true"
+                                class="'o_package_rename_ac'"
+                            />
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    t-on-click="onCancelPackageSelect">
+                                <i class="fa fa-times"/>
+                            </button>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <button
+                            t-if="canPutInPack"
+                            type="button"
+                            class="btn btn-outline-primary btn-lg"
+                            t-on-click="onSelectPackage"
+                        >Select Package</button>
+                    </t>
 
                     <button
                         t-if="canConsumeByDemand"

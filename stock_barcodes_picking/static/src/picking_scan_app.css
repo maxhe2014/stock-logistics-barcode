@@ -30,3 +30,13 @@
 .o_picking_scan_selector .list-group-item {
     cursor: pointer;
 }
+
+/* Inline package rename AutoComplete: constrained width */
+.o_package_rename_ac {
+    width: 12rem;
+    max-width: 40vw;
+}
+.o_package_rename_ac .o-autocomplete--input {
+    width: 100%;
+}
+

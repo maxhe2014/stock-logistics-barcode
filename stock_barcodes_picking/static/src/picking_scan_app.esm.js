@@ -6,6 +6,7 @@ import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
+import { AutoComplete } from "@web/core/autocomplete/autocomplete";
 
 /**
  * PickingScanApp — thin OWL client action for the outgoing-picking
@@ -25,6 +26,7 @@ import { standardActionServiceProps } from "@web/webclient/actions/action_servic
 export class PickingScanApp extends Component {
     static template = "stock_barcodes_picking.PickingScanApp";
     static props = { ...standardActionServiceProps };
+    static components = { AutoComplete };
 
     setup() {
         this.orm = useService("orm");
@@ -82,6 +84,12 @@ export class PickingScanApp extends Component {
             expandedMoveId: false,
             // Move id to scroll into view after the next render patch.
             pendingScrollMoveId: false,
+            // Package rename inline editor (AutoComplete with existing names)
+            editingPackageMoveId: false,
+            editingPackageId: false,
+            packageDraftName: "",
+            // Select-package inline Many2One editor
+            selectingPackage: false,
         });
 
         // Sound alert for scan errors. Only an error tone is used
@@ -341,12 +349,12 @@ export class PickingScanApp extends Component {
 
     /** Enter inline quantity-edit mode for a move row (pencil button).
      *  Pre-fills the draft with the move demand. */
-    onEditMoveQty(moveId) {
-        const mv = this.state.move_ids.find((m) => m.id === moveId);
+    onEditMoveQty(rowKey) {
+        const mv = this.state.move_ids.find((m) => m.row_key === rowKey);
         if (!mv) {
             return;
         }
-        this.state.editingQtyMoveId = moveId;
+        this.state.editingQtyMoveId = rowKey;
         this.state.draftQty = String(mv.product_uom_qty || 0);
     }
 
@@ -354,10 +362,10 @@ export class PickingScanApp extends Component {
         this.state.draftQty = ev.currentTarget.value;
     }
 
-    onDraftQtyKeydown(ev, moveId) {
+    onDraftQtyKeydown(ev, rowKey) {
         if (ev.key === "Enter") {
             ev.preventDefault();
-            this.onConfirmMoveQty(moveId);
+            this.onConfirmMoveQty(rowKey);
         } else if (ev.key === "Escape") {
             ev.preventDefault();
             this.onCancelMoveQty();
@@ -370,8 +378,12 @@ export class PickingScanApp extends Component {
      * action_consume_with_qty(qty). Two RPCs, one user action. If the
      * user cancels the input, no RPC fires (active_move_id untouched).
      */
-    async onConfirmMoveQty(moveId) {
+    async onConfirmMoveQty(rowKey) {
         if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        const mv = this.state.move_ids.find((m) => m.row_key === rowKey);
+        if (!mv) {
             return;
         }
         const qty = parseFloat(this.state.draftQty);
@@ -388,7 +400,7 @@ export class PickingScanApp extends Component {
             const ok = await this.orm.call(
                 "wiz.stock.barcodes.picking",
                 "set_active_move",
-                [[this.wizId], moveId]
+                [[this.wizId], mv.id]
             );
             if (!ok) {
                 await this._refreshState();
@@ -453,11 +465,11 @@ export class PickingScanApp extends Component {
      * Accordion toggle for a move's multi-SN list. Opening one move
      * collapses any other. Clicking the already-open move collapses it.
      */
-    onToggleMoveLots(moveId) {
-        if (this.state.expandedMoveId === moveId) {
+    onToggleMoveLots(rowKey) {
+        if (this.state.expandedMoveId === rowKey) {
             this.state.expandedMoveId = false;
         } else {
-            this.state.expandedMoveId = moveId;
+            this.state.expandedMoveId = rowKey;
         }
     }
 
@@ -483,19 +495,83 @@ export class PickingScanApp extends Component {
     }
 
     /**
-     * Rename a package via a prompt dialog.
+     * Open the inline package-rename editor (AutoComplete).
+     *
+     * Replaces the old window.prompt() with an Odoo-standard AutoComplete
+     * that suggests existing package names via name_search while still
+     * allowing the operator to type a brand-new name.
      */
-    async onEditPackageName(packageId, currentName) {
+    onEditPackageName(packageId, rowKey, currentName) {
         if (this.state.scanning || !this.wizId) {
             return;
         }
-        const newName = window.prompt(
-            _t("Enter new package name:"),
-            currentName || ""
-        );
-        if (newName === null) {
+        this.state.editingPackageMoveId = rowKey;
+        this.state.editingPackageId = packageId;
+        this.state.packageDraftName = currentName || "";
+    }
+
+    /**
+     * AutoComplete source: return existing package names matching the
+     * typed text (name_search on stock.package).
+     */
+    async loadPackageNameOptions(name) {
+        try {
+            const results = await this.orm.call(
+                "stock.package",
+                "name_search",
+                [],
+                { name: name || "", limit: 8 }
+            );
+            const options = results.map(([id, label]) => ({
+                label,
+                onSelect: () => this._confirmPackageRename(label),
+            }));
+            if (options.length === 0) {
+                options.push({ label: _t("(no existing package)") });
+            }
+            return options;
+        } catch {
+            return [];
+        }
+    }
+
+    get packageNameSources() {
+        return [
+            {
+                placeholder: _t("Loading..."),
+                options: this.loadPackageNameOptions.bind(this),
+            },
+        ];
+    }
+
+    onPackageNameChange({ inputValue }) {
+        this.state.packageDraftName = inputValue;
+    }
+
+    onPackageNameInput({ inputValue }) {
+        this.state.packageDraftName = inputValue;
+    }
+
+    onPackageNameKeydown(ev) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this._confirmPackageRename(this.state.packageDraftName);
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this._cancelPackageRename();
+        }
+    }
+
+    async _confirmPackageRename(name) {
+        const newName = (name || "").trim();
+        if (!newName) {
+            this.notification.add(_t("Package name cannot be empty."), {
+                type: "danger",
+            });
             return;
         }
+        const packageId = this.state.editingPackageId;
+        this._cancelPackageRename();
         this.state.scanning = true;
         try {
             const res = await this.orm.call(
@@ -515,6 +591,12 @@ export class PickingScanApp extends Component {
         } finally {
             this.state.scanning = false;
         }
+    }
+
+    _cancelPackageRename() {
+        this.state.editingPackageMoveId = false;
+        this.state.editingPackageId = false;
+        this.state.packageDraftName = "";
     }
 
     /**
@@ -549,28 +631,69 @@ export class PickingScanApp extends Component {
     }
 
     /**
-     * Bind unpacked picked lines to an existing package.
-     * Opens the package list view so the operator can pick one; on close
-     * the state refreshes. The actual binding is done by scanning the
-     * package barcode (handled by _scan_package on the backend).
+     * Toggle the inline package selector.
+     *
+     * Replaces the old window.prompt() with the standard AutoComplete
+     * so the operator can search and pick an existing package to bind
+     * the unpacked picked lines to.
      */
-    async onSelectPackage() {
+    onSelectPackage() {
         if (this.state.scanning || !this.wizId) {
             return;
         }
-        const name = window.prompt(
-            _t("Enter the package name to bind unpacked products to:")
-        );
-        if (name === null) {
+        this.state.selectingPackage = !this.state.selectingPackage;
+    }
+
+    onCancelPackageSelect() {
+        this.state.selectingPackage = false;
+    }
+
+    /**
+     * AutoComplete source for package selection: name_search on
+     * stock.package and return selectable options.
+     */
+    async loadPackageSelectOptions(name) {
+        try {
+            const results = await this.orm.call(
+                "stock.package",
+                "name_search",
+                [],
+                { name: name || "", limit: 8 }
+            );
+            return results.map(([id, label]) => ({
+                label,
+                onSelect: () => this.onPackageSelected({ id }),
+            }));
+        } catch {
+            return [];
+        }
+    }
+
+    get packageSelectSources() {
+        return [
+            {
+                placeholder: _t("Loading..."),
+                options: this.loadPackageSelectOptions.bind(this),
+            },
+        ];
+    }
+
+    /**
+     * Package select callback: bind unpacked picked lines to the
+     * selected package.
+     */
+    async onPackageSelected(value) {
+        if (!value || !value.id) {
             return;
         }
+        const packageId = value.id;
+        this.state.selectingPackage = false;
         this.state.scanning = true;
         try {
-            // Reuse the scan logic: lookup package by name and bind.
             const res = await this.orm.call(
                 "wiz.stock.barcodes.picking",
-                "action_select_existing_package_by_name",
-                [[this.wizId], name]
+                "action_select_existing_package",
+                [[this.wizId], packageId]
             );
             await this._handleActionResult(res, "Select package");
         } catch (err) {
@@ -590,13 +713,67 @@ export class PickingScanApp extends Component {
      * Validate the picking. Three-state:
      *   false → guard / no picking → show error
      *   true  → validated, no backorder → refresh
-     *   dict  → backorder wizard → doAction + onClose refresh
+     *   dict  → backorder wizard → doAction; on close, switch to the
+     *           newly created backorder and refresh.
      */
-    onValidatePicking() {
-        return this._callAction(
-            "action_validate_picking",
-            _t("Validate")
-        );
+    async onValidatePicking() {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_validate_picking",
+                [[this.wizId]]
+            );
+            if (res === false) {
+                await this._refreshState();
+                if (["error", "not_found", "more_match"].includes(this.state.message_type)) {
+                    this._playAlert();
+                }
+            } else if (res && typeof res === "object" && res.type) {
+                // Backorder confirmation wizard. Once it closes, the
+                // backorder picking has been created — switch to it so
+                // the operator continues with the remaining quantity.
+                await this.actionService.doAction(res, {
+                    onClose: async () => {
+                        try {
+                            await this.orm.call(
+                                "wiz.stock.barcodes.picking",
+                                "switch_to_backorder_if_any",
+                                [[this.wizId]]
+                            );
+                        } finally {
+                            await this._refreshState();
+                        }
+                    },
+                });
+            } else {
+                // true — validated directly. A backorder may still have
+                // been created (e.g. operation type set to "always
+                // auto-create backorder"), so try to switch to it.
+                try {
+                    await this.orm.call(
+                        "wiz.stock.barcodes.picking",
+                        "switch_to_backorder_if_any",
+                        [[this.wizId]]
+                    );
+                } finally {
+                    await this._refreshState();
+                }
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Validate failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
     }
 
     /**
@@ -727,6 +904,25 @@ export class PickingScanApp extends Component {
         const steps = this.state.scan_steps || [];
         const s = steps[this.state.step];
         return s ? s.label : "";
+    }
+
+    /**
+     * Group move rows by stock.move id. The backend splits a single move
+     * into multiple rows (one per result_package_id). This groups them back
+     * so the product header is rendered once, with all package rows beneath.
+     * Each group: { move, rows, totalPicked }
+     */
+    get groupedMoves() {
+        const groups = new Map();
+        for (const mv of this.state.move_ids || []) {
+            if (!groups.has(mv.id)) {
+                groups.set(mv.id, { move: mv, rows: [], totalPicked: 0 });
+            }
+            const g = groups.get(mv.id);
+            g.rows.push(mv);
+            g.totalPicked += Number(mv.quantity) || 0;
+        }
+        return Array.from(groups.values());
     }
 }
 
