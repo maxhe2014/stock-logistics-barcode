@@ -1,12 +1,13 @@
 // Copyright 2026 OpenViking
 // License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-import { Component, useState, onWillStart, onPatched } from "@odoo/owl";
+import { Component, useState, onWillStart, onPatched, onMounted, onWillUnmount } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { AutoComplete } from "@web/core/autocomplete/autocomplete";
+import { browser } from "@web/core/browser/browser";
 
 /**
  * PickingScanApp — thin OWL client action for the outgoing-picking
@@ -41,6 +42,37 @@ export class PickingScanApp extends Component {
         );
 
         this.wizId = this.props.action.params?.wiz_id;
+
+        // Browser back button handling — preserve the source list's context.
+        //
+        // When this scan app mounts, the controller's onMounted hook overwrites
+        // sessionStorage["current_action"] with the scan action.  We capture
+        // the *previous* action (the picking list, with its full menu-applied
+        // context such as the "incoming receipts" filter) *before* that
+        // happens, so it is still available here in setup().
+        //
+        // On browser back, Odoo's normal popstate → loadState path reloads
+        // the list action by its numeric ID, which drops the menu context and
+        // shows *all* operations instead of just receipts.  To prevent that,
+        // we restore the captured previous action into sessionStorage before
+        // Odoo's popstate handler reads it.  actionService._getActionParams
+        // then matches lastAction.id against state.action and reuses the full
+        // action (with context) instead of loading a bare copy by ID.
+        //
+        // Unlike the previous historyBack() approach, this does NOT call
+        // restore()/_updateUI/pushState, so no extra browser-history entries
+        // are created and the controller stack stays in sync with history —
+        // avoiding the freeze that occurred after repeated enter/back cycles.
+        try {
+            this._previousAction = browser.sessionStorage.getItem("current_action");
+        } catch {
+            this._previousAction = null;
+        }
+        this._onPopState = () => {
+            if (this._previousAction) {
+                browser.sessionStorage.setItem("current_action", this._previousAction);
+            }
+        };
         // Local UI mirror of the wizard state. Hydrated from
         // ``get_scan_state()`` after every interaction; rendered by the
         // t-* directives in the template.
@@ -118,6 +150,16 @@ export class PickingScanApp extends Component {
             if (el && el.scrollIntoView) {
                 el.scrollIntoView({ block: "center", inline: "nearest" });
             }
+        });
+
+        // Register the popstate listener in the capture phase so it runs
+        // before Odoo's own router listener, ensuring current_action is
+        // restored before loadState → _getActionParams reads it.
+        onMounted(() => {
+            window.addEventListener("popstate", this._onPopState, { capture: true });
+        });
+        onWillUnmount(() => {
+            window.removeEventListener("popstate", this._onPopState, { capture: true });
         });
     }
 
