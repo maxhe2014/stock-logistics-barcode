@@ -187,7 +187,7 @@
                             <!-- Package rows under this product -->
                             <t t-foreach="group.rows" t-as="mv" t-key="mv.row_key">
                                 <tr
-                                    t-att-class="!mv.picked ? 'table-danger' : 'table-success'"
+                                    t-att-class="mv.quantity >= mv.product_uom_qty ? 'table-success' : (mv.quantity > 0 ? 'table-warning' : 'table-danger')"
                                 >
                                     <td></td>
                                     <td class="align-middle ps-4">

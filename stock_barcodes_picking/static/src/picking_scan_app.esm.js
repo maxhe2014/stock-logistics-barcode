@@ -890,13 +890,15 @@ export class PickingScanApp extends Component {
     /**
      * Put in Pack: visible when the user has the packages group and there
      * is at least one picked (unpacked) move line.
+     * For non-serial products there are no lots, so check picked quantity
+     * (mv.quantity > 0) instead of pickedLots.
      */
     get canPutInPack() {
         if (!this.state.show_put_in_pack || !this.state.picking_id) {
             return false;
         }
         const moves = this.state.move_ids || [];
-        return moves.some((mv) => (mv.pickedLots || []).length > 0);
+        return moves.some((mv) => mv.quantity > 0 && !mv.package_id);
     }
 
     /** Step label for the current step index. */
