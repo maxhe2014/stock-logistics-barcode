@@ -129,16 +129,57 @@
                                     />
                                 </td>
                                 <td class="align-middle">
-                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <strong><t t-out="group.move.product_name" /></strong>
-                                    </div>
-                                    <div class="small text-muted lh-sm">
-                                        Demand <t t-out="group.move.product_uom_qty" />
-                                        <span class="mx-1">·</span>
-                                        Picked <t t-out="group.totalPicked" />
-                                        <t t-if="group.move.tracking !== 'none'">
-                                            <span class="mx-1">·</span>
-                                            <t t-out="group.move.tracking" />
+                                    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                                        <div>
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <strong><t t-out="group.move.product_name" /></strong>
+                                            </div>
+                                            <div class="small text-muted lh-sm">
+                                                Demand <t t-out="group.move.product_uom_qty" />
+                                                <span class="mx-1">·</span>
+                                                Picked <t t-out="group.totalPicked" />
+                                                <t t-if="group.move.tracking !== 'none'">
+                                                    <span class="mx-1">·</span>
+                                                    <t t-out="group.move.tracking" />
+                                                </t>
+                                            </div>
+                                        </div>
+                                        <!-- Inline qty edit (pencil) — only for non-serial tracking, placed in the header for compactness -->
+                                        <t t-if="group.move.tracking !== 'serial'">
+                                            <t t-if="state.editingQtyMoveId === group.rows[0].row_key">
+                                                <div class="d-flex align-items-center gap-1" t-on-click.stop="">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        class="form-control form-control-sm"
+                                                        style="width: 6rem;"
+                                                        t-att-value="state.draftQty"
+                                                        t-on-input="(ev) => this.onDraftQtyInput(ev)"
+                                                        t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, group.rows[0].row_key)"
+                                                    />
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-success"
+                                                            title="Confirm quantity"
+                                                            t-on-click.stop="() => this.onConfirmMoveQty(group.rows[0].row_key)">
+                                                        <i class="fa fa-check"/>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            title="Cancel"
+                                                            t-on-click.stop="() => this.onCancelMoveQty()">
+                                                        <i class="fa fa-times"/>
+                                                    </button>
+                                                </div>
+                                            </t>
+                                            <t t-else="">
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-primary"
+                                                        title="Edit quantity"
+                                                        t-on-click.stop="() => this.onEditMoveQty(group.rows[0].row_key)">
+                                                    <i class="fa fa-pencil"/>
+                                                </button>
+                                            </t>
                                         </t>
                                     </div>
                                 </td>
@@ -271,42 +312,6 @@
                                                     <i t-att-class="state.expandedMoveId === mv.row_key ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
                                                     查看
                                                 </button>
-                                            </t>
-                                            <!-- Inline qty edit (pencil) — only for non-serial tracking -->
-                                            <t t-if="group.move.tracking !== 'serial'">
-                                                <t t-if="state.editingQtyMoveId === mv.row_key">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="any"
-                                                        class="form-control form-control-sm"
-                                                        style="width: 6rem;"
-                                                        t-att-value="state.draftQty"
-                                                        t-on-input="(ev) => this.onDraftQtyInput(ev)"
-                                                        t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, mv.row_key)"
-                                                        t-on-click.stop=""
-                                                    />
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-success"
-                                                            title="Confirm quantity"
-                                                            t-on-click.stop="() => this.onConfirmMoveQty(mv.row_key)">
-                                                        <i class="fa fa-check"/>
-                                                    </button>
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-secondary"
-                                                            title="Cancel"
-                                                            t-on-click.stop="() => this.onCancelMoveQty()">
-                                                        <i class="fa fa-times"/>
-                                                    </button>
-                                                </t>
-                                                <t t-else="">
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-primary"
-                                                            title="Edit quantity"
-                                                            t-on-click.stop="() => this.onEditMoveQty(mv.row_key)">
-                                                        <i class="fa fa-pencil"/>
-                                                    </button>
-                                                </t>
                                             </t>
                                         </div>
                                     </td>
