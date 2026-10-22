@@ -1,10 +1,7 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-from odoo import api, SUPERUSER_ID
-
-
-def post_init_hook(cr, registry):
+def post_init_hook(env):
     """Backfill barcode_scan_source_location for existing picking types.
 
     New Boolean columns default to NULL (rendered as False) on existing
@@ -15,7 +12,6 @@ def post_init_hook(cr, registry):
     pre-feature behaviour. ``barcode_scan_dest_location`` stays False
     (destination scanning was never required before).
     """
-    env = api.Environment(cr, SUPERUSER_ID, {})
     picking_types = env["stock.picking.type"].with_context(
         active_test=False
     ).search([])
