@@ -462,7 +462,10 @@ export class MrpScanApp extends Component {
             this.notification.add(
                 _t("%(label)s failed: %(err)s", {
                     label: errorLabel || methodName,
-                    err: err?.message || String(err),
+                    // Server user errors carry the real message in
+                    // err.data.message (err.message is only "Odoo Server
+                    // Error"), so surface the specific reason to the operator.
+                    err: err?.data?.message || err?.message || String(err),
                 }),
                 { type: "danger" }
             );

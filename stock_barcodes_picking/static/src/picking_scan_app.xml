@@ -197,7 +197,7 @@
                                                 <t t-if="state.editingPackageMoveId === mv.row_key">
                                                     <span class="d-inline-flex align-items-center gap-1"
                                                           t-on-keydown="(ev) => this.onPackageNameKeydown(ev)">
-                                                        <i class="fa fa-archive" style="color:#0d47a1;"/>
+                                                        <i class="fa fa-archive text-info"/>
                                                         <AutoComplete
                                                             value="state.packageDraftName"
                                                             sources="packageNameSources"
@@ -223,28 +223,24 @@
                                                 </t>
                                                 <t t-else="">
                                                     <span t-if="mv.package_name"
-                                                          class="badge d-inline-flex align-items-center gap-1"
-                                                          style="background-color:#e3f2fd;color:#0d47a1;border:1px solid #90caf9;">
+                                                          class="badge bg-info d-inline-flex align-items-center gap-1">
                                                         <i class="fa fa-archive"/>
                                                         <t t-out="mv.package_name" />
                                                         <button type="button"
                                                                 class="btn btn-link btn-sm p-0 ms-1"
-                                                                style="color:#0d47a1;"
                                                                 title="Rename package"
                                                                 t-on-click.stop="() => this.onEditPackageName(mv.package_id, mv.row_key, mv.package_name)">
                                                             <i class="fa fa-pencil"/>
                                                         </button>
                                                         <button type="button"
-                                                                class="btn btn-link btn-sm p-0"
-                                                                style="color:#c62828;"
+                                                                class="btn btn-link btn-sm p-0 text-danger"
                                                                 title="Remove package (unpack)"
                                                                 t-on-click.stop="() => this.onUnpackPackage(mv.package_id, mv.id)">
                                                             <i class="fa fa-trash"/>
                                                         </button>
                                                     </span>
                                                     <span t-else=""
-                                                          class="badge d-inline-flex align-items-center gap-1"
-                                                          style="background-color:#f5f5f5;color:#757575;border:1px dashed #bdbdbd;">
+                                                          class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
                                                         <i class="fa fa-inbox"/>
                                                         未装包
                                                     </span>
@@ -261,7 +257,7 @@
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="mv.lots[0].name" />
                                                     <button type="button"
-                                                            class="btn btn-link btn-sm p-0 ms-1 text-white opacity-75"
+                                                            class="btn btn-link btn-sm p-0 ms-1 text-danger"
                                                             t-att-title="'Remove ' + mv.lots[0].name"
                                                             t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.lots[0].id)">
                                                         <i class="fa fa-trash"/>
@@ -269,8 +265,7 @@
                                                 </span>
                                                 <!-- Reserved (unpicked) SN: greyed "pending", no delete -->
                                                 <span t-else=""
-                                                      class="badge d-inline-flex align-items-center gap-1"
-                                                      style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
+                                                      class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
                                                     <i class="fa fa-clock-o"/>
                                                     <t t-out="mv.lots[0].name" />
                                                     <span class="small opacity-75">待拣</span>
@@ -278,13 +273,11 @@
                                             </t>
                                             <!-- Multi-SN: show the LATEST PICKED SN inline + count badge to expand all -->
                                             <t t-if="mv.pickedLots.length > 0 and (mv.pickedLots.length > 1 or mv.lots.length > mv.pickedLots.length)">
-                                                <span class="badge d-inline-flex align-items-center gap-1"
-                                                      style="background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;">
+                                                <span class="badge bg-info d-inline-flex align-items-center gap-1">
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="mv.pickedLots[mv.pickedLots.length - 1].name" />
                                                     <button type="button"
-                                                            class="btn btn-link btn-sm p-0 ms-1 opacity-75"
-                                                            style="color:#000;"
+                                                            class="btn btn-link btn-sm p-0 ms-1 text-danger"
                                                             t-att-title="'Remove ' + mv.pickedLots[mv.pickedLots.length - 1].name"
                                                             t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.pickedLots[mv.pickedLots.length - 1].id)">
                                                         <i class="fa fa-trash"/>
@@ -300,8 +293,7 @@
                                             </t>
                                             <!-- Reserved SNs only (none picked yet) -->
                                             <t t-if="mv.pickedLots.length === 0 and mv.lots.length > 0">
-                                                <span class="badge d-inline-flex align-items-center gap-1"
-                                                      style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
+                                                <span class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
                                                     <i class="fa fa-clock-o"/>
                                                     <t t-out="mv.lots.length" /> 个待拣
                                                 </span>
@@ -322,16 +314,14 @@
                                     <td colspan="2" class="p-0">
                                         <div class="d-flex flex-wrap gap-2 p-2 bg-light border-top">
                                             <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
-                                                <!-- Picked lots: latest highlighted blue, others grey -->
+                                                <!-- Picked lots: latest highlighted, others grey -->
                                                 <span t-if="lot.picked"
-                                                    t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? '' : 'bg-secondary')"
-                                                    t-att-style="lot.id === mv.latest_lot_id ? 'background-color:#cce5ff;border-left:4px solid #6ea8fe;color:#000;' : ''"
+                                                    t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-info' : 'bg-secondary')"
                                                 >
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="lot.name" />
                                                     <button type="button"
-                                                            t-att-class="'btn btn-link btn-sm p-0 ms-1 opacity-75 ' + (lot.id === mv.latest_lot_id ? '' : 'text-white')"
-                                                            t-att-style="lot.id === mv.latest_lot_id ? 'color:#000;' : ''"
+                                                            class="btn btn-link btn-sm p-0 ms-1 text-danger"
                                                             t-att-title="'Remove ' + lot.name"
                                                             t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
                                                         <i class="fa fa-trash"/>
@@ -339,8 +329,7 @@
                                                 </span>
                                                 <!-- Reserved (unpicked) lots: greyed "pending", no delete -->
                                                 <span t-else=""
-                                                      class="badge d-inline-flex align-items-center gap-1"
-                                                      style="background-color:#e9ecef;color:#6c757d;border:1px dashed #adb5bd;">
+                                                      class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
                                                     <i class="fa fa-clock-o"/>
                                                     <t t-out="lot.name" />
                                                     <span class="small opacity-75">待拣</span>
@@ -372,7 +361,7 @@
                     >Put in Pack</button>
 
                     <t t-if="state.selectingPackage">
-                        <div class="d-flex align-items-center gap-1 bg-white border rounded p-1">
+                        <div class="d-flex align-items-center gap-1 bg-light border rounded p-1">
                             <AutoComplete
                                 value="''"
                                 sources="packageSelectSources"

@@ -1240,6 +1240,14 @@ msgid "Serial component %s must be consumed by scanning SNs"
 msgstr "序列号组件 %s 必须通过扫描序列号来消耗"
 
 #. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/models/mrp_production.py:0
+msgid ""
+"Serial number(s) %(lots)s for product %(product)s have already been "
+"produced and cannot be reused."
+msgstr "序列号 %(lots)s 已用于生产产品「%(product)s」，不能重复使用。"
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,help:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__pending_finish
 msgid ""
 "Set by action_finish_production's dialog path; consumed by "

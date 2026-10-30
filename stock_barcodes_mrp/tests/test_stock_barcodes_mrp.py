@@ -1,5 +1,6 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
 
@@ -2886,3 +2887,39 @@ class TestStockBarcodesMrp(TransactionCase):
         # No line was harmed.
         move_a.invalidate_recordset()
         self.assertEqual(len(move_a.move_line_ids), line_count_before)
+
+    def test_finish_duplicate_finished_sn_names_the_serial(self):
+        """Finishing with a serial already produced on another MO must raise
+        the addon's clear message naming the conflicting SN (instead of core's
+        untranslated product-only message)."""
+        first_mo = self.MrpProduction.create({
+            "product_id": self.finished_product_serial.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_serial.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        first_mo.action_confirm()
+        first_mo.action_assign()
+        wiz = self.WizScanMrp.create({"production_id": first_mo.id})
+        self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
+        self.action_barcode_scanned(wiz, "SN-DUPLICATE-001")
+        self.assertIs(wiz.action_finish_production(), True)
+        self.assertEqual(first_mo.state, "done")
+        produced_sn = first_mo.lot_producing_ids
+        self.assertEqual(produced_sn.name, "SN-DUPLICATE-001")
+
+        second_mo = self.MrpProduction.create({
+            "product_id": self.finished_product_serial.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_serial.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        second_mo.action_confirm()
+        second_mo.lot_producing_ids = [(6, 0, produced_sn.ids)]
+        with self.assertRaises(UserError) as caught:
+            second_mo._check_sn_uniqueness()
+        message = str(caught.exception)
+        self.assertIn("SN-DUPLICATE-001", message)
+        self.assertIn(self.finished_product_serial.name, message)

@@ -1,10 +1,35 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
-from odoo import models
+from odoo import _, models
+from odoo.exceptions import UserError
 
 
 class MrpProduction(models.Model):
     _inherit = "mrp.production"
+
+    def _check_sn_uniqueness(self):
+        """Replace core's untranslated "already produced" error with a clear,
+        translated message that names the conflicting serial numbers.
+
+        Core raises the error from the ``mrp`` module, so its Chinese
+        translation cannot be provided by this addon (Python translations are
+        loaded per module). Re-checking the finished-serial branch here makes
+        the message translatable and identical on the desktop MO form and in
+        the MRP scan app.
+        """
+        self.ensure_one()
+        if self.product_tracking == "serial" and self.lot_producing_ids:
+            lots = self.lot_producing_ids.filtered(
+                lambda lot: lot.id not in self.move_raw_ids.lot_ids.ids
+            )
+            if lots and self._are_finished_serials_already_produced(lots):
+                raise UserError(_(
+                    "Serial number(s) %(lots)s for product %(product)s have "
+                    "already been produced and cannot be reused.",
+                    lots=", ".join(lots.mapped("name")),
+                    product=self.product_id.name,
+                ))
+        return super()._check_sn_uniqueness()
 
     def action_barcode_scan(self):
         """Open the MRP scan client action (OWL MrpScanApp) for this MO.

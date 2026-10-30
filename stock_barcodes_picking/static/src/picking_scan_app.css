@@ -1,19 +1,13 @@
 /* Copyright 2026 OpenViking
    License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). */
 
-.o_picking_scan_app {
-    background-color: #f8f9fa;
-}
-
 .o_picking_scan_input {
     font-family: monospace;
     font-size: 1.25rem;
 }
 
-/* Picking info strip: compact, readable */
-.o_picking_scan_info {
-    background-color: #fff;
-}
+/* Info strip and badges use theme classes only (same palette as
+   stock_barcodes_mrp) so light and dark color schemes both apply. */
 
 /* Step indicator pills */
 .o_picking_scan_steps .nav-link {
