@@ -99,6 +99,43 @@ class TestStockBarcodesPicking(TransactionCase):
         wiz._set_default_values()
         return wiz
 
+    def _create_serial_product(self, name, barcode):
+        return self.Product.create({
+            "name": name,
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": barcode,
+        })
+
+    def _create_lot(self, product, name):
+        return self.env["stock.lot"].create({
+            "name": name,
+            "product_id": product.id,
+            "company_id": self.env.company.id,
+        })
+
+    def _create_out_picking(self, product, qty=1.0):
+        """Outgoing picking without pre-filling stock, so serial quantities
+        stay exactly as the test sets them."""
+        picking = self.StockPicking.create({
+            "picking_type_id": self.picking_type.id,
+            "location_id": self.stock_location.id,
+            "location_dest_id": self.customer_location.id,
+            "partner_id": self.env["res.partner"].search([], limit=1).id,
+        })
+        self.StockMove.create({
+            "product_id": product.id,
+            "product_uom_qty": qty,
+            "product_uom": product.uom_id.id,
+            "picking_id": picking.id,
+            "location_id": self.stock_location.id,
+            "location_dest_id": self.customer_location.id,
+        })
+        picking.action_confirm()
+        picking.action_assign()
+        return picking
+
     # --- SET semantics ---
     def test_set_semantics_replace_quantity(self):
         """Re-scanning a product with a different qty SETS (not ADDS).
@@ -599,6 +636,82 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertEqual(wiz.active_move_id, move_b)
         self.assertEqual(
             sum(l.quantity for l in move_b.move_line_ids if l.picked), 1.0
+        )
+
+    # --- Scan-time serial availability checks ---
+    def test_scan_serial_from_other_location_rejected(self):
+        """A serial stored in another internal location is rejected at
+        scan time instead of failing only at validation."""
+        product = self._create_serial_product(
+            "Serial Elsewhere", "PROD-SN-ELSEWHERE"
+        )
+        lot = self._create_lot(product, "SN-ELSEWHERE-001")
+        other_location = self.StockLocation.create({
+            "name": "Other Stock",
+            "usage": "internal",
+            "location_id": self.warehouse.view_location_id.id,
+        })
+        self.StockQuant._update_available_quantity(
+            product, other_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(product)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn(lot.name, wiz.message)
+        self.assertIn(other_location.display_name, wiz.message)
+        self.assertFalse(
+            picking.move_line_ids.filtered(lambda l: l.lot_id == lot),
+            "the serial must not be added to the transfer",
+        )
+
+    def test_scan_delivered_serial_rejected(self):
+        """A serial already at a customer location cannot be picked again."""
+        product = self._create_serial_product(
+            "Serial Delivered", "PROD-SN-DELIVERED"
+        )
+        lot = self._create_lot(product, "SN-DELIVERED-001")
+        self.StockQuant._update_available_quantity(
+            product, self.customer_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(product)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("already been delivered", wiz.message)
+        self.assertFalse(
+            picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        )
+
+    def test_scan_serial_reserved_by_other_transfer_rejected(self):
+        """A serial reserved by another transfer is rejected at scan time."""
+        product = self._create_serial_product(
+            "Serial Reserved", "PROD-SN-RESERVED"
+        )
+        lot = self._create_lot(product, "SN-RESERVED-001")
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot
+        )
+        other_picking = self._create_out_picking(product)
+        self.assertEqual(other_picking.move_line_ids.lot_id, lot)
+
+        picking = self._create_out_picking(product)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("reserved by another transfer", wiz.message)
+        self.assertIn(other_picking.name, wiz.message)
+        self.assertFalse(
+            picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
         )
 
     # --- action_force_add ---

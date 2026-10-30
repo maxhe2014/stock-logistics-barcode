@@ -1067,7 +1067,11 @@ class WizStockBarcodesPicking(models.TransientModel):
                 self._compute_qty_available()
                 if product.tracking == "serial":
                     self.product_qty = 1.0
-                    self.action_confirm()
+                    # Keep the error set by action_confirm (e.g. serial
+                    # not in the scanned location) instead of replacing
+                    # it with the generic step instruction.
+                    if not self.action_confirm():
+                        return True
                     self._set_message_step()
                     return True
                 self._set_message(
@@ -1130,6 +1134,84 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.qty_available = sum(quants.mapped("quantity"))
 
     # --- Action methods ---
+    def _get_serial_pick_error(self, lot):
+        """Return why ``lot`` cannot be picked from the scanned source.
+
+        This module only drives outgoing transfers, so an existing serial
+        number must physically be in the scanned source location and must
+        not be delivered already or reserved by another transfer. Returning
+        the reason at scan time avoids core's validation-time error, which
+        reports a single serial per attempt and forces a back-and-forth
+        cleanup loop.
+
+        :return: translated error message, or False when the serial can be
+            picked.
+        """
+        self.ensure_one()
+        if not self.picking_id or lot.product_id.tracking != "serial":
+            return False
+        location = self.location_id
+        if not location:
+            move = self.active_move_id or self.picking_id.move_ids.filtered(
+                lambda m: m.product_id == lot.product_id and m.state != "cancel"
+            )[:1]
+            location = move.location_id if move else self.picking_id.location_id
+        if not location:
+            return False
+        quants = self.env["stock.quant"].search([
+            ("product_id", "=", lot.product_id.id),
+            ("lot_id", "=", lot.id),
+            ("quantity", ">", 0),
+        ])
+        # Already delivered: sending it again would create a second unit
+        # of the same serial at the customer location.
+        if quants.filtered(lambda q: q.location_id.usage == "customer"):
+            return _(
+                "Serial number %(sn)s has already been delivered and "
+                "cannot be picked again.",
+                sn=lot.name,
+            )
+        in_source = quants.filtered(
+            lambda q: q.location_id.parent_path.startswith(
+                location.parent_path
+            )
+        )
+        if not in_source:
+            if quants:
+                return _(
+                    "Serial number %(sn)s is not in location %(location)s "
+                    "(currently in: %(locations)s). It was not added to "
+                    "this transfer.",
+                    sn=lot.name,
+                    location=location.display_name,
+                    locations=", ".join(
+                        quants.mapped("location_id.display_name")
+                    ),
+                )
+            return _(
+                "Serial number %(sn)s has no stock in location "
+                "%(location)s. It was not added to this transfer.",
+                sn=lot.name,
+                location=location.display_name,
+            )
+        # Reserved by another transfer: picking it here would move stock
+        # promised elsewhere (core reports this only at validation).
+        other_lines = self.env["stock.move.line"].search([
+            ("picking_id", "!=", self.picking_id.id),
+            ("picking_id", "!=", False),
+            ("product_id", "=", lot.product_id.id),
+            ("lot_id", "=", lot.id),
+            ("state", "not in", ("done", "cancel")),
+        ])
+        if other_lines:
+            return _(
+                "Serial number %(sn)s is reserved by another transfer "
+                "(%(pickings)s) and cannot be picked again.",
+                sn=lot.name,
+                pickings=", ".join(other_lines.picking_id.mapped("name")),
+            )
+        return False
+
     def action_confirm(self):
         """Confirm the scanned product and update stock move lines."""
         if not self._check_selector_resolved():
@@ -1163,6 +1245,23 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self.product_qty or self.product_qty <= 0:
             self._set_message("error", _("Quantity must be positive"))
             return False
+
+        # A pre-existing serial must physically be in the scanned source
+        # location. This catches wrong/past serials at scan time instead
+        # of at validation, where core reports one serial per attempt and
+        # forces the operator to go back and delete it manually.
+        # Serials created on the fly (use_create_lots) are exempt: whether
+        # creating them is allowed is decided by the operation type.
+        new_lot = not self.lot_id and bool(self.lot_name)
+        if (
+            not new_lot
+            and self.product_id.tracking == "serial"
+            and self.lot_id
+        ):
+            error = self._get_serial_pick_error(self.lot_id)
+            if error:
+                self._set_message("error", error)
+                return False
 
         if not self.lot_id and self.lot_name and self.product_id.tracking != "none":
             self.lot_id = self._create_new_lot()

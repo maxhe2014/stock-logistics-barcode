@@ -965,6 +965,40 @@ msgstr ""
 "序列号/批次 %(name)s 不存在。此操作类型不允许创建新的序列号/批次。"
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s has already been delivered and cannot be picked "
+"again."
+msgstr "序列号 %(sn)s 已出库，不能重复使用。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s has no stock in location %(location)s. It was not "
+"added to this transfer."
+msgstr "序列号 %(sn)s 在库位 %(location)s 已无库存，未加入本单。请更换序列号。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s is not in location %(location)s (currently in: "
+"%(locations)s). It was not added to this transfer."
+msgstr ""
+"序列号 %(sn)s 不在库位 %(location)s（当前在：%(locations)s），未加入本单。"
+"请确认实物库位或更换序列号。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s is reserved by another transfer (%(pickings)s) and "
+"cannot be picked again."
+msgstr "序列号 %(sn)s 已被其他单据占用（%(pickings)s），不能重复使用。"
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_switch_selector
 msgid "Show Picking Selector"
 msgstr "显示调拨单选择器"

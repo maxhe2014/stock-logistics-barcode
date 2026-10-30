@@ -935,6 +935,38 @@ msgid ""
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s has already been delivered and cannot be picked "
+"again."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s has no stock in location %(location)s. It was not "
+"added to this transfer."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s is not in location %(location)s (currently in: "
+"%(locations)s). It was not added to this transfer."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s is reserved by another transfer (%(pickings)s) and "
+"cannot be picked again."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_switch_selector
 msgid "Show Picking Selector"
 msgstr ""
