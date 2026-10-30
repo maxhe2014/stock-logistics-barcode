@@ -235,14 +235,18 @@ class WizStockBarcodesPicking(models.TransientModel):
             rec.total_done = 0.0
             if not rec.picking_id:
                 continue
-            for move in rec.picking_id.move_ids.filtered(
+            moves = rec.picking_id.move_ids.filtered(
                 lambda m: m.state not in ("done", "cancel")
-            ):
-                rec.total_demand += move.product_uom_qty
-                rec.total_done += sum(
-                    line.quantity for line in move.move_line_ids
-                    if line.picked
-                )
+            )
+            rec.total_demand = sum(m.product_uom_qty for m in moves)
+            # One read of the picking's lines (instead of one per move)
+            # keeps this cheap on large transfers.
+            active_move_ids = set(moves.ids)
+            rec.total_done = sum(
+                line.quantity
+                for line in rec.picking_id.move_line_ids
+                if line.picked and line.move_id.id in active_move_ids
+            )
 
     # --- Default values ---
     def _set_default_values(self):
@@ -444,11 +448,29 @@ class WizStockBarcodesPicking(models.TransientModel):
         show_reserved = bool(
             picking.picking_type_id.barcode_show_reserved_sns
         )
-        moves = []
-        for mv in self.move_ids.filtered(
+        # Read every move line (and the names it references) ONCE. Reading
+        # them per move gave each move its own prefetch group, so a N-move
+        # picking paid ~N extra SELECTs per scan (10 moves -> 10 separate
+        # stock_lot queries). Warming the cache here keeps the loop below
+        # query-free and also benefits _compute_totals.
+        active_moves = self.move_ids.filtered(
             lambda m: m.state not in ("done", "cancel")
-        ):
-            move_lines = mv.move_line_ids
+        )
+        all_lines = picking.move_line_ids
+        lot_name_by_id = {lot.id: lot.name for lot in all_lines.lot_id}
+        package_name_by_id = {
+            pkg.id: pkg.name for pkg in all_lines.result_package_id
+        }
+        product_info_by_id = {
+            prod.id: (prod.display_name or "", prod.tracking or "none")
+            for prod in active_moves.product_id
+        }
+        lines_by_move_id = {}
+        for move, lines in all_lines.grouped("move_id").items():
+            lines_by_move_id[move.id] = lines
+        moves = []
+        for mv in active_moves:
+            move_lines = lines_by_move_id.get(mv.id, all_lines.browse())
             picked_all = bool(move_lines) and all(
                 l.picked for l in move_lines
             )
@@ -460,7 +482,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             package_groups = {}  # (package_id, package_name) -> [lines]
             for l in picked_lines:
                 pkg_id = l.result_package_id.id or False
-                pkg_name = l.result_package_id.name or ""
+                pkg_name = package_name_by_id.get(pkg_id, "")
                 key = (pkg_id, pkg_name)
                 if key not in package_groups:
                     package_groups[key] = []
@@ -472,7 +494,11 @@ class WizStockBarcodesPicking(models.TransientModel):
             has_packaged = any(k[0] for k in package_groups)
             for (pkg_id, pkg_name), lines in package_groups.items():
                 lots = [
-                    {"id": l.lot_id.id, "name": l.lot_id.name, "picked": True}
+                    {
+                        "id": l.lot_id.id,
+                        "name": lot_name_by_id.get(l.lot_id.id, ""),
+                        "picked": True,
+                    }
                     for l in lines
                     if l.lot_id
                 ]
@@ -482,7 +508,11 @@ class WizStockBarcodesPicking(models.TransientModel):
                         lambda l: not l.picked and l.lot_id
                     ).sorted(key=lambda l: l.id)
                     lots += [
-                        {"id": l.lot_id.id, "name": l.lot_id.name, "picked": False}
+                        {
+                            "id": l.lot_id.id,
+                            "name": lot_name_by_id.get(l.lot_id.id, ""),
+                            "picked": False,
+                        }
                         for l in reserved_lines
                     ]
                 picked_lot_ids = [
@@ -492,11 +522,15 @@ class WizStockBarcodesPicking(models.TransientModel):
                 moves.append({
                     "id": mv.id,
                     "row_key": "%s_%s" % (mv.id, pkg_id or "nopkg"),
-                    "product_name": mv.product_id.display_name or "",
+                    "product_name": product_info_by_id.get(
+                        mv.product_id.id, ("", "none")
+                    )[0],
                     "product_uom_qty": mv.product_uom_qty,
                     "quantity": sum(l.quantity for l in lines),
                     "picked": picked_all,
-                    "tracking": mv.product_id.tracking or "none",
+                    "tracking": product_info_by_id.get(
+                        mv.product_id.id, ("", "none")
+                    )[1],
                     "lots": lots,
                     "latest_lot_id": picked_lot_ids[-1] if picked_lot_ids else False,
                     "package_id": pkg_id,
