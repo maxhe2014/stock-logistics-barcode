@@ -968,6 +968,14 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
+"Serial number %(sn)s has already been added to this transfer. Do not scan "
+"it again."
+msgstr "序列号 %(sn)s 已添加，请勿重复扫码。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
 "Serial number %(sn)s has already been delivered and cannot be picked "
 "again."
 msgstr "序列号 %(sn)s 已出库，不能重复使用。"

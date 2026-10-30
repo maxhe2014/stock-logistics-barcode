@@ -714,6 +714,33 @@ class TestStockBarcodesPicking(TransactionCase):
             picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
         )
 
+    def test_duplicate_serial_scan_warns(self):
+        """Scanning the same serial twice must warn instead of silently
+        ignoring the second scan."""
+        product = self._create_serial_product(
+            "Serial Duplicate", "PROD-SN-DUPLICATE"
+        )
+        lot = self._create_lot(product, "SN-DUPLICATE-001")
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(product)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned(lot.name)
+        lines = picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines.picked)
+
+        wiz.on_barcode_scanned(lot.name)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn(lot.name, wiz.message)
+        self.assertIn("already been added", wiz.message)
+        lines = picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(sum(l.quantity for l in lines), 1.0)
+
     # --- action_force_add ---
     def test_force_add_creates_move_and_picks(self):
         """action_force_add adds a product NOT on the picking, creates a

@@ -1246,6 +1246,23 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("error", _("Quantity must be positive"))
             return False
 
+        # A serial can only be picked once per transfer. Without this the
+        # second scan silently matches the existing picked line and
+        # reports success, so the operator cannot tell the scan was
+        # ignored.
+        if self.product_id.tracking == "serial" and self.lot_id:
+            already_picked = self.picking_id.move_line_ids.filtered(
+                lambda l: l.picked and l.lot_id == self.lot_id
+            )
+            if already_picked:
+                self._set_message(
+                    "error",
+                    _("Serial number %(sn)s has already been added to this "
+                      "transfer. Do not scan it again.",
+                      sn=self.lot_id.name),
+                )
+                return False
+
         # A pre-existing serial must physically be in the scanned source
         # location. This catches wrong/past serials at scan time instead
         # of at validation, where core reports one serial per attempt and
