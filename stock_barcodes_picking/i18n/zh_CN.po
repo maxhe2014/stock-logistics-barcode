@@ -988,6 +988,13 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
+"Matched product %(product)s for serial number %(sn)s. It has been added."
+msgstr "已按序列号 %(sn)s 匹配产品：%(product)s，并已加入。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
 "Serial number %(sn)s has already been added to this transfer. Do not scan "
 "it again."
 msgstr "序列号 %(sn)s 已添加，请勿重复扫码。"

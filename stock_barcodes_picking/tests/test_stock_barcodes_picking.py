@@ -810,6 +810,76 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertEqual(len(lines), 1)
         self.assertEqual(sum(l.quantity for l in lines), 1.0)
 
+    def test_scan_serial_without_product_auto_matches(self):
+        """Scanning a serial alone selects its product and adds it."""
+        product = self._create_serial_product(
+            "Serial Auto", "PROD-SN-AUTO"
+        )
+        lot = self._create_lot(product, "SN-AUTO-001")
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(product)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        # No product scan, no row selection: scan the serial only.
+        wiz.on_barcode_scanned(lot.name)
+
+        # product_id is reset after a successful confirm, but the row
+        # highlight must stay on the matched product so the operator can
+        # keep scanning its serials.
+        self.assertEqual(wiz.active_move_id.product_id, product)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn(product.name, wiz.message)
+        self.assertIn(lot.name, wiz.message)
+        lines = picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines.picked)
+        self.assertEqual(sum(lines.mapped("quantity")), 1.0)
+
+    def test_scan_serial_of_other_product_rejected(self):
+        """A serial of a product outside the transfer is rejected."""
+        in_picking_product = self._create_serial_product(
+            "Serial In Picking", "PROD-SN-IN"
+        )
+        other_product = self._create_serial_product(
+            "Serial Other", "PROD-SN-OUT"
+        )
+        lot = self._create_lot(other_product, "SN-OTHER-001")
+        self.StockQuant._update_available_quantity(
+            other_product, self.stock_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(in_picking_product)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("not part of this transfer", wiz.message)
+        self.assertFalse(
+            picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        )
+
+    def test_scan_unknown_serial_without_product_rejected(self):
+        """With use_create_lots disabled, an unknown serial is rejected."""
+        self.picking_type.use_create_lots = False
+        product = self._create_serial_product(
+            "Serial Unknown", "PROD-SN-UNKNOWN"
+        )
+        picking = self._create_out_picking(product)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned("SN-UNKNOWN-404")
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("does not exist", wiz.message)
+        self.assertEqual(
+            self.env["stock.lot"].search_count(
+                [("name", "=", "SN-UNKNOWN-404")]
+            ),
+            0,
+        )
+
     # --- action_force_add ---
     def test_force_add_creates_move_and_picks(self):
         """action_force_add adds a product NOT on the picking, creates a

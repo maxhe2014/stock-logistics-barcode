@@ -958,6 +958,13 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
+"Matched product %(product)s for serial number %(sn)s. It has been added."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
 "Serial number %(sn)s has already been added to this transfer. Do not scan "
 "it again."
 msgstr ""

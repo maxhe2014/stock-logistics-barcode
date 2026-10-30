@@ -845,7 +845,12 @@ class WizStockBarcodesPicking(models.TransientModel):
         search_product = self.product_id
         if not search_product and self.active_move_id:
             search_product = self.active_move_id.product_id
-        if not search_product or search_product.tracking == "none":
+        if not search_product:
+            # Nothing selected yet: resolve the product from the serial so
+            # the operator can scan serial numbers straight away instead
+            # of scanning the product barcode or tapping a row first.
+            return self._scan_lot_fallback(barcode)
+        if search_product.tracking == "none":
             return False
         lot_domain = [("name", "=", barcode), ("product_id", "=", search_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
@@ -966,18 +971,22 @@ class WizStockBarcodesPicking(models.TransientModel):
                         % {"name": move.product_id.name},
                     )
                     return True
-        if not self.product_id:
-            self._set_message(
-                "error",
-                _("Scan a product barcode or click a product row first."),
-            )
-            return True
+        # Check the operation type before requiring a product: when the
+        # operator scans serial numbers first, an unknown code means the
+        # serial does not exist, so that must be the message even if no
+        # product context is set yet.
         if not self.picking_id.use_create_lots:
             self._set_message(
                 "error",
                 _("Serial number/lot %(name)s does not exist. This "
                   "operation type does not allow creating new ones.")
                 % {"name": barcode},
+            )
+            return True
+        if not self.product_id:
+            self._set_message(
+                "error",
+                _("Scan a product barcode or click a product row first."),
             )
             return True
         self.lot_name = barcode
@@ -1073,6 +1082,13 @@ class WizStockBarcodesPicking(models.TransientModel):
                     if not self.action_confirm():
                         return True
                     self._set_message_step()
+                    self._set_message(
+                        "success",
+                        _("Matched product %(product)s for serial number "
+                          "%(sn)s. It has been added.",
+                          product=product.name,
+                          sn=lot.name),
+                    )
                     return True
                 self._set_message(
                     "info", _("Lot: %s. Enter qty and confirm.") % lot.name
