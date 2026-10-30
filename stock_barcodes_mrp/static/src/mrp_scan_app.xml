@@ -73,10 +73,12 @@
 
             <!-- Finished SN display + clear button -->
             <div t-if="state.finished_lot_name || state.finished_lot_id"
-                 class="o_mrp_scan_finished_sn d-flex align-items-center gap-2 px-3 py-2 bg-light border-bottom">
+                 class="o_mrp_scan_finished_sn d-flex align-items-center flex-wrap gap-2 px-3 py-2 bg-light border-bottom">
                 <i class="fa fa-barcode text-success"/>
                 <span class="text-muted">成品 SN：</span>
-                <span class="fw-bold"><t t-out="state.finished_lot_name" /></span>
+                <span class="fw-bold text-break" style="min-width: 0;">
+                    <t t-out="state.finished_lot_name" />
+                </span>
                 <button t-if="canCleanFinishedLot"
                         type="button"
                         class="btn btn-sm btn-outline-danger ms-auto"
@@ -123,11 +125,11 @@
                                     </div>
                                     <!-- Line 3: SN + actions (consume/reset) merged here to
                                          save columns and give the component name full width -->
-                                    <div class="d-flex align-items-center gap-2 mt-1">
+                                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                         <t t-if="comp.lots.length === 1">
                                             <span class="d-inline-flex align-items-center gap-1">
                                                 <i class="fa fa-barcode text-muted"/>
-                                                <span class="small text-truncate" style="max-width: 16em;">
+                                                <span class="small">
                                                     <t t-out="comp.lots[0].name" />
                                                 </span>
                                                 <button type="button"
@@ -208,11 +210,13 @@
                             <tr t-if="state.expandedComponentId === comp.id">
                                 <td colspan="2" class="ps-4 py-1 bg-white">
                                     <t t-foreach="comp.lots" t-as="sn" t-key="sn.id">
-                                        <div class="d-flex align-items-center small text-muted">
-                                            <i class="fa fa-circle-o me-1"/>
-                                            <span class="flex-fill"><t t-out="sn.name" /></span>
+                                        <div class="d-flex align-items-center flex-wrap gap-2 small text-muted">
+                                            <i class="fa fa-circle-o"/>
+                                            <span class="text-break" style="min-width: 0;">
+                                                <t t-out="sn.name" />
+                                            </span>
                                             <button type="button"
-                                                    class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                    class="btn btn-sm btn-link text-danger p-0 flex-shrink-0"
                                                     t-att-title="'Remove ' + sn.name"
                                                     t-on-click.stop="() => this.onRemoveComponentLot(comp.id, sn.id)">
                                                 <i class="fa fa-trash"/>
