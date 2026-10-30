@@ -1285,14 +1285,58 @@ class WizStockBarcodesPicking(models.TransientModel):
 
         move_dic = self._process_stock_move_line()
         if move_dic:
-            self._set_message(
-                "success",
-                _("Product scanned: %(prod)s x%(qty)s")
-                % {"prod": self.product_id.name, "qty": self.product_qty},
+            product_name = self.product_id.name
+            quantity = self.product_qty
+            excess = (
+                self._get_over_picked_qty(self.product_id)
+                if self._get_excess_qty_policy() == "allow"
+                else 0.0
             )
+            # _clean_values resets the banner to the next step instruction
+            # and clears product_id, so values must be captured first and
+            # the over-demand notice set AFTER it.
             self._clean_values()
+            if excess:
+                self._set_message(
+                    "success",
+                    _("Product scanned: %(prod)s x%(qty)s (over demand by "
+                      "%(excess)s)",
+                      prod=product_name,
+                      qty=quantity,
+                      excess=excess),
+                )
             return move_dic
         return False
+
+    def _get_over_picked_qty(self, product):
+        """Return how much this product is picked above its demand.
+
+        Only used to mention the excess in the success message when the
+        operation type allows over-picking; 0 elsewhere.
+        """
+        self.ensure_one()
+        moves = self.picking_id.move_ids.filtered(
+            lambda m: m.product_id == product and m.state != "cancel"
+        )
+        demand = sum(m.product_uom_qty for m in moves)
+        picked = sum(
+            line.quantity
+            for line in moves.move_line_ids
+            if line.picked and line.product_id == product
+        )
+        return max(0.0, picked - demand)
+
+    def _get_excess_qty_policy(self):
+        """Return the over-picking policy of the transfer's operation type.
+
+        Falls back to ``warn`` (legacy behaviour) when no picking type is
+        available, e.g. when the wizard is opened without a transfer.
+        """
+        self.ensure_one()
+        return (
+            self.picking_id.picking_type_id.barcode_excess_qty_policy
+            or "warn"
+        )
 
     def _process_stock_move_line(self):
         """Find matching picking move and update/create move line.
@@ -1353,6 +1397,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         other_lines_qty = sum(l.quantity for l in other_lines if l.picked)
         total_demand = sum(m.product_uom_qty for m in moves)
         force = self.env.context.get("force_create_move", False)
+        policy = self._get_excess_qty_policy()
         rounding = self.product_id.uom_id.rounding
 
         move_lines_dic = {}
@@ -1364,12 +1409,22 @@ class WizStockBarcodesPicking(models.TransientModel):
                               precision_rounding=rounding) > 0
                 and not force
             ):
-                self._set_message(
-                    "more_match",
-                    _("Quantity exceeds demand (max: %s)") % max_quantity,
-                )
-                self.visible_force_done = True
-                return False
+                if policy == "forbid":
+                    self._set_message(
+                        "error",
+                        _("Quantity exceeds demand (max: %(max)s). "
+                          "Over-picking is forbidden for this operation "
+                          "type.",
+                          max=max_quantity),
+                    )
+                    return False
+                if policy == "warn":
+                    self._set_message(
+                        "more_match",
+                        _("Quantity exceeds demand (max: %s)") % max_quantity,
+                    )
+                    self.visible_force_done = True
+                    return False
             line = existing_lines[:1]
             increase = self.product_qty - line.quantity
             if increase > 0:
@@ -1396,6 +1451,26 @@ class WizStockBarcodesPicking(models.TransientModel):
         else:
             is_serial = self.product_id.tracking == "serial"
             excess = other_lines_qty + self.product_qty - total_demand
+            # Decide before redistributing other lines: redistributing and
+            # then aborting would leave those lines emptied even though the
+            # scan was rejected.
+            if excess > 0 and not force:
+                if policy == "forbid":
+                    self._set_message(
+                        "error",
+                        _("Quantity exceeds demand (max: %(max)s). "
+                          "Over-picking is forbidden for this operation "
+                          "type.",
+                          max=total_demand),
+                    )
+                    return False
+                if policy == "warn":
+                    self._set_message(
+                        "more_match",
+                        _("Quantity exceeds demand (max: %s)") % total_demand,
+                    )
+                    self.visible_force_done = True
+                    return False
             if excess > 0:
                 for line in other_lines.sorted(key=lambda l: l.id):
                     if is_serial and line.quantity > 0:
@@ -1408,13 +1483,6 @@ class WizStockBarcodesPicking(models.TransientModel):
                         line.unlink()
                     if excess <= 0:
                         break
-            if excess > 0 and not force:
-                self._set_message(
-                    "more_match",
-                    _("Quantity exceeds demand (max: %s)") % total_demand,
-                )
-                self.visible_force_done = True
-                return False
             move = moves[:1]
             sml_vals = {
                 "move_id": move.id,
@@ -1439,6 +1507,18 @@ class WizStockBarcodesPicking(models.TransientModel):
         return move_lines_dic
 
     def action_force_done(self):
+        """Confirm the over-demand scan.
+
+        Refused when the operation type forbids over-picking, so a stale
+        button or a direct RPC call cannot bypass the policy.
+        """
+        if self._get_excess_qty_policy() == "forbid":
+            self._set_message(
+                "error",
+                _("Over-picking is forbidden for this operation type."),
+            )
+            self.visible_force_done = False
+            return False
         return self.with_context(force_create_move=True).action_confirm()
 
     def action_consume_by_demand(self):

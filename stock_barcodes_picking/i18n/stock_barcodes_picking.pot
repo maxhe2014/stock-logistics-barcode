@@ -631,6 +631,11 @@ msgid "Packaging"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Quantity Control"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Picked"
@@ -694,6 +699,13 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Product scanned: %(prod)s x%(qty)s (over demand by %(excess)s)"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Product: %s. Enter qty and confirm."
 msgstr ""
 
@@ -737,6 +749,14 @@ msgstr ""
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_qty
 msgid "Quantity"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Quantity exceeds demand (max: %(max)s). Over-picking is forbidden for "
+"this operation type."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -982,6 +1002,43 @@ msgstr ""
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
 msgid "Show Reserved Serial Numbers"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
+msgid "Over-picking Policy"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
+msgid ""
+"Controls what the barcode scan app does when the scanned quantity exceeds "
+"the remaining demand of the transfer:\n"
+"- Allow: the excess is added without asking.\n"
+"- Warn and Require Confirmation: scanning is blocked until the operator "
+"confirms with the 'Force done' button (legacy behaviour).\n"
+"- Forbid: the scan is rejected and no confirmation is offered."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__allow
+msgid "Allow"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__forbid
+msgid "Forbid"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__warn
+msgid "Warn and Require Confirmation"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Over-picking is forbidden for this operation type."
 msgstr ""
 
 #. module: stock_barcodes_picking

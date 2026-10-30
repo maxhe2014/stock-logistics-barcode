@@ -206,6 +206,75 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertTrue(wiz.action_force_done())
         self.assertEqual(move.move_line_ids[0].quantity, 99.0)
 
+    # --- over-picking policy (picking type setting) ---
+    def test_excess_policy_allow_adds_and_notifies(self):
+        """Policy 'allow' adds the excess directly and mentions it."""
+        self.picking_type.barcode_excess_qty_policy = "allow"
+        picking = self._create_picking(self.product_simple, qty=10.0)
+        move = picking.move_ids[0]
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(self.product_simple.barcode)
+        wiz.product_qty = 12.0
+        self.assertTrue(wiz.action_confirm())
+
+        self.assertEqual(move.move_line_ids[0].quantity, 12.0)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("over demand", wiz.message)
+        self.assertFalse(wiz.visible_force_done)
+
+    def test_excess_policy_forbid_rejects(self):
+        """Policy 'forbid' rejects the scan and blocks force_done."""
+        self.picking_type.barcode_excess_qty_policy = "forbid"
+        picking = self._create_picking(self.product_simple, qty=10.0)
+        move = picking.move_ids[0]
+        reserved_qty = sum(l.quantity for l in move.move_line_ids)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(self.product_simple.barcode)
+        wiz.product_qty = 12.0
+        self.assertFalse(wiz.action_confirm())
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("forbidden", wiz.message)
+        self.assertFalse(wiz.visible_force_done)
+        self.assertEqual(
+            sum(l.quantity for l in move.move_line_ids), reserved_qty
+        )
+        # A direct RPC call must not bypass the policy either.
+        self.assertFalse(wiz.action_force_done())
+        self.assertEqual(wiz.message_type, "error")
+
+    def test_excess_policy_forbid_blocks_extra_serial(self):
+        """Policy 'forbid' rejects a serial above the remaining demand."""
+        self.picking_type.barcode_excess_qty_policy = "forbid"
+        product = self._create_serial_product(
+            "Serial Forbid", "PROD-SN-FORBID"
+        )
+        lot_1 = self._create_lot(product, "SN-FORBID-001")
+        lot_2 = self._create_lot(product, "SN-FORBID-002")
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot_1
+        )
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot_2
+        )
+        picking = self._create_out_picking(product, qty=1.0)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned(lot_1.name)
+        self.assertEqual(
+            sum(l.quantity for l in picking.move_line_ids if l.picked), 1.0
+        )
+
+        wiz.on_barcode_scanned(lot_2.name)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("forbidden", wiz.message)
+        self.assertFalse(
+            picking.move_line_ids.filtered(lambda l: l.lot_id == lot_2)
+        )
+
     # --- Location must-scan enforcement ---
     def test_confirm_without_location_fails(self):
         """action_confirm must reject when no source location was scanned.

@@ -19,6 +19,9 @@
                     <group string="Serial Numbers">
                         <field name="barcode_show_reserved_sns"/>
                     </group>
+                    <group name="quantity_control" string="Quantity Control">
+                        <field name="barcode_excess_qty_policy"/>
+                    </group>
                     <group string="Packaging" groups="stock.group_tracking_lot">
                         <field name="barcode_require_pack"/>
                         <field name="barcode_validation_all_packed"/>

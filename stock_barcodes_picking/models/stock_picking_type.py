@@ -41,6 +41,23 @@ class PickingType(models.Model):
              "product is scanned. If 'After a Group of Products', packages "
              "are optional but all products must be packed before validation.",
     )
+    barcode_excess_qty_policy = fields.Selection(
+        string="Over-picking Policy",
+        selection=[
+            ("allow", "Allow"),
+            ("warn", "Warn and Require Confirmation"),
+            ("forbid", "Forbid"),
+        ],
+        default="warn",
+        help="Controls what the barcode scan app does when the scanned "
+             "quantity exceeds the remaining demand of the transfer:\n"
+             "- Allow: the excess is added without asking.\n"
+             "- Warn and Require Confirmation: scanning is blocked until "
+             "the operator confirms with the 'Force done' button (legacy "
+             "behaviour).\n"
+             "- Forbid: the scan is rejected and no confirmation is "
+             "offered.",
+    )
     barcode_validation_all_packed = fields.Boolean(
         string="Require All Products Packed Before Validation",
         default=False,

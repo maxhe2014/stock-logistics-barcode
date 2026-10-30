@@ -658,6 +658,11 @@ msgid "Packaging"
 msgstr "包装"
 
 #. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Quantity Control"
+msgstr "数量控制"
+
+#. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Picked"
@@ -723,6 +728,13 @@ msgstr "已扫描产品：%(prod)s x%(qty)s"
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Product scanned: %(prod)s x%(qty)s (over demand by %(excess)s)"
+msgstr "已扫描产品：%(prod)s x%(qty)s（超出需求 %(excess)s）"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Product: %s. Enter qty and confirm."
 msgstr "产品：%s。输入数量并确认。"
 
@@ -767,6 +779,14 @@ msgstr "装包"
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_qty
 msgid "Quantity"
 msgstr "数量"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Quantity exceeds demand (max: %(max)s). Over-picking is forbidden for "
+"this operation type."
+msgstr "数量超出需求量（最多 %(max)s），此作业类型禁止超量扫码。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -1015,6 +1035,47 @@ msgstr "显示调拨单选择器"
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
 msgid "Show Reserved Serial Numbers"
 msgstr "显示预留序列号"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
+msgid "Over-picking Policy"
+msgstr "超量扫码策略"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
+msgid ""
+"Controls what the barcode scan app does when the scanned quantity exceeds "
+"the remaining demand of the transfer:\n"
+"- Allow: the excess is added without asking.\n"
+"- Warn and Require Confirmation: scanning is blocked until the operator "
+"confirms with the 'Force done' button (legacy behaviour).\n"
+"- Forbid: the scan is rejected and no confirmation is offered."
+msgstr ""
+"控制扫码应用在扫描数量超过调拨单剩余需求量时的处理方式：\n"
+"- 允许：直接加入超出部分，不再询问。\n"
+"- 警告并要求确认：拦截扫码，需操作员点击“强制消耗”按钮确认（沿用原有行为）。\n"
+"- 禁止：拒绝扫码，不提供确认按钮。"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__allow
+msgid "Allow"
+msgstr "允许"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__forbid
+msgid "Forbid"
+msgstr "禁止"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__warn
+msgid "Warn and Require Confirmation"
+msgstr "警告并要求确认"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Over-picking is forbidden for this operation type."
+msgstr "此作业类型禁止超量扫码。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_force_add
