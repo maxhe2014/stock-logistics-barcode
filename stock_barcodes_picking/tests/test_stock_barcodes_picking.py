@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase
-from odoo import _
 
 
 class TestStockBarcodesPicking(TransactionCase):
@@ -70,7 +69,7 @@ class TestStockBarcodesPicking(TransactionCase):
         wiz.visible_switch_selector = True
         wiz._set_message(
             "more_match",
-            _("Multiple transfers found. Select one."),
+            self.env._("Multiple transfers found. Select one."),
         )
 
     def _create_picking(self, product, qty=10.0, location=None):

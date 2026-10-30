@@ -1,6 +1,6 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 from odoo.tools.float_utils import float_compare, float_is_zero
 
@@ -78,7 +78,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         # lives on the view node instead; action_apply_finished_lot() guards
         # the chosen lot server-side.
     )
-    finished_lot_name = fields.Char(string="Finished Lot Name")
+    finished_lot_name = fields.Char()
     finished_qty_producing = fields.Float(
         string="Finished Qty", digits="Product Unit of Measure",
     )
@@ -99,7 +99,7 @@ class WizStockBarcodesMrp(models.TransientModel):
     product_uom_id = fields.Many2one(comodel_name="uom.uom", string="UoM")
     product_tracking = fields.Selection(related="product_id.tracking", readonly=True)
     lot_id = fields.Many2one(comodel_name="stock.lot", string="Lot/Serial")
-    lot_name = fields.Char(string="Lot Name")
+    lot_name = fields.Char()
     product_qty = fields.Float(
         string="Quantity", digits="Product Unit of Measure"
     )
@@ -188,14 +188,12 @@ class WizStockBarcodesMrp(models.TransientModel):
 
     # --- OE-aligned UI conventions (ent stock_barcode_mrp) ---
     queue_visible = fields.Boolean(
-        string="Queue Visible",
         default=False,
         help="Show the work-order queue drawer below the scan zone. The "
         "enterprise app keeps the queue off the scan screen; it only "
         "appears when no MO is active or the operator opens it from Tools.",
     )
     show_tools = fields.Boolean(
-        string="Show Tools",
         default=False,
         help="Expand the Tools panel with secondary operations (manual "
         "entry, force actions, MO details, queue). No <details> precedent "
@@ -318,8 +316,8 @@ class WizStockBarcodesMrp(models.TransientModel):
     def _compute_display_name(self):
         for rec in self:
             rec.display_name = "{} - {} - {}".format(
-                _("Barcode reader"),
-                rec.production_id.name or _("MRP"),
+                self.env._("Barcode reader"),
+                rec.production_id.name or self.env._("MRP"),
                 self.env.user.name,
             )
 
@@ -381,8 +379,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             self._switch_production(backorders)
             self._set_message(
                 "success",
-                _("MO %(done)s done. Switched to backorder %(bo)s.")
-                % {"done": done_name, "bo": backorders.name},
+                self.env._("MO %(done)s done. Switched to backorder %(bo)s.", **{"done": done_name, "bo": backorders.name}),
             )
         else:
             next_mo = self._get_next_mo_in_queue()
@@ -390,14 +387,12 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self._switch_production(next_mo)
                 self._set_message(
                     "success",
-                    _("MO %(done)s done. Switched to MO %(next)s.")
-                    % {"done": done_name, "next": next_mo.name},
+                    self.env._("MO %(done)s done. Switched to MO %(next)s.", **{"done": done_name, "next": next_mo.name}),
                 )
             else:
                 self._set_message(
                     "success",
-                    _("Production done: %(mo)s. No more MOs in queue.")
-                    % {"mo": done_name},
+                    self.env._("Production done: %(mo)s. No more MOs in queue.", **{"mo": done_name}),
                 )
         # The just-finished MO's stashed scan state can never be
         # restored — drop it to prevent unbounded stash growth.
@@ -511,7 +506,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if self._accept_new_finished_lot(barcode):
             return True
         # Not found
-        self._set_message("not_found", _("Barcode not found: %s") % barcode)
+        self._set_message("not_found", self.env._("Barcode not found: %s", barcode))
         return True
 
     def process_barcode_and_dispatch(self, barcode):
@@ -661,8 +656,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if len(lots) > 1:
             self._set_message(
                 "more_match",
-                _("Multiple lots found for %s — refine barcode.") % barcode,
-            )
+                self.env._("Multiple lots found for %s — refine barcode.", barcode)            )
             return True
         lot = lots
         # Reverse lookup by lot_producing_ids — the field where the SN
@@ -682,7 +676,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not active_mos:
             self._set_message(
                 "info",
-                _("MO %s is already done") % done_mos[0].name,
+                self.env._("MO %s is already done", done_mos[0].name),
             )
             return True
         if len(active_mos) == 1:
@@ -700,8 +694,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.visible_switch_selector = True
         self._set_message(
             "more_match",
-            _("Found %s MOs for SN %s — click 'View candidate MOs' to pick.")
-            % (len(active_mos), barcode),
+            self.env._("Found %(count)s MOs for SN %(sn)s — click 'View candidate MOs' to pick.", count=len(active_mos), sn=barcode),
         )
         return True
 
@@ -735,7 +728,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not lots:
             return False
         if len(lots) > 1:
-            self._set_message("more_match", _("Multiple finished lots found"))
+            self._set_message("more_match", self.env._("Multiple finished lots found"))
             return True
         lot = lots
         # --- Rejection guard: MO already has a finished lot bound ---
@@ -745,15 +738,14 @@ class WizStockBarcodesMrp(models.TransientModel):
                 # Same SN re-scanned: idempotent no-op.
                 self._set_message(
                     "info",
-                    _("SN %s is already bound to this MO") % lot.name,
+                    self.env._("SN %s is already bound to this MO", lot.name),
                 )
                 return True
             # Different SN: reject, do not replace.
             self._set_message(
                 "error",
-                _("MO already has SN %(cur)s bound. Clear it first to "
-                  "scan a different one.")
-                % {"cur": current_bound[0].name},
+                self.env._("MO already has SN %(cur)s bound. Clear it first to "
+                  "scan a different one.", **{"cur": current_bound[0].name}),
             )
             return True
         # --- No bound lot yet: bind it ---
@@ -771,8 +763,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._auto_fill_components()
         self._set_message(
             "success",
-            _("%(type)s %(lot)s bound to MO")
-            % {"type": _("Serial") if is_serial else _("Lot"), "lot": lot.name},
+            self.env._("%(type)s %(lot)s bound to MO", **{"type": self.env._("Serial") if is_serial else self.env._("Lot"), "lot": lot.name}),
         )
         return True
 
@@ -807,9 +798,8 @@ class WizStockBarcodesMrp(models.TransientModel):
         if current_bound:
             self._set_message(
                 "error",
-                _("MO already has SN %(cur)s bound. Clear it first to "
-                  "scan a different one.")
-                % {"cur": current_bound[0].name},
+                self.env._("MO already has SN %(cur)s bound. Clear it first to "
+                  "scan a different one.", **{"cur": current_bound[0].name}),
             )
             return True
         # --- No bound lot yet: create + bind it ---
@@ -827,8 +817,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._auto_fill_components()
         self._set_message(
             "success",
-            _("%(type)s %(lot)s bound to MO")
-            % {"type": _("Serial") if is_serial else _("Lot"), "lot": barcode},
+            self.env._("%(type)s %(lot)s bound to MO", **{"type": self.env._("Serial") if is_serial else self.env._("Lot"), "lot": barcode}),
         )
         return True
 
@@ -860,7 +849,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             ):
                 self._set_message(
                     "error",
-                    _("MO %s is not active (draft/done/cancelled)") % barcode,
+                    self.env._("MO %s is not active (draft/done/cancelled)", barcode),
                 )
                 return True
             return False
@@ -869,12 +858,12 @@ class WizStockBarcodesMrp(models.TransientModel):
             self.visible_switch_selector = True
             self._set_message(
                 "more_match",
-                _("Multiple MOs found for barcode: %s. Select one.") % barcode,
+                self.env._("Multiple MOs found for barcode: %s. Select one.", barcode),
             )
             return True
         mo = mos
         if self.production_id == mo:
-            self._set_message("info", _("Already on MO %s") % mo.name)
+            self._set_message("info", self.env._("Already on MO %s", mo.name))
             return True
         # _switch_production sets the banner: notice + next instruction.
         self._switch_production(mo)
@@ -887,7 +876,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not location:
             return False
         self.location_id = location
-        self._set_message("info", _("Location: %s. Scan component.") % location.name)
+        self._set_message("info", self.env._("Location: %s. Scan component.", location.name))
         self.step = 2
         self._set_message_step()
         return True
@@ -898,7 +887,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not products:
             return False
         if len(products) > 1:
-            self._set_message("more_match", _("Multiple products found"))
+            self._set_message("more_match", self.env._("Multiple products found"))
             return True
         product = products
         # C5: scan-first reverse lookup — only when no MO is selected.
@@ -926,15 +915,15 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.visible_switch_selector = True
                 self._set_message(
                     "more_match",
-                    _("Found %s MOs for %s — click 'View candidate MOs' "
-                      "to pick.") % (len(active_mos), product.name),
+                    self.env._("Found %(count)s MOs for %(product)s — click 'View candidate MOs' "
+                      "to pick.", count=len(active_mos), product=product.name),
                 )
                 return True
             # 0 active MO for this product -> clear error so the
             # operator knows the MO is missing/inactive.
             self._set_message(
                 "error",
-                _("No active MO for product %s") % product.name,
+                self.env._("No active MO for product %s", product.name),
             )
             return True
         # TODO-A3: scanned the finished product of this MO -> auto-fill
@@ -968,10 +957,10 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.product_qty = 1.0
         self._compute_qty_available()
         if product.tracking != "none":
-            self._set_message("info", _("Product: %s. Scan lot.") % product.name)
+            self._set_message("info", self.env._("Product: %s. Scan lot.", product.name))
             self.step = 3
         else:
-            self._set_message("info", _("Product: %s. Enter qty and confirm.") % product.name)
+            self._set_message("info", self.env._("Product: %s. Enter qty and confirm.", product.name))
             self.step = 4
         self._set_message_step()
         return True
@@ -1007,7 +996,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             # the /web/dataset/call_button endpoint, whose
             # clean_action() would otherwise generate this key).
             "views": [(False, "list"), (False, "form")],
-            "name": _("Candidate MOs (%s)") % len(self.pending_switch_production_ids),
+            "name": self.env._("Candidate MOs (%s)", len(self.pending_switch_production_ids)),
             "domain": [("id", "in", self.pending_switch_production_ids.ids)],
             "context": {"barcode_wizard_id": self.id},
             "target": "current",
@@ -1031,7 +1020,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.ensure_one()
         production = self.production_id
         if not production:
-            self._set_message("error", _("No manufacturing order selected"))
+            self._set_message("error", self.env._("No manufacturing order selected"))
             return True
         qty = self.finished_qty_producing or production.product_qty
         filled = 0
@@ -1063,8 +1052,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._clean_values()
         self._set_message(
             "info",
-            _("Components auto-filled: %(filled)s full, %(partial)s partial.")
-            % {"filled": filled, "partial": partial},
+            self.env._("Components auto-filled: %(filled)s full, %(partial)s partial.", **{"filled": filled, "partial": partial}),
         )
         return True
 
@@ -1084,7 +1072,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             # Not a lot of the current product -> TODO-A2 reverse lookup
             return self._scan_lot_fallback(barcode)
         if len(lots) > 1:
-            self._set_message("more_match", _("Multiple lots found"))
+            self._set_message("more_match", self.env._("Multiple lots found"))
             return True
         lot = lots
         self.lot_id = lot
@@ -1104,7 +1092,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.location_id = self.production_id.location_src_id
             self.action_confirm()
             return True
-        self._set_message("info", _("Lot: %s. Enter qty and confirm.") % lot.name)
+        self._set_message("info", self.env._("Lot: %s. Enter qty and confirm.", lot.name))
         self.step = 4
         self._set_message_step()
         return True
@@ -1154,9 +1142,8 @@ class WizStockBarcodesMrp(models.TransientModel):
                 return self._resolve_lot_owner(narrowed, narrowed.product_id)
             self._set_message(
                 "more_match",
-                _("Multiple lots named %(sn)s found. Click the target "
-                  "component row first, then scan again.")
-                % {"sn": barcode},
+                self.env._("Multiple lots named %(sn)s found. Click the target "
+                  "component row first, then scan again.", **{"sn": barcode}),
             )
             return True
         if len(lots) == 1:
@@ -1169,7 +1156,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if len(products) > 1:
             self._set_message(
                 "more_match",
-                _("Multiple products found for barcode: %s") % barcode,
+                self.env._("Multiple products found for barcode: %s", barcode),
             )
             return True
         if len(products) == 1:
@@ -1194,7 +1181,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not self.product_id:
             self._set_message(
                 "error",
-                _("Scan a component product barcode or click a component row first."),
+                self.env._("Scan a component product barcode or click a component row first."),
             )
             return True
         self.lot_name = barcode
@@ -1215,7 +1202,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.step = 3
                 self._set_message_step()
             return True
-        self._set_message("info", _("New lot: %s. Enter qty and confirm.") % barcode)
+        self._set_message("info", self.env._("New lot: %s. Enter qty and confirm.", barcode))
         self.step = 4
         self._set_message_step()
         return True
@@ -1274,7 +1261,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._set_message_step()
         self._set_message(
             "info",
-            _("Component selection cleared. Scan the finished product SN."),
+            self.env._("Component selection cleared. Scan the finished product SN."),
         )
         return True
 
@@ -1347,8 +1334,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if move.product_id.tracking == "serial":
             self._set_message(
                 "error",
-                _("Serial component %s must be consumed by scanning SNs")
-                % move.product_id.name,
+                self.env._("Serial component %s must be consumed by scanning SNs", move.product_id.name),
             )
             return False
         qty = self.finished_qty_producing or self.production_id.product_qty
@@ -1383,8 +1369,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if move.product_id.tracking == "serial":
             self._set_message(
                 "error",
-                _("Serial component %s must be consumed by scanning SNs")
-                % move.product_id.name,
+                self.env._("Serial component %s must be consumed by scanning SNs", move.product_id.name),
             )
             return False
         try:
@@ -1412,13 +1397,13 @@ class WizStockBarcodesMrp(models.TransientModel):
         """
         self.ensure_one()
         if not self.production_id:
-            self._set_message("error", _("No manufacturing order selected"))
+            self._set_message("error", self.env._("No manufacturing order selected"))
             return True
         # Finished product -> prompt only, no binding, no step jump
         if product == self.production_id.product_id:
             self._set_message(
                 "info",
-                _("This is a finished product lot. "
+                self.env._("This is a finished product lot. "
                   "Enter/scan it in the finished lot area."),
             )
             return True
@@ -1447,7 +1432,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                     self._set_message_step()
                     return True
                 self._set_message(
-                    "info", _("Lot: %s. Enter qty and confirm.") % lot.name
+                    "info", self.env._("Lot: %s. Enter qty and confirm.", lot.name)
                 )
                 self.step = 4
             else:
@@ -1455,13 +1440,13 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.lot_name = False
                 if product.tracking != "none":
                     self._set_message(
-                        "info", _("Product: %s. Scan lot.") % product.name
+                        "info", self.env._("Product: %s. Scan lot.", product.name)
                     )
                     self.step = 3
                 else:
                     self._set_message(
                         "info",
-                        _("Product: %s. Enter qty and confirm.") % product.name,
+                        self.env._("Product: %s. Enter qty and confirm.", product.name),
                     )
                     self.step = 4
             self._set_message_step()
@@ -1469,8 +1454,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         # Unrelated product
         self._set_message(
             "error",
-            _("Lot belongs to product %(name)s which is not part of this MO")
-            % {"name": product.name},
+            self.env._("Lot belongs to product %(name)s which is not part of this MO", **{"name": product.name}),
         )
         return True
 
@@ -1500,8 +1484,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.visible_switch_selector = True
                 self._set_message(
                     "more_match",
-                    _("Product %(name)s belongs to multiple MOs. Select one.")
-                    % {"name": product.name},
+                    self.env._("Product %(name)s belongs to multiple MOs. Select one.", **{"name": product.name}),
                 )
                 return True
             # _switch_production sets the banner: notice + next instruction.
@@ -1511,8 +1494,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if self._is_any_mo_finished_product(product):
             self._set_message(
                 "error",
-                _("Product %(name)s is a finished product, cannot consume")
-                % {"name": product.name},
+                self.env._("Product %(name)s is a finished product, cannot consume", **{"name": product.name}),
             )
             return True
         # Branch 2: product exists but not reserved -> prompt to add
@@ -1525,8 +1507,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.visible_force_add = True
         self._set_message(
             "more_match",
-            _("Product %(name)s is not in BOM. Force add to consume?")
-            % {"name": product.name},
+            self.env._("Product %(name)s is not in BOM. Force add to consume?", **{"name": product.name}),
         )
         return True
 
@@ -1624,8 +1605,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         # otherwise the restored/derived instruction would be lost.
         self._set_message(
             "info",
-            _("Switched to MO %(mo)s. %(next)s")
-            % {"mo": new_mo.name, "next": self.message},
+            self.env._("Switched to MO %(mo)s. %(next)s", **{"mo": new_mo.name, "next": self.message}),
         )
 
     def _restore_progress(self, mo):
@@ -1706,26 +1686,26 @@ class WizStockBarcodesMrp(models.TransientModel):
         # Edge case: MO state check
         if self.production_state == "draft":
             self._set_message(
-                "error", _("MO is draft, confirm it before scanning")
+                "error", self.env._("MO is draft, confirm it before scanning")
             )
             return False
         if self.production_state in ("done", "cancel"):
             self._set_message(
                 "error",
-                _("MO is %(state)s, cannot scan components") % {"state": self.production_state},
+                self.env._("MO is %(state)s, cannot scan components", **{"state": self.production_state}),
             )
             return False
         if not self.product_id:
-            self._set_message("error", _("No product scanned"))
+            self._set_message("error", self.env._("No product scanned"))
             return False
         if not self.location_id:
-            self._set_message("error", _("No source location scanned"))
+            self._set_message("error", self.env._("No source location scanned"))
             return False
         if self.product_id.tracking != "none" and not self.lot_id and not self.lot_name:
-            self._set_message("error", _("Lot required for tracked product"))
+            self._set_message("error", self.env._("Lot required for tracked product"))
             return False
         if not self.product_qty or self.product_qty <= 0:
-            self._set_message("error", _("Quantity must be positive"))
+            self._set_message("error", self.env._("Quantity must be positive"))
             return False
 
         # Process lot creation if needed
@@ -1734,8 +1714,7 @@ class WizStockBarcodesMrp(models.TransientModel):
 
         move_dic = self._process_stock_move_line()
         if move_dic:
-            self._set_message("success", _("Component scanned: %(prod)s x%(qty)s")
-                              % {"prod": self.product_id.name, "qty": self.product_qty})
+            self._set_message("success", self.env._("Component scanned: %(prod)s x%(qty)s", **{"prod": self.product_id.name, "qty": self.product_qty}))
             self._clean_values()
             return move_dic
         return False
@@ -1756,8 +1735,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not moves:
             self._set_message(
                 "error",
-                _("Product %(name)s is not a component of this MO")
-                % {"name": self.product_id.name},
+                self.env._("Product %(name)s is not a component of this MO", **{"name": self.product_id.name}),
             )
             return False
 
@@ -1793,7 +1771,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             ):
                 self._set_message(
                     "more_match",
-                    _("Quantity exceeds demand (max: %s)") % max_quantity,
+                    self.env._("Quantity exceeds demand (max: %s)", max_quantity),
                 )
                 self.visible_force_done = True
                 return False
@@ -1855,7 +1833,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             ):
                 self._set_message(
                     "more_match",
-                    _("Quantity exceeds demand (max: %s)") % total_demand,
+                    self.env._("Quantity exceeds demand (max: %s)", total_demand),
                 )
                 self.visible_force_done = True
                 return False
@@ -1903,19 +1881,19 @@ class WizStockBarcodesMrp(models.TransientModel):
         """
         self.ensure_one()
         if not self.production_id or not self.product_id:
-            self._set_message("error", _("No product to add"))
+            self._set_message("error", self.env._("No product to add"))
             return False
         if self.product_id.tracking != "none":
             self._set_message(
                 "error",
-                _("Force add only supports non-tracked products"),
+                self.env._("Force add only supports non-tracked products"),
             )
             return False
         if not self.location_id:
-            self._set_message("error", _("No source location scanned"))
+            self._set_message("error", self.env._("No source location scanned"))
             return False
         if not self.product_qty or self.product_qty <= 0:
-            self._set_message("error", _("Quantity must be positive"))
+            self._set_message("error", self.env._("Quantity must be positive"))
             return False
         # Create the raw material move on the MO
         dest_location = self.product_id.with_company(
@@ -1938,8 +1916,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             self.visible_force_add = False
             self._set_message(
                 "success",
-                _("Added & consumed: %(prod)s x%(qty)s")
-                % {"prod": self.product_id.name, "qty": self.product_qty},
+                self.env._("Added & consumed: %(prod)s x%(qty)s", **{"prod": self.product_id.name, "qty": self.product_qty}),
             )
             self._clean_values()
             return move_dic
@@ -2010,30 +1987,28 @@ class WizStockBarcodesMrp(models.TransientModel):
         # can re-apply the already-bound SN).
         lot = self._get_effective_finished_lot()
         if not lot and self.production_id.product_id.tracking != "none":
-            self._set_message("error", _("Finished lot required for tracked product"))
+            self._set_message("error", self.env._("Finished lot required for tracked product"))
             return False
         if not self.finished_qty_producing or self.finished_qty_producing <= 0:
-            self._set_message("error", _("Quantity to produce must be positive"))
+            self._set_message("error", self.env._("Quantity to produce must be positive"))
             return False
         if lot and lot.product_id != self.production_id.product_id:
             # Guard: the m2o picker can no longer be domain-restricted
             # client-side, so reject a lot belonging to another product.
             self._set_message(
                 "error",
-                _("Lot %(lot)s belongs to %(product)s, not to the "
-                  "finished product")
-                % {
+                self.env._("Lot %(lot)s belongs to %(product)s, not to the "
+                  "finished product", **{
                     "lot": lot.name,
                     "product": lot.product_id.display_name,
-                },
+                }),
             )
             return False
         # Idempotent: replace semantics, safe to call repeatedly.
         self._apply_finished_lot_to_mo(lot)
         self._set_message(
             "success",
-            _("Finished lot: %(lot)s, qty: %(qty)s applied to MO")
-            % {"lot": lot.name if lot else _("N/A"), "qty": self.finished_qty_producing},
+            self.env._("Finished lot: %(lot)s, qty: %(qty)s applied to MO", **{"lot": lot.name if lot else self.env._("N/A"), "qty": self.finished_qty_producing}),
         )
         # Move to step 1 (scan source location)
         self.step = 1
@@ -2086,13 +2061,12 @@ class WizStockBarcodesMrp(models.TransientModel):
         means the MO is done.
         """
         if not self.production_id:
-            self._set_message("error", _("No manufacturing order"))
+            self._set_message("error", self.env._("No manufacturing order"))
             return False
         if self.production_state not in ("confirmed", "progress", "to_close"):
             self._set_message(
                 "error",
-                _("MO is %(state)s, cannot finish production")
-                % {"state": self.production_state},
+                self.env._("MO is %(state)s, cannot finish production", **{"state": self.production_state}),
             )
             return False
         # Apply scanned finished lot before marking done. Resolve the
@@ -2105,13 +2079,13 @@ class WizStockBarcodesMrp(models.TransientModel):
         ):
             self._set_message(
                 "error",
-                _("Please scan the finished product serial number (SN) first, "
+                self.env._("Please scan the finished product serial number (SN) first, "
                   "or use Manual Entry."),
             )
             return False
         qty = self.finished_qty_producing or self.production_id.qty_producing
         if not qty or qty <= 0:
-            self._set_message("error", _("Quantity to produce must be positive"))
+            self._set_message("error", self.env._("Quantity to produce must be positive"))
             return False
         # Apply lot + qty to MO. Reuse _apply_finished_lot_to_mo so serial
         # tracking keeps qty_producing == len(lot_producing_ids) (otherwise
@@ -2140,8 +2114,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self._switch_production(backorders)
                 self._set_message(
                     "success",
-                    _("MO %(done)s done. Switched to backorder %(bo)s.")
-                    % {"done": done_name, "bo": backorders.name},
+                    self.env._("MO %(done)s done. Switched to backorder %(bo)s.", **{"done": done_name, "bo": backorders.name}),
                 )
             else:
                 next_mo = self._get_next_mo_in_queue()
@@ -2149,14 +2122,12 @@ class WizStockBarcodesMrp(models.TransientModel):
                     self._switch_production(next_mo)
                     self._set_message(
                         "success",
-                        _("MO %(done)s done. Switched to MO %(next)s.")
-                        % {"done": done_name, "next": next_mo.name},
+                        self.env._("MO %(done)s done. Switched to MO %(next)s.", **{"done": done_name, "next": next_mo.name}),
                     )
                 else:
                     self._set_message(
                         "success",
-                        _("Production done: %(mo)s. No more MOs in queue.")
-                        % {"mo": done_name},
+                        self.env._("Production done: %(mo)s. No more MOs in queue.", **{"mo": done_name}),
                     )
             # Clean up the stash entry for the just-finished MO —
             # production is committed, the stashed scan state can
@@ -2179,7 +2150,7 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.pending_finish = True
         self._set_message(
             "info",
-            _("Resolving consumption warning for %s...") % self.production_id.name,
+            self.env._("Resolving consumption warning for %s...", self.production_id.name),
         )
         # Consumption / backorder wizard action: let the client open it
         return result
@@ -2349,23 +2320,19 @@ class WizStockBarcodesMrp(models.TransientModel):
             self.active_move_id.product_id if self.active_move_id else False
         )
         if self.step == 0:
-            return _("Scan the finished product lot: %s") % (
-                self.production_product_id.display_name
-            )
+            return self.env._("Scan the finished product lot: %s", self.production_product_id.display_name)
         if self.step == 1:
-            return _("MO %s: scan source location %s or scan a component") % (
-                self.production_id.name, self.location_id.name,
-            )
+            return self.env._("MO %(mo)s: scan source location %(location)s or scan a component", mo=self.production_id.name, location=self.location_id.name)
         if self.step == 2:
-            return _("Scan a component of MO %s") % self.production_id.name
+            return self.env._("Scan a component of MO %s", self.production_id.name)
         if self.step == 3:
             if not target_product:
-                return _("Scan a component product barcode")
-            return _("Scan the lot/serial of %s") % target_product.name
+                return self.env._("Scan a component product barcode")
+            return self.env._("Scan the lot/serial of %s", target_product.name)
         if self.step == 4:
             if not target_product:
-                return _("Scan a component product barcode")
-            return _("Enter the quantity for %s") % target_product.name
+                return self.env._("Scan a component product barcode")
+            return self.env._("Enter the quantity for %s", target_product.name)
         return ""
 
     def _set_message_step(self):

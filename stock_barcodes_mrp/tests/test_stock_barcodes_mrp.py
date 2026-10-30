@@ -513,11 +513,7 @@ class TestStockBarcodesMrp(TransactionCase):
         """Test that scanning is rejected when MO is done."""
         # Mark the simple production as done
         self.production.action_confirm()
-        # Produce the required qty
-        produce_wiz = self.env["mrp.production.backorder"].create({
-            "production_id": self.production.id,
-        }) if False else None  # Simplified: just check state guard
-        # Instead, directly test the state check by creating a done MO
+        # Directly test the state check by creating a done MO
         done_mo = self.MrpProduction.create({
             "product_id": self.finished_product.id,
             "product_qty": 1.0,
@@ -562,7 +558,7 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertFalse(res)
         self.assertEqual(wiz.message_type, "error")
 
-    def _scan_component(self, mo, product, barcode, qty, lot_barcode=None):
+    def _scan_component(self, mo, _product, barcode, qty, lot_barcode=None):
         wiz = self.WizScanMrp.create({"production_id": mo.id})
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.action_barcode_scanned(wiz, barcode)
@@ -582,7 +578,7 @@ class TestStockBarcodesMrp(TransactionCase):
             lambda m: m.product_id == self.component_tracked
         )
         self.assertEqual(sum(move.move_line_ids.mapped("quantity")), 2.0)
-        wiz, res = self._scan_component(
+        _, res = self._scan_component(
             self.production, self.component_tracked,
             "PROD-COMP-T", 2.0, lot_barcode="LOT-SUBST-001",
         )
@@ -702,7 +698,7 @@ class TestStockBarcodesMrp(TransactionCase):
         })
         self.assertEqual(sum(move.move_line_ids.mapped("quantity")), 3.0)
         # Scan 2.0: SET first line to 2 must absorb 0.5 from the second
-        wiz, res = self._scan_component(
+        _, res = self._scan_component(
             self.production, self.component_simple, "PROD-COMP-S", 2.0,
         )
         self.assertTrue(res)
@@ -1493,7 +1489,6 @@ class TestStockBarcodesMrp(TransactionCase):
         Passing field objects instead raises TypeError in web_read
         (`'fields' not in field_spec`), masking the real bug.
         """
-        wiz = self.WizScanMrp.create({"production_id": self.production.id})
         field_names = ["_barcode_scanned"]
         field_names_all = [
             "_barcode_scanned", "barcode", "production_id",
@@ -1878,7 +1873,7 @@ class TestStockBarcodesMrp(TransactionCase):
         })
         # No MO created for orphan_product
         wiz = self.WizScanMrp.create({})
-        self.action_barcode_scanned(wiz, "PROD-ORPHAN")
+        self.action_barcode_scanned(wiz, orphan_product.barcode)
         self.assertEqual(wiz.message_type, "error")
         self.assertFalse(wiz.production_id)
 
@@ -2535,6 +2530,9 @@ class TestStockBarcodesMrp(TransactionCase):
     def test_t6_finish_without_apply_still_works(self):
         wiz = self._t6_open_serial_wizard()
         original_mo = wiz.production_id
+        # Odoo 19 returns the backorder wizard when create_backorder is
+        # 'ask' (the default); use 'always' so mark_done completes.
+        original_mo.picking_type_id.create_backorder = "always"
         self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
         self.action_barcode_scanned(wiz, "SN-SER-FIN-001")
         # Serial: MO already has the lot. Finish directly (no Apply click).
@@ -2831,8 +2829,8 @@ class TestStockBarcodesMrp(TransactionCase):
         """action_remove_component_lot unlinks the SN's move line.
 
         After removing the only scanned SN: move_line_ids empty,
-        move.quantity == 0, move.state falls back to 'waiting' (Odoo
-        does not auto-re-reserve).
+        move.quantity == 0, move.state falls back to 'confirmed' (Odoo 19
+        unreserves the move and does not auto-re-reserve it).
         """
         mo = self._t6_fresh_2comp_mo()
         wiz = self.env["wiz.stock.barcodes.mrp"].create({
@@ -2859,7 +2857,7 @@ class TestStockBarcodesMrp(TransactionCase):
         move_a.invalidate_recordset()
         self.assertFalse(move_a.move_line_ids)
         self.assertEqual(move_a.quantity, 0.0)
-        self.assertEqual(move_a.state, "waiting")
+        self.assertEqual(move_a.state, "confirmed")
 
     def test_t6_remove_component_lot_wrong_move(self):
         """action_remove_component_lot returns False when move_id does not

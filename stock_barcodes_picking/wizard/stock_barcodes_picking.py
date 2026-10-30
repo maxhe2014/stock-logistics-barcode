@@ -1,6 +1,6 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 from odoo.tools.float_utils import float_compare, float_is_zero
 
@@ -73,12 +73,11 @@ class WizStockBarcodesPicking(models.TransientModel):
     )
     product_id = fields.Many2one(
         comodel_name="product.product",
-        string="Product",
     )
     product_uom_id = fields.Many2one(comodel_name="uom.uom", string="UoM")
     product_tracking = fields.Selection(related="product_id.tracking", readonly=True)
     lot_id = fields.Many2one(comodel_name="stock.lot", string="Lot/Serial")
-    lot_name = fields.Char(string="Lot Name")
+    lot_name = fields.Char()
     product_qty = fields.Float(
         string="Quantity", digits="Product Unit of Measure"
     )
@@ -127,7 +126,6 @@ class WizStockBarcodesPicking(models.TransientModel):
     # --- Click-to-select target move ---
     active_move_id = fields.Many2one(
         comodel_name="stock.move",
-        string="Active Move",
         help="Operator-selected target move. When set, scanning a "
              "serial/lot narrows the lot lookup to this move's product "
              "first, so cross-product SN collisions resolve automatically. "
@@ -200,25 +198,19 @@ class WizStockBarcodesPicking(models.TransientModel):
             return ""
         step_key = steps[self.step]
         if step_key == "location":
-            return _("Scan the source location of transfer %s") % (
-                self.picking_id.name or ""
-            )
+            return self.env._("Scan the source location of transfer %s", self.picking_id.name or "")
         if step_key == "product":
-            return _("Scan a product of transfer %s") % (
-                self.picking_id.name or ""
-            )
+            return self.env._("Scan a product of transfer %s", self.picking_id.name or "")
         if step_key == "lot":
             if not target_product:
-                return _("Scan a product barcode first")
-            return _("Scan the lot/serial of %s") % target_product.name
+                return self.env._("Scan a product barcode first")
+            return self.env._("Scan the lot/serial of %s", target_product.name)
         if step_key == "qty":
             if not target_product:
-                return _("Scan a product barcode first")
-            return _("Enter the quantity for %s") % target_product.name
+                return self.env._("Scan a product barcode first")
+            return self.env._("Enter the quantity for %s", target_product.name)
         if step_key == "dest_location":
-            return _("Scan the destination location of transfer %s") % (
-                self.picking_id.name or ""
-            )
+            return self.env._("Scan the destination location of transfer %s", self.picking_id.name or "")
         return ""
 
     def _set_message_step(self):
@@ -284,7 +276,6 @@ class WizStockBarcodesPicking(models.TransientModel):
             self.location_dest_id = self.picking_location_dest_id
         # Step lands on the first required location step, or "product"
         # when both location scans are disabled.
-        steps = self._get_scan_steps()
         self.step = 0
         self.product_id = False
         self.lot_id = False
@@ -407,8 +398,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_default_values()
         self._set_message(
             "info",
-            _("Switched to transfer %(picking)s. %(next)s")
-            % {"picking": new_picking.name, "next": self.message},
+            self.env._("Switched to transfer %(picking)s. %(next)s", **{"picking": new_picking.name, "next": self.message}),
         )
 
     def select_picking_candidate(self, picking_id):
@@ -423,7 +413,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not picked:
             self._set_message(
                 "error",
-                _("Selected transfer is not in the candidate list"),
+                self.env._("Selected transfer is not in the candidate list"),
             )
             return False
         self._switch_picking(picked)
@@ -441,11 +431,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         # keys fall back to the raw key string (no default label) so a
         # missing mapping is visible in the UI instead of silently wrong.
         step_labels = {
-            "location": _("库位"),
-            "product": _("产品"),
-            "lot": _("批次"),
-            "qty": _("数量"),
-            "dest_location": _("目的库位"),
+            "location": self.env._("库位"),
+            "product": self.env._("产品"),
+            "lot": self.env._("批次"),
+            "qty": self.env._("数量"),
+            "dest_location": self.env._("目的库位"),
         }
         scan_steps = [
             {"key": k, "label": step_labels.get(k, k)}
@@ -628,7 +618,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             if not self._scan_picking(barcode):
                 self._set_message(
                     "error",
-                    _("Select a transfer or scan a transfer name to continue"),
+                    self.env._("Select a transfer or scan a transfer name to continue"),
                 )
             return True
         if self._scan_picking(barcode):
@@ -643,7 +633,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             return True
         if self._scan_package(barcode):
             return True
-        self._set_message("not_found", _("Barcode not found: %s") % barcode)
+        self._set_message("not_found", self.env._("Barcode not found: %s", barcode))
         return True
 
     def _check_selector_resolved(self):
@@ -662,7 +652,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if self.visible_switch_selector:
             self._set_message(
                 "error",
-                _("Select a transfer first before continuing"),
+                self.env._("Select a transfer first before continuing"),
             )
             return False
         return True
@@ -703,8 +693,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             ):
                 self._set_message(
                     "error",
-                    _("Transfer %s is not active (draft/done/cancelled)")
-                    % barcode,
+                    self.env._("Transfer %s is not active (draft/done/cancelled)", barcode),
                 )
                 return True
             return False
@@ -717,13 +706,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             self.visible_switch_selector = True
             self._set_message(
                 "more_match",
-                _("Multiple transfers found for barcode: %s. Select one.")
-                % barcode,
+                self.env._("Multiple transfers found for barcode: %s. Select one.", barcode),
             )
             return True
         picking = pickings
         if self.picking_id == picking:
-            self._set_message("info", _("Already on transfer %s") % picking.name)
+            self._set_message("info", self.env._("Already on transfer %s", picking.name))
             return True
         self._switch_picking(picking)
         return True
@@ -741,8 +729,8 @@ class WizStockBarcodesPicking(models.TransientModel):
         if any_location.usage != "internal":
             self._set_message(
                 "error",
-                _("%s is not a stock location (only internal locations "
-                  "can be scanned)") % any_location.name,
+                self.env._("%s is not a stock location (only internal locations "
+                  "can be scanned)", any_location.name),
             )
             return True
         location = any_location
@@ -774,8 +762,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if any_location.usage in ("view", "inventory", "production"):
             self._set_message(
                 "error",
-                _("%s is not a valid destination location")
-                % any_location.name,
+                self.env._("%s is not a valid destination location", any_location.name),
             )
             return True
         self.location_dest_id = any_location
@@ -796,11 +783,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not products:
             return False
         if len(products) > 1:
-            self._set_message("more_match", _("Multiple products found"))
+            self._set_message("more_match", self.env._("Multiple products found"))
             return True
         product = products
         if not self.picking_id:
-            self._set_message("error", _("No transfer selected"))
+            self._set_message("error", self.env._("No transfer selected"))
             return True
         # Check the product belongs to this picking's moves
         component_moves = self.picking_id.move_ids.filtered(
@@ -809,8 +796,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not component_moves:
             self._set_message(
                 "error",
-                _("Product %(name)s is not part of this transfer")
-                % {"name": product.name},
+                self.env._("Product %(name)s is not part of this transfer", **{"name": product.name}),
             )
             return True
         self.product_id = product
@@ -829,13 +815,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         self._compute_qty_available()
         if product.tracking != "none":
             self._set_message(
-                "info", _("Product: %s. Scan lot.") % product.name
+                "info", self.env._("Product: %s. Scan lot.", product.name)
             )
             self.step = self._step_index("lot")
         else:
             self._set_message(
                 "info",
-                _("Product: %s. Enter qty and confirm.") % product.name,
+                self.env._("Product: %s. Enter qty and confirm.", product.name),
             )
             self.step = self._step_index("qty")
         self._set_message_step()
@@ -857,7 +843,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not lots:
             return self._scan_lot_fallback(barcode)
         if len(lots) > 1:
-            self._set_message("more_match", _("Multiple lots found"))
+            self._set_message("more_match", self.env._("Multiple lots found"))
             return True
         lot = lots
         self.lot_id = lot
@@ -873,7 +859,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             self.action_confirm()
             return True
         self._set_message(
-            "info", _("Lot: %s. Enter qty and confirm.") % lot.name
+            "info", self.env._("Lot: %s. Enter qty and confirm.", lot.name)
         )
         self.step = self._step_index("qty")
         self._set_message_step()
@@ -912,9 +898,8 @@ class WizStockBarcodesPicking(models.TransientModel):
                 return self._resolve_lot_owner(narrowed, narrowed.product_id)
             self._set_message(
                 "more_match",
-                _("Multiple lots named %(sn)s found. Click the target "
-                  "product row first, then scan again.")
-                % {"sn": barcode},
+                self.env._("Multiple lots named %(sn)s found. Click the target "
+                  "product row first, then scan again.", **{"sn": barcode}),
             )
             return True
         if len(lots) == 1:
@@ -926,7 +911,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if len(products) > 1:
             self._set_message(
                 "more_match",
-                _("Multiple products found for barcode: %s") % barcode,
+                self.env._("Multiple products found for barcode: %s", barcode),
             )
             return True
         if len(products) == 1:
@@ -966,9 +951,8 @@ class WizStockBarcodesPicking(models.TransientModel):
                     self.active_move_id = False
                     self._set_message(
                         "info",
-                        _("Product %(name)s is fully picked. Scan the "
-                          "next product barcode, then scan its lot.")
-                        % {"name": move.product_id.name},
+                        self.env._("Product %(name)s is fully picked. Scan the "
+                          "next product barcode, then scan its lot.", **{"name": move.product_id.name}),
                     )
                     return True
         # Check the operation type before requiring a product: when the
@@ -978,15 +962,14 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self.picking_id.use_create_lots:
             self._set_message(
                 "error",
-                _("Serial number/lot %(name)s does not exist. This "
-                  "operation type does not allow creating new ones.")
-                % {"name": barcode},
+                self.env._("Serial number/lot %(name)s does not exist. This "
+                  "operation type does not allow creating new ones.", **{"name": barcode}),
             )
             return True
         if not self.product_id:
             self._set_message(
                 "error",
-                _("Scan a product barcode or click a product row first."),
+                self.env._("Scan a product barcode or click a product row first."),
             )
             return True
         self.lot_name = barcode
@@ -1000,7 +983,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             self.action_confirm()
             return True
         self._set_message(
-            "info", _("Lot: %s. Enter qty and confirm.") % barcode
+            "info", self.env._("Lot: %s. Enter qty and confirm.", barcode)
         )
         self.step = self._step_index("qty")
         self._set_message_step()
@@ -1039,14 +1022,14 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not unpacked:
             self._set_message(
                 "info",
-                _("No unpacked picked products to bind."),
+                self.env._("No unpacked picked products to bind."),
             )
             return True
         unpacked.write({"picked": True})
         unpacked.result_package_id = package.id
         self._set_message(
             "success",
-            _("Products bound to package %s.") % package.name,
+            self.env._("Products bound to package %s.", package.name),
         )
         return True
 
@@ -1058,7 +1041,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         """
         self.ensure_one()
         if not self.picking_id:
-            self._set_message("error", _("No transfer selected"))
+            self._set_message("error", self.env._("No transfer selected"))
             return True
         component_moves = self.picking_id.move_ids.filtered(
             lambda m: m.product_id == product and m.state != "cancel"
@@ -1084,14 +1067,14 @@ class WizStockBarcodesPicking(models.TransientModel):
                     self._set_message_step()
                     self._set_message(
                         "success",
-                        _("Matched product %(product)s for serial number "
+                        self.env._("Matched product %(product)s for serial number "
                           "%(sn)s. It has been added.",
                           product=product.name,
                           sn=lot.name),
                     )
                     return True
                 self._set_message(
-                    "info", _("Lot: %s. Enter qty and confirm.") % lot.name
+                    "info", self.env._("Lot: %s. Enter qty and confirm.", lot.name)
                 )
                 self.step = self._step_index("qty")
             else:
@@ -1099,21 +1082,20 @@ class WizStockBarcodesPicking(models.TransientModel):
                 self.lot_name = False
                 if product.tracking != "none":
                     self._set_message(
-                        "info", _("Product: %s. Scan lot.") % product.name
+                        "info", self.env._("Product: %s. Scan lot.", product.name)
                     )
                     self.step = self._step_index("lot")
                 else:
                     self._set_message(
                         "info",
-                        _("Product: %s. Enter qty and confirm.") % product.name,
+                        self.env._("Product: %s. Enter qty and confirm.", product.name),
                     )
                     self.step = self._step_index("qty")
             self._set_message_step()
             return True
         self._set_message(
             "error",
-            _("Lot belongs to product %(name)s which is not part of this transfer")
-            % {"name": product.name},
+            self.env._("Lot belongs to product %(name)s which is not part of this transfer", **{"name": product.name}),
         )
         return True
 
@@ -1182,7 +1164,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         # Already delivered: sending it again would create a second unit
         # of the same serial at the customer location.
         if quants.filtered(lambda q: q.location_id.usage == "customer"):
-            return _(
+            return self.env._(
                 "Serial number %(sn)s has already been delivered and "
                 "cannot be picked again.",
                 sn=lot.name,
@@ -1194,7 +1176,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         )
         if not in_source:
             if quants:
-                return _(
+                return self.env._(
                     "Serial number %(sn)s is not in location %(location)s "
                     "(currently in: %(locations)s). It was not added to "
                     "this transfer.",
@@ -1204,7 +1186,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                         quants.mapped("location_id.display_name")
                     ),
                 )
-            return _(
+            return self.env._(
                 "Serial number %(sn)s has no stock in location "
                 "%(location)s. It was not added to this transfer.",
                 sn=lot.name,
@@ -1220,7 +1202,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             ("state", "not in", ("done", "cancel")),
         ])
         if other_lines:
-            return _(
+            return self.env._(
                 "Serial number %(sn)s is reserved by another transfer "
                 "(%(pickings)s) and cannot be picked again.",
                 sn=lot.name,
@@ -1234,32 +1216,31 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         if self.picking_state == "draft":
             self._set_message(
-                "error", _("Transfer is draft, confirm it before scanning")
+                "error", self.env._("Transfer is draft, confirm it before scanning")
             )
             return False
         if self.picking_state in ("done", "cancel"):
             self._set_message(
                 "error",
-                _("Transfer is %(state)s, cannot scan")
-                % {"state": self.picking_state},
+                self.env._("Transfer is %(state)s, cannot scan", **{"state": self.picking_state}),
             )
             return False
         if not self.product_id:
-            self._set_message("error", _("No product scanned"))
+            self._set_message("error", self.env._("No product scanned"))
             return False
         if not self.location_id:
-            self._set_message("error", _("No source location scanned"))
+            self._set_message("error", self.env._("No source location scanned"))
             return False
         if self.barcode_scan_dest_location and not self.location_dest_id:
             self._set_message(
-                "error", _("No destination location scanned")
+                "error", self.env._("No destination location scanned")
             )
             return False
         if self.product_id.tracking != "none" and not self.lot_id and not self.lot_name:
-            self._set_message("error", _("Lot required for tracked product"))
+            self._set_message("error", self.env._("Lot required for tracked product"))
             return False
         if not self.product_qty or self.product_qty <= 0:
-            self._set_message("error", _("Quantity must be positive"))
+            self._set_message("error", self.env._("Quantity must be positive"))
             return False
 
         # A serial can only be picked once per transfer. Without this the
@@ -1273,7 +1254,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             if already_picked:
                 self._set_message(
                     "error",
-                    _("Serial number %(sn)s has already been added to this "
+                    self.env._("Serial number %(sn)s has already been added to this "
                       "transfer. Do not scan it again.",
                       sn=self.lot_id.name),
                 )
@@ -1315,7 +1296,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             if excess:
                 self._set_message(
                     "success",
-                    _("Product scanned: %(prod)s x%(qty)s (over demand by "
+                    self.env._("Product scanned: %(prod)s x%(qty)s (over demand by "
                       "%(excess)s)",
                       prod=product_name,
                       qty=quantity,
@@ -1376,8 +1357,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not moves:
             self._set_message(
                 "error",
-                _("Product %(name)s is not part of this transfer")
-                % {"name": self.product_id.name},
+                self.env._("Product %(name)s is not part of this transfer", **{"name": self.product_id.name}),
             )
             return False
 
@@ -1428,7 +1408,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 if policy == "forbid":
                     self._set_message(
                         "error",
-                        _("Quantity exceeds demand (max: %(max)s). "
+                        self.env._("Quantity exceeds demand (max: %(max)s). "
                           "Over-picking is forbidden for this operation "
                           "type.",
                           max=max_quantity),
@@ -1437,7 +1417,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 if policy == "warn":
                     self._set_message(
                         "more_match",
-                        _("Quantity exceeds demand (max: %s)") % max_quantity,
+                        self.env._("Quantity exceeds demand (max: %s)", max_quantity),
                     )
                     self.visible_force_done = True
                     return False
@@ -1474,7 +1454,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 if policy == "forbid":
                     self._set_message(
                         "error",
-                        _("Quantity exceeds demand (max: %(max)s). "
+                        self.env._("Quantity exceeds demand (max: %(max)s). "
                           "Over-picking is forbidden for this operation "
                           "type.",
                           max=total_demand),
@@ -1483,7 +1463,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 if policy == "warn":
                     self._set_message(
                         "more_match",
-                        _("Quantity exceeds demand (max: %s)") % total_demand,
+                        self.env._("Quantity exceeds demand (max: %s)", total_demand),
                     )
                     self.visible_force_done = True
                     return False
@@ -1531,7 +1511,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if self._get_excess_qty_policy() == "forbid":
             self._set_message(
                 "error",
-                _("Over-picking is forbidden for this operation type."),
+                self.env._("Over-picking is forbidden for this operation type."),
             )
             self.visible_force_done = False
             return False
@@ -1553,12 +1533,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             self.active_move_id.product_id if self.active_move_id else False
         )
         if not product:
-            self._set_message("error", _("No product selected"))
+            self._set_message("error", self.env._("No product selected"))
             return False
         if product.tracking != "none":
             self._set_message(
                 "error",
-                _("Cannot consume tracked product by demand; scan the lot"),
+                self.env._("Cannot consume tracked product by demand; scan the lot"),
             )
             return False
         # Full demand from the move (not reservation)
@@ -1568,11 +1548,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not move:
             self._set_message(
                 "error",
-                _("Product %s is not part of this transfer") % product.name,
+                self.env._("Product %s is not part of this transfer", product.name),
             )
             return False
         if not self.location_id:
-            self._set_message("error", _("No source location scanned"))
+            self._set_message("error", self.env._("No source location scanned"))
             return False
         self.product_id = product
         self.product_uom_id = product.uom_id
@@ -1585,8 +1565,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if result:
             self._set_message(
                 "success",
-                _("Consumed full demand: %(prod)s x%(qty)s")
-                % {"prod": product.name, "qty": move.product_uom_qty},
+                self.env._("Consumed full demand: %(prod)s x%(qty)s", **{"prod": product.name, "qty": move.product_uom_qty}),
             )
         return result
 
@@ -1599,15 +1578,15 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self._check_selector_resolved():
             return False
         if not self.active_move_id:
-            self._set_message("error", _("No product row selected"))
+            self._set_message("error", self.env._("No product row selected"))
             return False
         product = self.active_move_id.product_id
         if not self.location_id:
-            self._set_message("error", _("No source location scanned"))
+            self._set_message("error", self.env._("No source location scanned"))
             return False
         qty = float(qty) if qty else 0.0
         if qty <= 0:
-            self._set_message("error", _("Quantity must be positive"))
+            self._set_message("error", self.env._("Quantity must be positive"))
             return False
         self.product_id = product
         self.product_uom_id = product.uom_id
@@ -1616,8 +1595,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if result:
             self._set_message(
                 "success",
-                _("Consumed: %(prod)s x%(qty)s")
-                % {"prod": product.name, "qty": qty},
+                self.env._("Consumed: %(prod)s x%(qty)s", **{"prod": product.name, "qty": qty}),
             )
         return result
 
@@ -1634,7 +1612,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         picking = self.picking_id
         if not picking:
-            self._set_message("error", _("No transfer selected"))
+            self._set_message("error", self.env._("No transfer selected"))
             return False
         # Pack check: if required, all picked lines must be in a package.
         if self._lines_need_pack(picking):
@@ -1644,7 +1622,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             if unpacked:
                 self._set_message(
                     "error",
-                    _("All picked products must be put into a package "
+                    self.env._("All picked products must be put into a package "
                       "before validation.")
                 )
                 return False
@@ -1702,7 +1680,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         picking = self.picking_id
         if not picking:
-            self._set_message("error", _("No transfer selected"))
+            self._set_message("error", self.env._("No transfer selected"))
             return False
         # Fresh search to avoid stale cached picked values.
         # Use picked=True as the source of truth: scanned lines always
@@ -1717,7 +1695,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not unpacked:
             self._set_message(
                 "info",
-                _("No unpacked picked products to pack."),
+                self.env._("No unpacked picked products to pack."),
             )
             return True
         # Ensure picked=True so Odoo's native pack logic picks them up.
@@ -1732,7 +1710,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         except Exception as exc:
             self._set_message(
                 "error",
-                _("Failed to put in package: %(msg)s") % {"msg": str(exc)},
+                self.env._("Failed to put in package: %(msg)s", **{"msg": str(exc)}),
             )
             return False
         # If Odoo returned a wizard action (package type required),
@@ -1741,7 +1719,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             return result
         self._set_message(
             "success",
-            _("Products have been put into a package."),
+            self.env._("Products have been put into a package."),
         )
         return True
 
@@ -1752,16 +1730,16 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         new_name = (new_name or "").strip()
         if not new_name:
-            self._set_message("error", _("Package name cannot be empty."))
+            self._set_message("error", self.env._("Package name cannot be empty."))
             return False
         package = self.env["stock.package"].browse(package_id)
         if not package.exists():
-            self._set_message("error", _("Package not found."))
+            self._set_message("error", self.env._("Package not found."))
             return False
         package.name = new_name
         self._set_message(
             "success",
-            _("Package renamed to %s.") % new_name,
+            self.env._("Package renamed to %s.", new_name),
         )
         return True
 
@@ -1790,12 +1768,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             domain.append(("move_id", "=", move_id))
         lines = self.env["stock.move.line"].search(domain)
         if not lines:
-            self._set_message("info", _("No picked lines in this package."))
+            self._set_message("info", self.env._("No picked lines in this package."))
             return True
         lines.result_package_id = False
         self._set_message(
             "info",
-            _("Package removed; products are now unpacked."),
+            self.env._("Package removed; products are now unpacked."),
         )
         return True
 
@@ -1806,7 +1784,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         package = self.env["stock.package"].browse(package_id)
         if not package.exists():
-            self._set_message("error", _("Package not found."))
+            self._set_message("error", self.env._("Package not found."))
             return False
         unpacked = self.picking_id.move_line_ids.filtered(
             lambda l: l.picked and not l.result_package_id
@@ -1814,14 +1792,14 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not unpacked:
             self._set_message(
                 "info",
-                _("No unpacked picked products to bind."),
+                self.env._("No unpacked picked products to bind."),
             )
             return True
         unpacked.write({"picked": True})
         unpacked.result_package_id = package.id
         self._set_message(
             "success",
-            _("Products added to package %s.") % package.name,
+            self.env._("Products added to package %s.", package.name),
         )
         return True
 
@@ -1837,7 +1815,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             "res_model": "stock.package",
             "view_mode": "list,form",
             "target": "current",
-            "name": _("Select Package"),
+            "name": self.env._("Select Package"),
         }
 
     def set_active_move(self, move_id):
@@ -1874,26 +1852,26 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self._check_selector_resolved():
             return False
         if not self.picking_id:
-            self._set_message("error", _("No transfer selected"))
+            self._set_message("error", self.env._("No transfer selected"))
             return False
         if product_id:
             product = self.env["product.product"].browse(product_id)
         else:
             product = self.product_id
         if not product:
-            self._set_message("error", _("No product to add"))
+            self._set_message("error", self.env._("No product to add"))
             return False
         if product.tracking != "none":
             self._set_message(
                 "error",
-                _("Force add only supports non-tracked products"),
+                self.env._("Force add only supports non-tracked products"),
             )
             return False
         if not self.location_id:
-            self._set_message("error", _("No source location scanned"))
+            self._set_message("error", self.env._("No source location scanned"))
             return False
         if not self.product_qty or self.product_qty <= 0:
-            self._set_message("error", _("Quantity must be positive"))
+            self._set_message("error", self.env._("Quantity must be positive"))
             return False
         # Create the new move on the picking. location_dest_id is taken
         # from the picking (the new move has no inheritance chain).
@@ -1928,8 +1906,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._clean_values()
             self._set_message(
                 "success",
-                _("Added & picked: %(prod)s x%(qty)s")
-                % {"prod": product.name, "qty": self.product_qty},
+                self.env._("Added & picked: %(prod)s x%(qty)s", **{"prod": product.name, "qty": self.product_qty}),
             )
             return move_dic
         return False
@@ -1948,7 +1925,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self._check_selector_resolved():
             return False
         if not barcode:
-            self._set_message("error", _("No barcode to add"))
+            self._set_message("error", self.env._("No barcode to add"))
             return False
         product = self.env["product.product"].search(
             [("barcode", "=", barcode)], limit=1
@@ -1956,20 +1933,20 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not product:
             self._set_message(
                 "error",
-                _("No product found for barcode: %s") % barcode,
+                self.env._("No product found for barcode: %s", barcode),
             )
             return False
         if product.tracking != "none":
             self._set_message(
                 "error",
-                _("Force add only supports non-tracked products"),
+                self.env._("Force add only supports non-tracked products"),
             )
             return False
         if not self.location_id:
-            self._set_message("error", _("No source location scanned"))
+            self._set_message("error", self.env._("No source location scanned"))
             return False
         if not self.product_qty or self.product_qty <= 0:
-            self._set_message("error", _("Quantity must be positive"))
+            self._set_message("error", self.env._("Quantity must be positive"))
             return False
         return self.action_force_add(product_id=product.id)
 
@@ -1995,11 +1972,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         """
         self.ensure_one()
         if not self.picking_id:
-            self._set_message("error", _("No transfer selected"))
+            self._set_message("error", self.env._("No transfer selected"))
             return False
         move = self.picking_id.move_ids.filtered(lambda m: m.id == move_id)
         if not move:
-            self._set_message("error", _("Move not found in this transfer"))
+            self._set_message("error", self.env._("Move not found in this transfer"))
             return False
         # Use search instead of move.move_line_ids to avoid stale cache.
         lines = self.env["stock.move.line"].search([
@@ -2008,7 +1985,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             ("state", "not in", ("done", "cancel")),
         ])
         if not lines:
-            self._set_message("error", _("Lot/SN not found on this move"))
+            self._set_message("error", self.env._("Lot/SN not found on this move"))
             return False
         line = lines[0]
         if line.quantity > 1:
@@ -2019,7 +1996,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             line.unlink()
         self._set_message(
             "success",
-            _("Removed lot/SN from the transfer.")
+            self.env._("Removed lot/SN from the transfer.")
         )
         return True
 

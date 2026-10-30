@@ -1,6 +1,6 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class StockLot(models.Model):
@@ -78,7 +78,7 @@ class StockLot(models.Model):
         """Open the list of material lots consumed to produce this lot."""
         self.ensure_one()
         return {
-            "name": _("Consumed Material Lots for %s") % self.display_name,
+            "name": self.env._("Consumed Material Lots for %s", self.display_name),
             "type": "ir.actions.act_window",
             "res_model": "stock.lot",
             "view_mode": "list,form",
@@ -90,7 +90,7 @@ class StockLot(models.Model):
         """Open the list of finished lots produced using this lot."""
         self.ensure_one()
         return {
-            "name": _("Produced Finished Lots from %s") % self.display_name,
+            "name": self.env._("Produced Finished Lots from %s", self.display_name),
             "type": "ir.actions.act_window",
             "res_model": "stock.lot",
             "view_mode": "list,form",

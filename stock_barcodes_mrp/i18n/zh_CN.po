@@ -553,14 +553,14 @@ msgstr "强制添加仅支持非追溯产品"
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Found %s MOs for %s — click 'View candidate MOs' to pick."
-msgstr "找到 %s 个 %s 的制造订单 — 点击「查看候选制造订单」进行选择。"
+msgid "Found %(count)s MOs for %(product)s — click 'View candidate MOs' to pick."
+msgstr "找到 %(product)s 的 %(count)s 个制造订单 — 点击「查看候选制造订单」进行选择。"
 
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Found %s MOs for SN %s — click 'View candidate MOs' to pick."
-msgstr "找到序列号 %s 的 %s 个制造订单 — 点击「查看候选制造订单」进行选择。"
+msgid "Found %(count)s MOs for SN %(sn)s — click 'View candidate MOs' to pick."
+msgstr "找到序列号 %(sn)s 的 %(count)s 个制造订单 — 点击「查看候选制造订单」进行选择。"
 
 #. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__queue_filter_priority
@@ -701,8 +701,8 @@ msgstr "制造订单 %s 未激活（草稿/已完成/已取消）"
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "MO %s: scan source location %s or scan a component"
-msgstr "制造订单 %s：请扫描源库位 %s 或扫描组件"
+msgid "MO %(mo)s: scan source location %(location)s or scan a component"
+msgstr "制造订单 %(mo)s：请扫描源库位 %(location)s 或扫描组件"
 
 #. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form

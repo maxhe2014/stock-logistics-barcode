@@ -1,6 +1,6 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
-from odoo import _, models
+from odoo import models
 from odoo.exceptions import UserError
 
 
@@ -23,7 +23,7 @@ class MrpProduction(models.Model):
                 lambda lot: lot.id not in self.move_raw_ids.lot_ids.ids
             )
             if lots and self._are_finished_serials_already_produced(lots):
-                raise UserError(_(
+                raise UserError(self.env._(
                     "Serial number(s) %(lots)s for product %(product)s have "
                     "already been produced and cannot be reused.",
                     lots=", ".join(lots.mapped("name")),

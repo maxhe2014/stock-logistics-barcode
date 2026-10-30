@@ -501,13 +501,13 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Found %s MOs for %s — click 'View candidate MOs' to pick."
+msgid "Found %(count)s MOs for %(product)s — click 'View candidate MOs' to pick."
 msgstr ""
 
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Found %s MOs for SN %s — click 'View candidate MOs' to pick."
+msgid "Found %(count)s MOs for SN %(sn)s — click 'View candidate MOs' to pick."
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -648,7 +648,7 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "MO %s: scan source location %s or scan a component"
+msgid "MO %(mo)s: scan source location %(location)s or scan a component"
 msgstr ""
 
 #. module: stock_barcodes_mrp
