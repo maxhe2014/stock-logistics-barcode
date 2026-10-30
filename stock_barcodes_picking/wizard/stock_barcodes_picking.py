@@ -814,8 +814,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             )
             return True
         self.product_id = product
-        if self.active_move_id and self.active_move_id.product_id != product:
-            self.active_move_id = False
+        # Keep the row highlight in sync with the scanned product so the
+        # operator can keep scanning the same product without re-clicking.
+        self.active_move_id = (
+            component_moves[:1]
+            if not self.active_move_id
+            or self.active_move_id.product_id != product
+            else self.active_move_id
+        )
         self.product_uom_id = product.uom_id
         self.lot_id = False
         self.lot_name = False
@@ -1050,8 +1056,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         )
         if component_moves:
             self.product_id = product
-            if self.active_move_id and self.active_move_id.product_id != product:
-                self.active_move_id = False
+            # Follow the scanned product: highlight its move so the
+            # operator keeps scanning it without re-selecting the row.
+            if not self.active_move_id or self.active_move_id.product_id != product:
+                self.active_move_id = component_moves[:1]
             self.product_uom_id = product.uom_id
             if lot:
                 self.lot_id = lot
@@ -1810,11 +1818,12 @@ class WizStockBarcodesPicking(models.TransientModel):
         product_id is cleared, which cascades to product_tracking
         (related field) and re-enables the lot step in the UI.
 
-        active_move_id is also cleared: otherwise a subsequent scan of a
-        new lot/serial for a *different* product would be attributed to
-        the previously active move (via _create_new_lot_flow's fallback),
-        causing spurious "quantity exceeds demand" errors against the
-        old product's demand.
+        active_move_id is intentionally preserved: the operator keeps
+        scanning serial numbers/lots of the same product in a row, and
+        re-clicking the product row after each scan would be wasteful on
+        a shop-floor device. It is switched or cleared explicitly when
+        another product is scanned (_scan_product / _resolve_lot_owner)
+        or when the move is fully picked (see _create_new_lot_flow).
         """
         self.product_id = False
         self.lot_id = False
@@ -1823,6 +1832,5 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.qty_available = 0.0
         self.visible_force_done = False
         self.visible_force_add = False
-        self.active_move_id = False
         self.step = self._step_index("product")
         self._set_message_step()

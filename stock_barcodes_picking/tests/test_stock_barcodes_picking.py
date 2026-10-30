@@ -514,6 +514,93 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertTrue(wiz.set_active_move(own_move.id))
         self.assertEqual(wiz.active_move_id, own_move)
 
+    # --- Sticky product selection ---
+    def test_serial_scan_keeps_active_move(self):
+        """Scanning several serials of the same product keeps the row
+        selected, so the operator does not have to re-click it each time."""
+        product = self.Product.create({
+            "name": "Serial Sticky Product",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-SERIAL-STICKY",
+        })
+        picking = self._create_picking(product, qty=3.0)
+        move = picking.move_ids[0]
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.set_active_move(move.id)
+
+        wiz.on_barcode_scanned("SN-STICKY-001")
+        self.assertEqual(wiz.active_move_id, move)
+        self.assertEqual(
+            sum(l.quantity for l in move.move_line_ids if l.picked), 1.0
+        )
+
+        wiz.on_barcode_scanned("SN-STICKY-002")
+        self.assertEqual(wiz.active_move_id, move)
+        self.assertEqual(
+            sum(l.quantity for l in move.move_line_ids if l.picked), 2.0
+        )
+        # product_id is still cleaned after each confirm.
+        self.assertFalse(wiz.product_id)
+
+    def test_scan_other_product_switches_active_move(self):
+        """Scanning another product's barcode switches the active row so
+        serials of that product stay selected too."""
+        product_a = self.Product.create({
+            "name": "Serial A",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-SERIAL-A",
+        })
+        product_b = self.Product.create({
+            "name": "Serial B",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+            "barcode": "PROD-SERIAL-B",
+        })
+        self.StockQuant._update_available_quantity(product_a, self.stock_location, 5.0)
+        self.StockQuant._update_available_quantity(product_b, self.stock_location, 5.0)
+        picking = self.StockPicking.create({
+            "picking_type_id": self.picking_type.id,
+            "location_id": self.stock_location.id,
+            "location_dest_id": self.customer_location.id,
+        })
+        move_a = self.StockMove.create({
+            "product_id": product_a.id,
+            "product_uom_qty": 3.0,
+            "product_uom": product_a.uom_id.id,
+            "picking_id": picking.id,
+            "location_id": self.stock_location.id,
+            "location_dest_id": self.customer_location.id,
+        })
+        move_b = self.StockMove.create({
+            "product_id": product_b.id,
+            "product_uom_qty": 3.0,
+            "product_uom": product_b.uom_id.id,
+            "picking_id": picking.id,
+            "location_id": self.stock_location.id,
+            "location_dest_id": self.customer_location.id,
+        })
+        picking.action_confirm()
+        picking.action_assign()
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.set_active_move(move_a.id)
+        wiz.on_barcode_scanned("SN-A-001")
+        self.assertEqual(wiz.active_move_id, move_a)
+
+        wiz.on_barcode_scanned(product_b.barcode)
+        self.assertEqual(wiz.active_move_id, move_b)
+        wiz.on_barcode_scanned("SN-B-001")
+        self.assertEqual(wiz.active_move_id, move_b)
+        self.assertEqual(
+            sum(l.quantity for l in move_b.move_line_ids if l.picked), 1.0
+        )
+
     # --- action_force_add ---
     def test_force_add_creates_move_and_picks(self):
         """action_force_add adds a product NOT on the picking, creates a
