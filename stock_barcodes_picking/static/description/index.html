@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <title>Stock Barcodes Picking</title>
+    <style>
+        body {
+            font-family: -apple-system, "Segoe UI", "PingFang SC",
+                "Microsoft YaHei", sans-serif;
+            color: #212529;
+            line-height: 1.6;
+            margin: 0 auto;
+            max-width: 960px;
+            padding: 24px;
+        }
+        h1 { font-size: 28px; margin-bottom: 8px; }
+        h2 { font-size: 22px; margin-top: 32px; border-bottom: 1px solid #dee2e6; padding-bottom: 6px; }
+        h3 { font-size: 18px; margin-top: 24px; }
+        code {
+            background: #f1f3f5;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: Consolas, Menlo, monospace;
+            font-size: 13px;
+        }
+        pre {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 12px;
+            overflow-x: auto;
+        }
+        table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+        th, td { border: 1px solid #dee2e6; padding: 8px 10px; text-align: left; vertical-align: top; }
+        th { background: #f8f9fa; }
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px 14px;
+            margin: 12px 0;
+        }
+        .summary {
+            background: #e7f5ff;
+            border-left: 4px solid #339af0;
+            padding: 10px 14px;
+            margin: 12px 0;
+        }
+    </style>
+</head>
+<body>
+<section class="oe_container">
+    <h1>Stock Barcodes Picking</h1>
+    <p>
+        面向出库／收货的单据扫码应用：支持扫描单据号、库位、产品条码、批次／序列号，
+        并在单据上逐行累计已拣数量。
+    </p>
+
+    <h2>扫码输入缓冲参数（重要）</h2>
+
+    <div class="summary">
+        <strong>默认值：</strong>
+        <code>barcode.max_time_between_keys_in_ms = 1500</code>
+        （安装本模块时自动写入；如仍出现拆分，可提高到 <code>2000</code>）。
+    </div>
+
+    <h3>现象</h3>
+    <p>
+        扫描一个较长的条码（例如 GS1 DataMatrix、带签名/Base64 内容的序列号）时，
+        系统把这一串字符识别成多个条码，生成多个序列号和多条拣货行，
+        数量随分段数增加（例如 1 个码变成 5 个序列号、数量 5）。
+    </p>
+
+    <h3>原因</h3>
+    <p>
+        Odoo 的扫码服务（<code>barcodes</code> 模块）按键盘事件累积字符：
+        当相邻字符的间隔超过 <code>barcode.max_time_between_keys_in_ms</code>
+        （默认 <strong>150 毫秒</strong>）时，会立刻把当前缓冲内容当作一个完整条码派发；
+        任何长度 ≥ 3 的缓冲都会被派发。长条码在手机、蓝牙扫码枪或输入法逐字符注入时，
+        字符间隔一旦超过该阈值，就会被切成多段。
+    </p>
+    <p>
+        若作业类型的「创建新的序列号／批次」开启（常见于收货），
+        每段都会被当作一个新序列号创建，于是出现多个序列号、多条数量为 1 的行。
+        出库类型通常不允许建号，同样会被当作多次无效扫码或报错。
+    </p>
+
+    <h3>在哪设置</h3>
+    <p>
+        安装本模块时会自动写入该参数（默认 <code>1500</code>）；
+        模块升级不会重新写入，因此之后管理员手工调整的值会被保留。
+    </p>
+    <p>如需手工修改：</p>
+    <ol>
+        <li>进入 <strong>设置 → 技术 → 参数 → 系统参数</strong>。</li>
+        <li>新增一条参数：
+            <ul>
+                <li>键：<code>barcode.max_time_between_keys_in_ms</code></li>
+                <li>值：<code>1500</code></li>
+            </ul>
+        </li>
+        <li>保存后刷新扫码页面（新窗口或重新登录）生效。</li>
+    </ol>
+    <p>也可以通过 <code>ir.config_parameter</code> 直接写入：</p>
+<pre>&lt;function model="ir.config_parameter"
+          name="set_param"
+          eval="('barcode.max_time_between_keys_in_ms', '1500')"/&gt;</pre>
+
+    <h3>影响范围与取舍</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>项目</th>
+                <th>说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>生效范围</td>
+                <td>全局扫码（本模块、库存条码、其他使用 <code>barcodes</code> 服务的界面）。</td>
+            </tr>
+            <tr>
+                <td>有结束符（Enter／Tab）的扫码枪</td>
+                <td>收到结束符即提交，不增加等待时间。</td>
+            </tr>
+            <tr>
+                <td>无结束符、靠超时提交的输入方式</td>
+                <td>每次扫码最多多等约等于该参数的时间（1500ms ≈ 1.5 秒）。</td>
+            </tr>
+            <tr>
+                <td>设置过大（如 &gt; 2000）</td>
+                <td>连续两次扫码间隔很短时，可能被合并成一个条码，不建议。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>验证方法</h3>
+    <ol>
+        <li>扫描一个完整长条码后，打开「库存 → 产品 → 批次／序列号」，
+            确认只新增 <strong>1</strong> 条记录，名称与条码一致。</li>
+        <li>回到单据，确认只增加 <strong>1</strong> 条拣货行、数量为 1。</li>
+        <li>若仍被拆分，逐步把参数调到 1500、2000 再测；
+            同时观察扫码枪是否配置了字符间延迟（Inter-character delay）。</li>
+    </ol>
+
+    <div class="note">
+        只调大参数不会改变扫码业务规则；它仅决定「多久没有新字符就把当前缓冲当成一个完整条码」。
+        已拆分产生的错误序列号／拣货行需要单独删除，调参不会自动修复历史数据。
+    </div>
+</section>
+</body>
+</html>

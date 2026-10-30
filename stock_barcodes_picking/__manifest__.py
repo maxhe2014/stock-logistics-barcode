@@ -12,6 +12,7 @@
     "post_init_hook": "post_init_hook",
     "data": [
         "security/ir.model.access.csv",
+        "data/ir_config_parameter.xml",
         "data/ir_actions_client.xml",
         "wizard/stock_barcodes_picking_views.xml",
         "views/stock_picking_views.xml",

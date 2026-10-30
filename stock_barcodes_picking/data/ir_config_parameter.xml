@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Default barcode scan timing for the picking scan app.
+
+  Odoo's barcode service flushes the keyboard buffer as soon as the gap
+  between two characters exceeds this value (150 ms by default). Long
+  codes sent by phones, Bluetooth scanners or IMEs are often split into
+  several chunks, and each chunk is then handled as a separate barcode
+  (e.g. several serial numbers for a single scan).
+
+  The function only runs on install (noupdate="1"), so an administrator
+  changing the value later is not overridden by a module upgrade.
+-->
+<odoo>
+    <data noupdate="1">
+        <function model="ir.config_parameter"
+                  name="set_param"
+                  eval="('barcode.max_time_between_keys_in_ms', '1500')"/>
+    </data>
+</odoo>
