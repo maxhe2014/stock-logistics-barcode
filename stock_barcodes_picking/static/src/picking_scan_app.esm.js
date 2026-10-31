@@ -7,22 +7,8 @@ import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { AutoComplete } from "@web/core/autocomplete/autocomplete";
-import { Dialog } from "@web/core/dialog/dialog";
+import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog";
 import { browser } from "@web/core/browser/browser";
-
-class PackageSelectDialog extends Component {
-    static template = "stock_barcodes_picking.PackageSelectDialog";
-    static components = { Dialog, AutoComplete };
-    static props = { close: Function, sources: Array };
-
-    get title() {
-        return _t("Select Package");
-    }
-
-    get searchPlaceholder() {
-        return _t("Search a package...");
-    }
-}
 
 /**
  * PickingScanApp — thin OWL client action for the outgoing-picking
@@ -49,6 +35,8 @@ export class PickingScanApp extends Component {
         this.actionService = useService("action");
         this.notification = useService("notification");
         this.barcodeService = useService("barcode");
+        this.dialogService = useService("dialog");
+        this._closePackageDialog = null;
         // Global keyboard scanner: any barcode_scanned event from the CE
         // barcode service triggers _onScan. Covers hardware scanners and
         // the mobile camera scanner alike.
@@ -140,8 +128,6 @@ export class PickingScanApp extends Component {
             editingPackageMoveId: false,
             editingPackageId: false,
             packageDraftName: "",
-            // Select-package inline Many2One editor
-            selectingPackage: false,
         });
 
         // Sound alert for scan errors. Only an error tone is used
@@ -193,6 +179,7 @@ export class PickingScanApp extends Component {
         onWillUnmount(() => {
             window.removeEventListener("popstate", this._onPopState, { capture: true });
             clearTimeout(this._highlightTimer);
+            this._closePackageDialog?.();
         });
     }
 
@@ -746,51 +733,28 @@ export class PickingScanApp extends Component {
     }
 
     /**
-     * Toggle the inline package selector.
-     *
-     * Replaces the old window.prompt() with the standard AutoComplete
-     * so the operator can search and pick an existing package to bind
+     * Open a dialog to search and pick an existing package to bind
      * the unpacked picked lines to.
      */
     onSelectPackage() {
-        if (this.state.scanning || !this.wizId) {
+        if (this.state.scanning || !this.wizId || this._closePackageDialog) {
             return;
         }
-        this.state.selectingPackage = !this.state.selectingPackage;
-    }
-
-    onCancelPackageSelect() {
-        this.state.selectingPackage = false;
-    }
-
-    /**
-     * AutoComplete source for package selection: name_search on
-     * stock.package and return selectable options.
-     */
-    async loadPackageSelectOptions(name) {
-        try {
-            const results = await this.orm.call(
-                "stock.package",
-                "name_search",
-                [],
-                { name: name || "", limit: 8 }
-            );
-            return results.map(([id, label]) => ({
-                label,
-                onSelect: () => this.onPackageSelected({ id }),
-            }));
-        } catch {
-            return [];
-        }
-    }
-
-    get packageSelectSources() {
-        return [
+        this._closePackageDialog = this.dialogService.add(
+            SelectCreateDialog,
             {
-                placeholder: _t("Loading..."),
-                options: this.loadPackageSelectOptions.bind(this),
+                resModel: "stock.package",
+                title: _t("Select Package"),
+                multiSelect: false,
+                noCreate: true,
+                onSelected: (resIds) => this.onPackageSelected({ id: resIds[0] }),
             },
-        ];
+            {
+                onClose: () => {
+                    this._closePackageDialog = null;
+                },
+            }
+        );
     }
 
     /**
@@ -802,7 +766,6 @@ export class PickingScanApp extends Component {
             return;
         }
         const packageId = value.id;
-        this.state.selectingPackage = false;
         this.state.scanning = true;
         try {
             const res = await this.orm.call(

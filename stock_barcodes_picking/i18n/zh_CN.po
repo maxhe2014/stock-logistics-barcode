@@ -932,6 +932,7 @@ msgstr "已扫描源库位"
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #. odoo-python
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Select Package"

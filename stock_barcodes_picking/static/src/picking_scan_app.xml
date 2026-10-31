@@ -364,30 +364,12 @@
                         t-on-click="onPutInPack"
                     >Put in Pack</button>
 
-                    <t t-if="state.selectingPackage">
-                        <div class="d-flex align-items-center gap-1 bg-light border rounded p-1">
-                            <AutoComplete
-                                value="''"
-                                sources="packageSelectSources"
-                                placeholder="'Search a package...'"
-                                autofocus="true"
-                                class="'o_package_rename_ac'"
-                            />
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    t-on-click="onCancelPackageSelect">
-                                <i class="fa fa-times"/>
-                            </button>
-                        </div>
-                    </t>
-                    <t t-else="">
-                        <button
-                            t-if="canPutInPack"
-                            type="button"
-                            class="btn btn-outline-primary btn-lg"
-                            t-on-click="onSelectPackage"
-                        >Select Package</button>
-                    </t>
+                    <button
+                        t-if="canPutInPack"
+                        type="button"
+                        class="btn btn-outline-primary btn-lg"
+                        t-on-click="onSelectPackage"
+                    >Select Package</button>
 
                     <button
                         t-if="canConsumeByDemand"
