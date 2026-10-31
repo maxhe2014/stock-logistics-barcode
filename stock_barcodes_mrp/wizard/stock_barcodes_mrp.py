@@ -698,6 +698,31 @@ class WizStockBarcodesMrp(models.TransientModel):
         )
         return True
 
+    def _validate_finished_lot_reuse(self, lot):
+        """Reject a serial already produced on another, uncompensated MO."""
+        self.ensure_one()
+        production = self.production_id
+        if (
+            not production
+            or not lot
+            or production.product_id.tracking != "serial"
+            or lot in production.lot_producing_ids
+            or lot in production.move_raw_ids.lot_ids
+        ):
+            return True
+        if not production._are_finished_serials_already_produced(lot):
+            return True
+        self._set_message(
+            "error",
+            self.env._(
+                "Serial number %(lot)s for product %(product)s has already "
+                "been produced and cannot be reused.",
+                lot=lot.name,
+                product=production.product_id.display_name,
+            ),
+        )
+        return False
+
     def _scan_finished_lot(self, barcode):
         """Scan an EXISTING lot/serial of the finished product.
 
@@ -747,6 +772,8 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.env._("MO already has SN %(cur)s bound. Clear it first to "
                   "scan a different one.", **{"cur": current_bound[0].name}),
             )
+            return True
+        if not self._validate_finished_lot_reuse(lot):
             return True
         # --- No bound lot yet: bind it ---
         # End the component phase and clear any click-selected component
@@ -1209,8 +1236,11 @@ class WizStockBarcodesMrp(models.TransientModel):
             return True
         if len(products) == 1:
             return self._resolve_lot_owner(self.env["stock.lot"], products)
-        # Neither lot nor product found -> keep current behavior
-        return self._create_new_lot_flow(barcode)
+        # The product context owns this barcode as a component SN. Stop
+        # dispatch even when validation rejects it, otherwise an unknown
+        # component SN could be rebound as a new finished-product SN.
+        self._create_new_lot_flow(barcode)
+        return True
 
     def _create_new_lot_flow(self, barcode):
         """Treat an unknown barcode as a new lot for the current product."""
@@ -1247,8 +1277,9 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self.location_id = self.production_id.location_src_id
             result = self.action_confirm()
             if not result:
+                # Keep action_confirm's specific error (for example no
+                # stock); _set_message_step() would overwrite it.
                 self.step = 3
-                self._set_message_step()
             return True
         self._set_message("info", self.env._("New lot: %s. Enter qty and confirm.", barcode))
         self.step = 4
@@ -1486,8 +1517,8 @@ class WizStockBarcodesMrp(models.TransientModel):
                     self.product_qty = 1.0
                     if not self.location_id:
                         self.location_id = self.production_id.location_src_id
-                    self.action_confirm()
-                    self._set_message_step()
+                    if self.action_confirm():
+                        self._set_message_step()
                     return True
                 self._set_message(
                     "info", self.env._("Lot: %s. Enter qty and confirm.", lot.name)
@@ -1729,7 +1760,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             return
         domain = [
             ("product_id", "=", self.product_id.id),
-            ("location_id", "=", self.location_id.id),
+            ("location_id", "child_of", self.location_id.id),
         ]
         if self.lot_id:
             domain.append(("lot_id", "=", self.lot_id.id))
@@ -1765,6 +1796,36 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not self.product_qty or self.product_qty <= 0:
             self._set_message("error", self.env._("Quantity must be positive"))
             return False
+
+        # A serial component must physically exist at the scanned source
+        # location. Own-MO reservations remain consumable because this checks
+        # on-hand quantity rather than subtracting all reserved quantity.
+        if self.product_id.tracking == "serial":
+            quantity = 0.0
+            if self.lot_id:
+                groups = self.env["stock.quant"].read_group(
+                    [
+                        ("product_id", "=", self.product_id.id),
+                        ("location_id", "child_of", self.location_id.id),
+                        ("lot_id", "=", self.lot_id.id),
+                    ],
+                    ["quantity"],
+                    [],
+                    orderby="id",
+                )
+                quantity = groups[0]["quantity"] if groups else 0.0
+            self.qty_available = quantity
+            if self.product_id.uom_id.compare(quantity, 1.0) < 0:
+                self._set_message(
+                    "error",
+                    self.env._(
+                        "Component serial number %(lot)s has no stock in "
+                        "location %(location)s and cannot be consumed.",
+                        lot=self.lot_id.name or self.lot_name,
+                        location=self.location_id.display_name,
+                    ),
+                )
+                return False
 
         # Process lot creation if needed
         if not self.lot_id and self.lot_name and self.product_id.tracking != "none":
@@ -2062,6 +2123,8 @@ class WizStockBarcodesMrp(models.TransientModel):
                 }),
             )
             return False
+        if not self._validate_finished_lot_reuse(lot):
+            return False
         # Idempotent: replace semantics, safe to call repeatedly.
         self._apply_finished_lot_to_mo(lot)
         self._set_message(
@@ -2144,6 +2207,8 @@ class WizStockBarcodesMrp(models.TransientModel):
         qty = self.finished_qty_producing or self.production_id.qty_producing
         if not qty or qty <= 0:
             self._set_message("error", self.env._("Quantity to produce must be positive"))
+            return False
+        if not self._validate_finished_lot_reuse(lot):
             return False
         # Apply lot + qty to MO. Reuse _apply_finished_lot_to_mo so serial
         # tracking keeps qty_producing == len(lot_producing_ids) (otherwise

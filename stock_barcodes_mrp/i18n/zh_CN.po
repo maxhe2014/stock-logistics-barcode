@@ -320,6 +320,14 @@ msgstr "组件状态"
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"Component serial number %(lot)s has no stock in location %(location)s and "
+"cannot be consumed."
+msgstr "组件序列号 %(lot)s 在库位 %(location)s 没有库存，不能消耗。"
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Component scanned: %(prod)s x%(qty)s"
 msgstr "已扫描组件：%(prod)s x%(qty)s"
 
@@ -1238,6 +1246,14 @@ msgstr "序列号"
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Serial component %s must be consumed by scanning SNs"
 msgstr "序列号组件 %s 必须通过扫描序列号来消耗"
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"Serial number %(lot)s for product %(product)s has already been produced "
+"and cannot be reused."
+msgstr "序列号 %(lot)s 已用于生产产品「%(product)s」，不能重复使用。"
 
 #. module: stock_barcodes_mrp
 #. odoo-python

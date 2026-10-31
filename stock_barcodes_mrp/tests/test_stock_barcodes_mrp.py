@@ -2720,12 +2720,8 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertNotEqual(wiz.step, 4)
         self.assertFalse(wiz.product_id)
 
-    def test_t6_create_new_lot_uses_active_move(self):
-        """Unknown barcode borrows active_move's product as context.
-
-        For a serial component, the new SN is auto-created and consumed
-        (qty=1) immediately — no step=4 quantity prompt.
-        """
+    def test_t6_unknown_serial_with_active_move_rejected_without_stock(self):
+        """An unknown SN borrowed from active_move must not be auto-created."""
         mo = self._t6_fresh_2comp_mo()
         wiz = self.env["wiz.stock.barcodes.mrp"].create({
             "production_id": mo.id,
@@ -2737,24 +2733,19 @@ class TestStockBarcodesMrp(TransactionCase):
             lambda m: m.product_id == self.component_serial_a
         )
         wiz.set_active_move(move_a.id)
-        self.action_barcode_scanned(wiz, "DEFINITELY-NOT-A-BARCODE-888")
-        # Serial auto-consume runs; after success values are cleaned (step=2).
-        self.assertEqual(wiz.step, 2)
-        self.assertNotIn("for False", wiz.message or "")
-        # A move line was created for the new lot on component A.
-        ml = move_a.move_line_ids.filtered(
-            lambda l: l.lot_id.name == "DEFINITELY-NOT-A-BARCODE-888"
-        )
-        self.assertTrue(ml)
-        self.assertEqual(ml.quantity, 1.0)
+        barcode = "DEFINITELY-NOT-A-BARCODE-888"
+        self.action_barcode_scanned(wiz, barcode)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn(barcode, wiz.message)
+        self.assertIn("no stock", wiz.message)
+        self.assertFalse(self.StockProductionLot.search([("name", "=", barcode)]))
+        self.assertFalse(mo.lot_producing_ids)
+        self.assertFalse(move_a.move_line_ids.filtered(
+            lambda line: line.lot_id.name == barcode
+        ))
 
-    def test_t6_create_new_lot_serial_autoconsume_via_product_scan(self):
-        """Scan serial component product, then a new SN → auto-create + consume.
-
-        Regression: previously _create_new_lot_flow set step=4 for serial
-        products too, yielding 'Enter the quantity for <component>' instead
-        of consuming the single serial unit.
-        """
+    def test_t6_unknown_serial_after_product_scan_rejected_without_stock(self):
+        """A component SN with no stock must not become a finished SN."""
         mo = self._t6_fresh_2comp_mo()
         wiz = self.env["wiz.stock.barcodes.mrp"].create({
             "production_id": mo.id,
@@ -2762,21 +2753,16 @@ class TestStockBarcodesMrp(TransactionCase):
             "res_id": mo.id,
         })
         self.action_barcode_scanned(wiz, self.finished_product_serial.barcode)
-        # Scan component product barcode → step 3 (scan lot).
         self.action_barcode_scanned(wiz, self.component_serial_a.barcode)
         self.assertEqual(wiz.product_id, self.component_serial_a)
         self.assertEqual(wiz.step, 3)
-        # Scan a brand-new serial SN → should auto-create lot and consume.
-        self.action_barcode_scanned(wiz, "T6-NEW-SERIAL-SN-001")
-        self.assertEqual(wiz.step, 2)  # cleaned after consume
-        move_a = mo.move_raw_ids.filtered(
-            lambda m: m.product_id == self.component_serial_a
-        )
-        ml = move_a.move_line_ids.filtered(
-            lambda l: l.lot_id.name == "T6-NEW-SERIAL-SN-001"
-        )
-        self.assertTrue(ml)
-        self.assertEqual(ml.quantity, 1.0)
+        barcode = "T6-NEW-SERIAL-SN-001"
+        self.action_barcode_scanned(wiz, barcode)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn(barcode, wiz.message)
+        self.assertIn("no stock", wiz.message)
+        self.assertFalse(self.StockProductionLot.search([("name", "=", barcode)]))
+        self.assertFalse(mo.lot_producing_ids)
 
     def test_t6_scan_state_includes_component_lots(self):
         """get_scan_state components expose scanned lot names for display."""
@@ -2922,6 +2908,41 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertIn("SN-DUPLICATE-001", message)
         self.assertIn(self.finished_product_serial.name, message)
 
+    def test_scan_duplicate_finished_sn_rejected_before_binding(self):
+        """A previously produced SN is rejected by the scan, not at finish."""
+        first_mo = self.MrpProduction.create({
+            "product_id": self.finished_product_serial.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_serial.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        first_mo.action_confirm()
+        first_mo.action_assign()
+        first_wiz = self.WizScanMrp.create({"production_id": first_mo.id})
+        self.action_barcode_scanned(first_wiz, self.finished_product_serial.barcode)
+        barcode = "SN-DUPLICATE-SCAN-001"
+        self.action_barcode_scanned(first_wiz, barcode)
+        self.assertIs(first_wiz.action_finish_production(), True)
+        produced_sn = first_mo.lot_producing_ids
+        self.assertEqual(produced_sn.name, barcode)
+
+        second_mo = self.MrpProduction.create({
+            "product_id": self.finished_product_serial.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom_serial.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        second_mo.action_confirm()
+        second_wiz = self.WizScanMrp.create({"production_id": second_mo.id})
+        self.action_barcode_scanned(second_wiz, barcode)
+        self.assertEqual(second_wiz.message_type, "error")
+        self.assertIn(barcode, second_wiz.message)
+        self.assertIn("already been produced", second_wiz.message)
+        self.assertFalse(second_wiz.finished_lot_id)
+        self.assertFalse(second_mo.lot_producing_ids)
+
     # --- T7: scan a component SN without selecting a product/row ---
     def _t7_fresh_wizard(self, mo):
         return self.env["wiz.stock.barcodes.mrp"].create({
@@ -2952,6 +2973,28 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertTrue(lines.picked)
         # Single active move for that product -> row highlighted.
         self.assertEqual(wiz.active_move_id, move_a)
+
+    def test_t7_component_serial_without_stock_rejected(self):
+        """An existing component SN with no source-location stock is blocked."""
+        lot = self.StockProductionLot.create({
+            "name": "SN-SER-A-NO-STOCK",
+            "product_id": self.component_serial_a.id,
+            "company_id": False,
+        })
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self._t7_fresh_wizard(mo)
+        self.action_barcode_scanned(wiz, lot.name)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn(lot.name, wiz.message)
+        self.assertIn("no stock", wiz.message)
+        self.assertEqual(wiz.qty_available, 0.0)
+        move_a = mo.move_raw_ids.filtered(
+            lambda move: move.product_id == self.component_serial_a
+        )
+        self.assertFalse(move_a.move_line_ids.filtered(
+            lambda line: line.lot_id == lot and line.picked
+        ))
+        self.assertFalse(mo.lot_producing_ids)
 
     def test_t7_scan_component_lot_without_product(self):
         """Lot-tracked component scanned with nothing selected -> qty step."""
@@ -2984,10 +3027,16 @@ class TestStockBarcodesMrp(TransactionCase):
 
     def test_t7_ambiguous_sn_requires_row_selection(self):
         """Same SN name on two MO components -> more_match, then recovery."""
-        self.StockProductionLot.create({
+        component_a_lot = self.StockProductionLot.create({
             "name": "SN-SER-B-SHARED",
             "product_id": self.component_serial_a.id,
             "company_id": False,
+        })
+        self.StockQuant.create({
+            "product_id": self.component_serial_a.id,
+            "lot_id": component_a_lot.id,
+            "location_id": self.components_location.id,
+            "quantity": 1.0,
         })
         mo = self._t6_fresh_2comp_mo()
         wiz = self._t7_fresh_wizard(mo)
