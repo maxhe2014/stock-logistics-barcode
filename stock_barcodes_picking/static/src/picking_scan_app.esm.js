@@ -76,6 +76,9 @@ export class PickingScanApp extends Component {
         // Local UI mirror of the wizard state. Hydrated from
         // ``get_scan_state()`` after every interaction; rendered by the
         // t-* directives in the template.
+        // Scans arriving while an RPC is in flight are buffered here and
+        // drained in order (see _onScan), so fast scanners lose nothing.
+        this._scanQueue = [];
         this.state = useState({
             message: "",
             message_type: "info",
@@ -205,15 +208,34 @@ export class PickingScanApp extends Component {
     }
 
     /**
+     * Scan entry point — serializes scans through a queue.
+     *
+     * A hardware scanner can fire faster than the per-scan RPC round trip;
+     * previously those scans were silently dropped. Every barcode is now
+     * queued and processed in order by a single worker, so a burst of
+     * scans cannot lose codes (each scan is still one RPC).
+     */
+    async _onScan(barcode) {
+        if (!barcode) {
+            return;
+        }
+        this._scanQueue.push(barcode);
+        if (this.state.scanning) {
+            // A running worker will drain the queue.
+            return;
+        }
+        while (this._scanQueue.length) {
+            await this._scanOne(this._scanQueue.shift());
+        }
+    }
+
+    /**
      * Core scan handler — single RPC entry.
      * Calls process_barcode_and_dispatch(barcode) → {action, state}.
      * Tracks the last unmatched barcode so the "Force add?" button can
      * pass it back to action_force_add_from_barcode.
      */
-    async _onScan(barcode) {
-        if (!barcode || this.state.scanning) {
-            return;
-        }
+    async _scanOne(barcode) {
         // When the candidate selector is open, the manual input is
         // disabled, but the hardware scanner can still fire. Let the
         // scan through — the backend guard only accepts picking-name

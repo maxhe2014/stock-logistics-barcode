@@ -40,6 +40,9 @@ export class MrpScanApp extends Component {
         );
 
         this.wizId = this.props.action.params?.wiz_id;
+        // Scans arriving while an RPC is in flight are buffered here and
+        // drained in order (see _onScan), so fast scanners lose nothing.
+        this._scanQueue = [];
         // Local UI mirror of the wizard state. Hydrated from
         // `get_scan_state()` after every scan; rendered by the
         // t-* directives in the template.
@@ -100,14 +103,32 @@ export class MrpScanApp extends Component {
     }
 
     /**
+     * Scan entry point — serializes scans through a queue.
+     *
+     * A hardware scanner can fire faster than the per-scan RPC round trip;
+     * previously those scans were silently dropped. Every barcode is now
+     * queued and processed in order by a single worker.
+     */
+    async _onScan(barcode) {
+        if (!barcode) {
+            return;
+        }
+        this._scanQueue.push(barcode);
+        if (this.state.scanning) {
+            // A running worker will drain the queue.
+            return;
+        }
+        while (this._scanQueue.length) {
+            await this._scanOne(this._scanQueue.shift());
+        }
+    }
+
+    /**
      * Core scan handler — single RPC entry.
      * Calls process_barcode_and_dispatch(barcode) → {action, state}.
      * If action is non-null, auto-doAction into the filtered MO list.
      */
-    async _onScan(barcode) {
-        if (!barcode || this.state.scanning) {
-            return;
-        }
+    async _scanOne(barcode) {
         this.state.scanning = true;
         try {
             const res = await this.orm.call(

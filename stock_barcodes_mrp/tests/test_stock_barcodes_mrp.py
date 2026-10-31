@@ -2702,10 +2702,10 @@ class TestStockBarcodesMrp(TransactionCase):
     def test_t6_create_new_lot_requires_product(self):
         """_create_new_lot_flow without product context must not set step=4.
 
-        The defensive branch is unreachable via normal dispatch (_scan_lot
-        returns False when both product_id and active_move_id are empty, and
-        _accept_new_finished_lot catches the barcode as a finished SN), so
-        the method is invoked directly.
+        The defensive branch is unreachable via normal dispatch: an
+        existing lot is resolved by _scan_lot_without_product, and an
+        unknown barcode falls through to _accept_new_finished_lot as a
+        finished SN — so the method is invoked directly.
 
         Regression: _create_new_lot_flow set step=4 while product_id was
         empty, yielding 'Enter the quantity for False'.
@@ -2921,3 +2921,100 @@ class TestStockBarcodesMrp(TransactionCase):
         message = str(caught.exception)
         self.assertIn("SN-DUPLICATE-001", message)
         self.assertIn(self.finished_product_serial.name, message)
+
+    # --- T7: scan a component SN without selecting a product/row ---
+    def _t7_fresh_wizard(self, mo):
+        return self.env["wiz.stock.barcodes.mrp"].create({
+            "production_id": mo.id,
+            "res_model_id": self.env.ref("mrp.model_mrp_production").id,
+            "res_id": mo.id,
+        })
+
+    def test_t7_scan_component_sn_without_product_serial(self):
+        """Component serial scanned with nothing selected -> product resolved.
+
+        Mirrors stock_barcodes_picking: the SN itself tells which product
+        to consume, so no product barcode / row click is required.
+        """
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self._t7_fresh_wizard(mo)
+        self.assertFalse(wiz.product_id)
+        self.assertFalse(wiz.active_move_id)
+        self.action_barcode_scanned(wiz, self.lot_serial_a_shared.name)
+        self.assertNotIn("Barcode not found", wiz.message or "")
+        move_a = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_a
+        )
+        lines = move_a.move_line_ids.filtered(
+            lambda l: l.lot_id == self.lot_serial_a_shared
+        )
+        self.assertTrue(lines, "component A SN must be consumed")
+        self.assertTrue(lines.picked)
+        # Single active move for that product -> row highlighted.
+        self.assertEqual(wiz.active_move_id, move_a)
+
+    def test_t7_scan_component_lot_without_product(self):
+        """Lot-tracked component scanned with nothing selected -> qty step."""
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.assertFalse(wiz.product_id)
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
+        self.assertEqual(wiz.product_id, self.component_tracked)
+        self.assertEqual(wiz.lot_id, self.component_lot)
+        self.assertEqual(wiz.step, 4)
+
+    def test_t7_scan_foreign_sn_rejected(self):
+        """A SN of a product outside this MO is rejected with a clear error."""
+        foreign_product = self.Product.create({
+            "name": "Foreign Serial Product",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "serial",
+        })
+        self.StockProductionLot.create({
+            "name": "SN-FOREIGN-001",
+            "product_id": foreign_product.id,
+            "company_id": False,
+        })
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "SN-FOREIGN-001")
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("not part of this MO", wiz.message)
+        self.assertFalse(wiz.product_id)
+        self.assertFalse(wiz.lot_id)
+
+    def test_t7_ambiguous_sn_requires_row_selection(self):
+        """Same SN name on two MO components -> more_match, then recovery."""
+        self.StockProductionLot.create({
+            "name": "SN-SER-B-SHARED",
+            "product_id": self.component_serial_a.id,
+            "company_id": False,
+        })
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self._t7_fresh_wizard(mo)
+        self.action_barcode_scanned(wiz, "SN-SER-B-SHARED")
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertFalse(wiz.product_id)
+        # Recovery: scanning the component product barcode narrows it.
+        self.action_barcode_scanned(wiz, "PROD-COMP-SER-A")
+        self.assertEqual(wiz.product_id, self.component_serial_a)
+        self.action_barcode_scanned(wiz, "SN-SER-B-SHARED")
+        # Serial auto-consumed, so the scan fields are cleared again; assert
+        # on the move line of component A.
+        move_a = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_serial_a
+        )
+        lines = move_a.move_line_ids.filtered(
+            lambda l: l.lot_id.name == "SN-SER-B-SHARED"
+            and l.lot_id.product_id == self.component_serial_a
+        )
+        self.assertTrue(lines, "resolved SN must be consumed on component A")
+        self.assertTrue(lines.picked)
+
+    def test_t7_unknown_barcode_still_accepted_as_finished_sn(self):
+        """Unknown codes keep working as new finished serials."""
+        mo = self._t6_fresh_2comp_mo()
+        wiz = self._t7_fresh_wizard(mo)
+        self.action_barcode_scanned(wiz, "NEW-FIN-SN-001")
+        self.assertEqual(wiz.finished_lot_name, "NEW-FIN-SN-001")
+        self.assertEqual(wiz.message_type, "success")
+

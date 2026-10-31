@@ -717,20 +717,23 @@ class WizStockBarcodesPicking(models.TransientModel):
         """
         self.ensure_one()
         active_states = ("confirmed", "assigned", "partially_available")
-        pickings = self.env["stock.picking"].search([
-            ("name", "=", barcode),
-            ("state", "in", active_states),
-        ])
-        if not pickings:
-            if self.env["stock.picking"].search_count(
-                [("name", "=", barcode)], limit=1
-            ):
+        # One search instead of search + search_count: an inactive picking
+        # (draft/done/cancel) must still raise the explicit state error
+        # rather than fall through to the product scanner, so the whole
+        # name match is fetched and partitioned here.
+        pickings = self.env["stock.picking"].search([("name", "=", barcode)])
+        active_pickings = pickings.filtered(
+            lambda p: p.state in active_states
+        )
+        if not active_pickings:
+            if pickings:
                 self._set_message(
                     "error",
                     self.env._("Transfer %s is not active (draft/done/cancelled)", barcode),
                 )
                 return True
             return False
+        pickings = active_pickings
         if len(pickings) > 1:
             # Multiple active pickings share this name. Populate the
             # candidate selector and open it. The dispatch guard below
@@ -751,6 +754,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         return True
 
     def _scan_location(self, barcode):
+        # Source-location scanning is opt-in per operation type. When it
+        # is off the operator never scans a location, so skip the lookup
+        # entirely: every barcode used to pay one stock.location SELECT.
+        if not self.barcode_scan_source_location:
+            return False
         # Only internal (physical stock) locations are valid source
         # locations for picking. Customer/supplier/virtual locations are
         # rejected with a distinct message so the operator knows whether
@@ -785,6 +793,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         location); customer/supplier locations are also accepted for
         outgoing/incoming pickings.
         """
+        # Destination scanning is opt-in as well; skip the lookup for the
+        # operation types that do not scan it (saves one SELECT per scan).
+        if not self.barcode_scan_dest_location:
+            return False
         any_location = self.env["stock.location"].search(
             [("barcode", "=", barcode)], limit=1
         )
@@ -884,13 +896,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.lot_name = lot.name
         self.product_id = lot.product_id
         self.product_uom_id = lot.product_id.uom_id
-        self._compute_qty_available()
+        lot_quants = self._compute_qty_available()
         if self.product_tracking == "serial":
             self.product_qty = 1.0
             # No location fallback: serial auto-confirm will fail in
             # action_confirm ("No source location scanned") until the
             # operator scans the source location.
-            self.action_confirm()
+            self.action_confirm(lot_quants=lot_quants)
             return True
         self._set_message(
             "info", self.env._("Lot: %s. Enter qty and confirm.", lot.name)
@@ -1090,13 +1102,13 @@ class WizStockBarcodesPicking(models.TransientModel):
             if lot:
                 self.lot_id = lot
                 self.lot_name = lot.name
-                self._compute_qty_available()
+                lot_quants = self._compute_qty_available()
                 if product.tracking == "serial":
                     self.product_qty = 1.0
                     # Keep the error set by action_confirm (e.g. serial
                     # not in the scanned location) instead of replacing
                     # it with the generic step instruction.
-                    if not self.action_confirm():
+                    if not self.action_confirm(lot_quants=lot_quants):
                         return True
                     self._set_message_step()
                     self._set_message(
@@ -1149,24 +1161,46 @@ class WizStockBarcodesPicking(models.TransientModel):
         })
 
     def _compute_qty_available(self):
+        """Set ``qty_available`` and return the quants that were read.
+
+        The returned recordset lets the serial confirm path
+        (``_get_serial_pick_error``) reuse the same read instead of
+        querying the lot's quants a second time.
+        """
+        self.qty_available = 0.0
         if not self.product_id or not self.location_id:
-            self.qty_available = 0.0
-            return
-        domain = [
+            return self.env["stock.quant"]
+        if self.lot_id:
+            quants = self.env["stock.quant"].search([
+                ("product_id", "=", self.product_id.id),
+                ("lot_id", "=", self.lot_id.id),
+            ])
+            self.qty_available = sum(
+                q.quantity for q in quants
+                if q.location_id == self.location_id
+            )
+            return quants
+        quants = self.env["stock.quant"].search([
             ("product_id", "=", self.product_id.id),
             ("location_id", "=", self.location_id.id),
-        ]
-        if self.lot_id:
-            domain.append(("lot_id", "=", self.lot_id.id))
+        ])
         # Barcode scenario: at most a handful of quants for one product +
-        # location (+ optional lot). search+mapped is clearer than the
-        # Odoo 19 _read_group tuple format and avoids the deprecated
-        # read_group API.
-        quants = self.env["stock.quant"].search(domain)
+        # location. search+mapped is clearer than the Odoo 19 _read_group
+        # tuple format and avoids the deprecated read_group API.
         self.qty_available = sum(quants.mapped("quantity"))
+        return quants
+
+    def _get_lot_quants(self, lot, quants=None):
+        """Positive quants of ``lot``, reusing ``quants`` when provided."""
+        if quants is None:
+            quants = self.env["stock.quant"].search([
+                ("product_id", "=", lot.product_id.id),
+                ("lot_id", "=", lot.id),
+            ])
+        return quants.filtered(lambda q: q.quantity > 0)
 
     # --- Action methods ---
-    def _get_serial_pick_error(self, lot):
+    def _get_serial_pick_error(self, lot, quants=None):
         """Return why ``lot`` cannot be picked from the scanned source.
 
         This module only drives outgoing transfers, so an existing serial
@@ -1190,11 +1224,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             location = move.location_id if move else self.picking_id.location_id
         if not location:
             return False
-        quants = self.env["stock.quant"].search([
-            ("product_id", "=", lot.product_id.id),
-            ("lot_id", "=", lot.id),
-            ("quantity", ">", 0),
-        ])
+        quants = self._get_lot_quants(lot, quants=quants)
         # Already delivered: sending it again would create a second unit
         # of the same serial at the customer location.
         if quants.filtered(lambda q: q.location_id.usage == "customer"):
@@ -1244,8 +1274,13 @@ class WizStockBarcodesPicking(models.TransientModel):
             )
         return False
 
-    def action_confirm(self):
-        """Confirm the scanned product and update stock move lines."""
+    def action_confirm(self, lot_quants=None):
+        """Confirm the scanned product and update stock move lines.
+
+        :param lot_quants: quants of the scanned lot already read during
+            the scan (``_compute_qty_available``); avoids a second
+            quant query on the serial validation path.
+        """
         if not self._check_selector_resolved():
             return False
         if self.picking_state == "draft":
@@ -1306,7 +1341,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             and self.product_id.tracking == "serial"
             and self.lot_id
         ):
-            error = self._get_serial_pick_error(self.lot_id)
+            error = self._get_serial_pick_error(self.lot_id, quants=lot_quants)
             if error:
                 self._set_message("error", error)
                 return False
@@ -1395,7 +1430,10 @@ class WizStockBarcodesPicking(models.TransientModel):
             )
             return False
 
-        existing_lines = moves.mapped("move_line_ids").filtered(
+        # Read the moves' lines once; every filtered/compare below works on
+        # this recordset (mapped() re-read the same lines three times).
+        all_lines = moves.move_line_ids
+        existing_lines = all_lines.filtered(
             lambda l: (
                 l.product_id == self.product_id
                 and (not self.location_id or l.location_id == self.location_id)
@@ -1412,7 +1450,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             and self.product_id.tracking == "serial"
             and self.lot_id
         ):
-            existing_lines = moves.mapped("move_line_ids").filtered(
+            existing_lines = all_lines.filtered(
                 lambda l: (
                     l.product_id == self.product_id
                     and (not self.location_id or l.location_id == self.location_id)
@@ -1420,7 +1458,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                     and not l.picked
                 )
             )
-        other_lines = moves.mapped("move_line_ids") - existing_lines
+        other_lines = all_lines - existing_lines
         # Only already-picked lines count against demand. Pre-filled
         # reception lines (quantity set, picked=False) must not block
         # scanning.

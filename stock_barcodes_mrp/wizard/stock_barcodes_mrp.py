@@ -1064,7 +1064,12 @@ class WizStockBarcodesMrp(models.TransientModel):
         search_product = self.product_id
         if not search_product and self.active_move_id:
             search_product = self.active_move_id.product_id
-        if not search_product or search_product.tracking == "none":
+        if not search_product:
+            # No component selected at all: resolve the SN to its product
+            # so the operator can scan component serials directly instead
+            # of hitting "Barcode not found".
+            return self._scan_lot_without_product(barcode)
+        if search_product.tracking == "none":
             return False
         lot_domain = [("name", "=", barcode), ("product_id", "=", search_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
@@ -1098,6 +1103,49 @@ class WizStockBarcodesMrp(models.TransientModel):
         return True
 
     # --- TODO-A2: lot reverse lookup ---
+    def _scan_lot_without_product(self, barcode):
+        """Resolve a scanned lot/serial to its own product.
+
+        Called when neither ``product_id`` nor ``active_move_id`` gives a
+        search target, i.e. the operator scanned a component serial before
+        picking a product/row. Mirrors stock_barcodes_picking's "scan the
+        SN, the product follows" behaviour.
+
+        Returns False when the barcode is not an existing lot, so the
+        dispatch chain can still treat it as a new finished-product SN
+        (``_accept_new_finished_lot``). Deliberately does NOT fall back to
+        ``_create_new_lot_flow``: with no product that would raise a
+        "scan a product first" error and swallow the finished-SN path.
+        """
+        self.ensure_one()
+        if not self.production_id or not self.company_id:
+            return False
+        lots = self.env["stock.lot"].search([
+            ("name", "=", barcode),
+            ("company_id", "in", [self.company_id.id, False]),
+        ])
+        if not lots:
+            return False
+        if len(lots) > 1:
+            # Same SN name across several products: narrow to this MO's
+            # components (a foreign lot must not hijack the scan).
+            component_products = self.production_id.move_raw_ids.filtered(
+                lambda m: m.state not in ("done", "cancel")
+            ).product_id
+            narrowed = lots.filtered(
+                lambda lot_item: lot_item.product_id in component_products
+            )
+            if len(narrowed) != 1:
+                self._set_message(
+                    "more_match",
+                    self.env._("Multiple lots named %(sn)s found. Click the "
+                      "target component row first, then scan again.",
+                      **{"sn": barcode}),
+                )
+                return True
+            return self._resolve_lot_owner(narrowed, narrowed.product_id)
+        return self._resolve_lot_owner(lots, lots.product_id)
+
     def _scan_lot_fallback(self, barcode):
         """The scanned barcode is not a lot of the current product.
 
@@ -1418,6 +1466,16 @@ class WizStockBarcodesMrp(models.TransientModel):
             # case) keeps the selection for consecutive SN scans.
             if self.active_move_id and self.active_move_id.product_id != product:
                 self.active_move_id = False
+            # Highlight the target row when the product has exactly one
+            # active raw move, so the operator can see where the SN landed
+            # (mirrors stock_barcodes_picking's auto-selection). Several
+            # moves for the same product stay unselected — the move line
+            # distribution handles them.
+            single_move = component_moves.filtered(
+                lambda m: m.state not in ("done", "cancel")
+            )
+            if len(single_move) == 1:
+                self.active_move_id = single_move
             self.product_uom_id = product.uom_id
             if lot:
                 self.lot_id = lot
