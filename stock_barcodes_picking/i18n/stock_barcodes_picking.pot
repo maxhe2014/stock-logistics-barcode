@@ -865,6 +865,8 @@ msgid "Scan failed: %(err)s"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_stock_barcodes_picking_form
 msgid "Scan or type barcode…"
 msgstr ""
@@ -903,6 +905,12 @@ msgstr ""
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Select Package"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Select a transfer below…"
 msgstr ""
 
 #. module: stock_barcodes_picking

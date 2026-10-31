@@ -915,6 +915,12 @@ export class PickingScanApp extends Component {
 
     // --- Computed getters for template visibility ---
 
+    get barcodePlaceholder() {
+        return this.state.visible_switch_selector
+            ? _t("Select a transfer below…")
+            : _t("Scan or type barcode…");
+    }
+
     /** Map message_type → alert CSS class. */
     get alertClass() {
         const t = this.state.message_type || "info";

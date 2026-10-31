@@ -15,7 +15,7 @@
 <templates id="template" xml:space="preserve">
     <t t-name="stock_barcodes_mrp.MrpScanApp">
         <div class="o_mrp_scan_app d-flex flex-column h-100">
-            <!-- Header: manual scan input + escape-hatch button -->
+            <!-- Header: manual scan input + escape-hatch button + back -->
             <div class="o_mrp_scan_header p-3 border-bottom">
                 <div class="row g-2 align-items-center">
                     <div class="col">
@@ -39,6 +39,13 @@
                             t-on-click="onBackToFinishedLot">
                             <i class="fa fa-barcode me-1"/>扫成品SN
                         </button>
+                    </div>
+                    <div class="col-auto">
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-lg o_mrp_scan_header_back"
+                            t-on-click="onBack"
+                        >Back</button>
                     </div>
                 </div>
             </div>

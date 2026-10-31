@@ -23,7 +23,7 @@
                         <input
                             type="text"
                             class="form-control form-control-lg o_picking_scan_input"
-                            t-att-placeholder="state.visible_switch_selector ? 'Select a transfer below…' : 'Scan or type barcode…'"
+                            t-att-placeholder="barcodePlaceholder"
                             t-att-disabled="state.scanning or state.visible_switch_selector ? 'disabled' : ''"
                             t-on-keydown="onManualScanEnter"
                         />
