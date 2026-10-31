@@ -155,10 +155,13 @@
                                                 <i class="fa fa-barcode"/>
                                                 <t t-out="comp.lots[comp.lots.length - 1].name" />
                                             </span>
-                                            <span class="badge bg-info cursor-pointer"
-                                                  t-on-click.stop="() => this.onToggleComponentLots(comp.id)">
-                                                <t t-out="comp.lots.length" /> 个 SN
-                                            </span>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                                                    t-att-title="state.expandedComponentId === comp.id ? '收起全部' : '展开全部'"
+                                                    t-on-click.stop="() => this.onToggleComponentLots(comp.id)">
+                                                <i t-att-class="state.expandedComponentId === comp.id ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
+                                                共 <t t-out="comp.lots.length" /> 个
+                                            </button>
                                         </t>
                                         <t t-else="">
                                             <!-- Serial component, no SN yet: hint the operator -->

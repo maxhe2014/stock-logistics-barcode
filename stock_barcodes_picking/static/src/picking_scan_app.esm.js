@@ -7,7 +7,22 @@ import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { AutoComplete } from "@web/core/autocomplete/autocomplete";
+import { Dialog } from "@web/core/dialog/dialog";
 import { browser } from "@web/core/browser/browser";
+
+class PackageSelectDialog extends Component {
+    static template = "stock_barcodes_picking.PackageSelectDialog";
+    static components = { Dialog, AutoComplete };
+    static props = { close: Function, sources: Array };
+
+    get title() {
+        return _t("Select Package");
+    }
+
+    get searchPlaceholder() {
+        return _t("Search a package...");
+    }
+}
 
 /**
  * PickingScanApp — thin OWL client action for the outgoing-picking
