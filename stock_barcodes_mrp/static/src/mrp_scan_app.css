@@ -7,3 +7,24 @@
     align-items: center;
     justify-content: center;
 }
+
+/* Keep the component list as the scroll container in the flex layout. */
+.o_mrp_scan_components {
+    min-height: 0;
+}
+
+/* Briefly flash the exact component serial number that was just scanned. */
+@keyframes o_mrp_scan_recent_flash {
+    0%, 100% {
+        filter: brightness(1);
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    }
+    50% {
+        filter: brightness(1.75);
+        box-shadow: 0 0 0 0.3rem rgba(255, 193, 7, 0.65);
+    }
+}
+
+.o_mrp_scan_recent {
+    animation: o_mrp_scan_recent_flash 0.4s ease-in-out 5;
+}

@@ -109,6 +109,7 @@
                             <tr
                                 t-att-class="!comp.picked ? 'table-danger' : 'table-success'"
                                 t-att-style="state.active_move_id === comp.id ? 'border-left:4px solid #0d6efd;' : ''"
+                                t-att-data-scan-row="comp.id"
                                 t-on-click="() => this.onSelectMove(comp.id)"
                                 role="button"
                             >
@@ -134,7 +135,8 @@
                                          save columns and give the component name full width -->
                                     <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                         <t t-if="comp.lots.length === 1">
-                                            <span class="d-inline-flex align-items-center gap-1">
+                                            <span t-att-class="'d-inline-flex align-items-center gap-1' + (state.recentComponentLotKey === comp.id + ':' + comp.lots[0].id ? ' badge bg-info o_mrp_scan_recent' : '')"
+                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[0].id">
                                                 <i class="fa fa-barcode text-muted"/>
                                                 <span class="small">
                                                     <t t-out="comp.lots[0].name" />
@@ -148,6 +150,11 @@
                                             </span>
                                         </t>
                                         <t t-elif="comp.lots.length > 1">
+                                            <span t-att-class="'badge bg-info d-inline-flex align-items-center gap-1' + (state.recentComponentLotKey === comp.id + ':' + comp.lots[comp.lots.length - 1].id ? ' o_mrp_scan_recent' : '')"
+                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[comp.lots.length - 1].id">
+                                                <i class="fa fa-barcode"/>
+                                                <t t-out="comp.lots[comp.lots.length - 1].name" />
+                                            </span>
                                             <span class="badge bg-info cursor-pointer"
                                                   t-on-click.stop="() => this.onToggleComponentLots(comp.id)">
                                                 <t t-out="comp.lots.length" /> 个 SN
@@ -219,7 +226,9 @@
                                     <t t-foreach="comp.lots" t-as="sn" t-key="sn.id">
                                         <div class="d-flex align-items-center flex-wrap gap-2 small text-muted">
                                             <i class="fa fa-circle-o"/>
-                                            <span class="text-break" style="min-width: 0;">
+                                            <span t-att-class="'text-break' + (state.recentComponentLotKey === comp.id + ':' + sn.id ? ' badge bg-info o_mrp_scan_recent' : '')"
+                                                  t-att-data-scan-lot="comp.id + ':' + sn.id"
+                                                  style="min-width: 0;">
                                                 <t t-out="sn.name" />
                                             </span>
                                             <button type="button"

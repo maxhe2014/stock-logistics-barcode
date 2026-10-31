@@ -1,7 +1,7 @@
 // Copyright 2026 OpenViking
 // License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Component, useState, onWillStart, onPatched, onWillUnmount } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
@@ -43,6 +43,8 @@ export class MrpScanApp extends Component {
         // Scans arriving while an RPC is in flight are buffered here and
         // drained in order (see _onScan), so fast scanners lose nothing.
         this._scanQueue = [];
+        this._pendingComponentScanTarget = null;
+        this._highlightTimer = null;
         // Local UI mirror of the wizard state. Hydrated from
         // `get_scan_state()` after every scan; rendered by the
         // t-* directives in the template.
@@ -77,6 +79,8 @@ export class MrpScanApp extends Component {
             active_move_product_name: "",
             // Component scanned-SN expansion row (move id or false)
             expandedComponentId: false,
+            // Composite move_id:lot_id highlighted for two seconds after scanning.
+            recentComponentLotKey: "",
             // Inline quantity editing for non-serial components
             editingQtyMoveId: false,
             draftQty: "",
@@ -86,6 +90,39 @@ export class MrpScanApp extends Component {
             // First render: fetch the initial wizard state so the UI
             // shows the right step banner even before any scan.
             await this._refreshState();
+        });
+
+        // Keep a newly scanned component SN visible without moving the
+        // viewport when it is already on screen. Only the component-list
+        // container is adjusted, never the outer Odoo page.
+        onPatched(() => {
+            const target = this._pendingComponentScanTarget;
+            if (!target) {
+                return;
+            }
+            this._pendingComponentScanTarget = null;
+            const container = document.querySelector(".o_mrp_scan_components");
+            if (!container) {
+                return;
+            }
+            const lotKey = `${target.moveId}:${target.lotId}`;
+            const el = container.querySelector(`[data-scan-lot="${lotKey}"]`)
+                || container.querySelector(`[data-scan-row="${target.moveId}"]`);
+            if (!el) {
+                return;
+            }
+            const margin = 8;
+            const containerRect = container.getBoundingClientRect();
+            const targetRect = el.getBoundingClientRect();
+            if (targetRect.top < containerRect.top + margin) {
+                container.scrollTop -= containerRect.top + margin - targetRect.top;
+            } else if (targetRect.bottom > containerRect.bottom - margin) {
+                container.scrollTop += targetRect.bottom - containerRect.bottom + margin;
+            }
+        });
+
+        onWillUnmount(() => {
+            clearTimeout(this._highlightTimer);
         });
     }
 
@@ -130,6 +167,14 @@ export class MrpScanApp extends Component {
      */
     async _scanOne(barcode) {
         this.state.scanning = true;
+        const componentStateBefore = new Map();
+        for (const comp of this.state.components) {
+            componentStateBefore.set(comp.id, {
+                lotIds: new Set((comp.lots || []).map((lot) => lot.id)),
+                quantity: comp.quantity,
+                picked: comp.picked,
+            });
+        }
         try {
             const res = await this.orm.call(
                 "wiz.stock.barcodes.mrp",
@@ -137,6 +182,39 @@ export class MrpScanApp extends Component {
                 [[this.wizId], barcode]
             );
             Object.assign(this.state, res.state);
+            // Locate the exact component SN that was added or picked. The
+            // barcode fallback also covers scanning an already reserved SN.
+            let scannedTarget = null;
+            for (const comp of this.state.components) {
+                const before = componentStateBefore.get(comp.id);
+                if (!before) {
+                    continue;
+                }
+                const componentChanged = comp.quantity !== before.quantity
+                    || comp.picked !== before.picked;
+                const scannedLot = (comp.lots || []).find((lot) => !before.lotIds.has(lot.id))
+                    || (componentChanged
+                        ? (comp.lots || []).find((lot) => lot.name === barcode)
+                        : null);
+                if (!scannedLot) {
+                    continue;
+                }
+                comp.lots = comp.lots.filter((lot) => lot.id !== scannedLot.id);
+                comp.lots.push(scannedLot);
+                scannedTarget = { moveId: comp.id, lotId: scannedLot.id };
+                break;
+            }
+            if (scannedTarget) {
+                const lotKey = `${scannedTarget.moveId}:${scannedTarget.lotId}`;
+                this._pendingComponentScanTarget = scannedTarget;
+                this.state.recentComponentLotKey = lotKey;
+                clearTimeout(this._highlightTimer);
+                this._highlightTimer = setTimeout(() => {
+                    if (this.state.recentComponentLotKey === lotKey) {
+                        this.state.recentComponentLotKey = "";
+                    }
+                }, 2000);
+            }
             if (res.action) {
                 // Multi-match: auto-open the filtered MO list.
                 // No extra button click — the onchange trade-off is gone.

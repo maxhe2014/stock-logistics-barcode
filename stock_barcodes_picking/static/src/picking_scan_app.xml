@@ -291,7 +291,7 @@
                                                         t-att-title="state.expandedMoveId === mv.row_key ? '收起全部' : '展开全部'"
                                                         t-on-click.stop="() => this.onToggleMoveLots(mv.row_key)">
                                                     <i t-att-class="state.expandedMoveId === mv.row_key ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
-                                                    共 <t t-out="mv.lots.length" /> 个
+                                                    共 <t t-out="mv.pickedLots.length" /> 个
                                                 </button>
                                             </t>
                                             <!-- Reserved SNs only (none picked yet) -->
