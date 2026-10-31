@@ -15,9 +15,30 @@
     font-size: 0.875rem;
 }
 
+/* Keep the move list as the scroll container in the full-height flex layout. */
+.o_picking_scan_moves {
+    min-height: 0;
+}
+
 /* Move row: pointer cursor for row-click selection */
 .o_picking_scan_moves tbody tr {
     cursor: pointer;
+}
+
+/* Briefly flash the exact serial number that was just scanned. */
+@keyframes o_picking_scan_recent_flash {
+    0%, 100% {
+        filter: brightness(1);
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    }
+    50% {
+        filter: brightness(1.75);
+        box-shadow: 0 0 0 0.3rem rgba(255, 193, 7, 0.65);
+    }
+}
+
+.o_picking_scan_recent {
+    animation: o_picking_scan_recent_flash 0.4s ease-in-out 5;
 }
 
 /* Candidate selector: distinct warning style */

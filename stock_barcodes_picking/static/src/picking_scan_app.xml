@@ -188,6 +188,7 @@
                             <t t-foreach="group.rows" t-as="mv" t-key="mv.row_key">
                                 <tr
                                     t-att-class="mv.quantity >= mv.product_uom_qty ? 'table-success' : (mv.quantity > 0 ? 'table-warning' : 'table-danger')"
+                                    t-att-data-scan-row="mv.row_key"
                                 >
                                     <td></td>
                                     <td class="align-middle ps-4">
@@ -253,7 +254,8 @@
                                             <t t-if="mv.lots.length === 1">
                                                 <!-- Picked SN -->
                                                 <span t-if="mv.lots[0].picked"
-                                                      class="badge bg-secondary d-inline-flex align-items-center gap-1">
+                                                      t-att-class="'badge bg-secondary d-inline-flex align-items-center gap-1' + (state.recentScanLotKey === mv.row_key + ':' + mv.lots[0].id ? ' o_picking_scan_recent' : '')"
+                                                      t-att-data-scan-lot="mv.row_key + ':' + mv.lots[0].id">
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="mv.lots[0].name" />
                                                     <button type="button"
@@ -273,7 +275,8 @@
                                             </t>
                                             <!-- Multi-SN: show the LATEST PICKED SN inline + count badge to expand all -->
                                             <t t-if="mv.pickedLots.length > 0 and (mv.pickedLots.length > 1 or mv.lots.length > mv.pickedLots.length)">
-                                                <span class="badge bg-info d-inline-flex align-items-center gap-1">
+                                                <span t-att-class="'badge bg-info d-inline-flex align-items-center gap-1' + (state.recentScanLotKey === mv.row_key + ':' + mv.pickedLots[mv.pickedLots.length - 1].id ? ' o_picking_scan_recent' : '')"
+                                                      t-att-data-scan-lot="mv.row_key + ':' + mv.pickedLots[mv.pickedLots.length - 1].id">
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="mv.pickedLots[mv.pickedLots.length - 1].name" />
                                                     <button type="button"
@@ -316,7 +319,8 @@
                                             <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
                                                 <!-- Picked lots: latest highlighted, others grey -->
                                                 <span t-if="lot.picked"
-                                                    t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-info' : 'bg-secondary')"
+                                                    t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-info' : 'bg-secondary') + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ' o_picking_scan_recent' : '')"
+                                                    t-att-data-scan-lot="mv.row_key + ':' + lot.id"
                                                 >
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="lot.name" />

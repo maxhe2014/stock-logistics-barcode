@@ -79,6 +79,8 @@ export class PickingScanApp extends Component {
         // Scans arriving while an RPC is in flight are buffered here and
         // drained in order (see _onScan), so fast scanners lose nothing.
         this._scanQueue = [];
+        this._pendingScanTarget = null;
+        this._highlightTimer = null;
         this.state = useState({
             message: "",
             message_type: "info",
@@ -117,8 +119,8 @@ export class PickingScanApp extends Component {
             // Multi-SN accordion: the move id whose lot list is expanded,
             // or false when all are collapsed (default).
             expandedMoveId: false,
-            // Move id to scroll into view after the next render patch.
-            pendingScrollMoveId: false,
+            // Composite row_key:lot_id highlighted for two seconds after scanning.
+            recentScanLotKey: "",
             // Package rename inline editor (AutoComplete with existing names)
             editingPackageMoveId: false,
             editingPackageId: false,
@@ -138,20 +140,32 @@ export class PickingScanApp extends Component {
             await this._refreshState();
         });
 
-        // After every render patch, if a scan asked us to jump to a move
-        // row, scroll it into the middle of the move-list viewport.
-        // Uses direct (non-smooth) scrolling for fast scanner response.
+        // After a successful serial scan, keep the scanned lot visible without
+        // moving the viewport when it is already on screen. Only the move-list
+        // container is adjusted, never the outer Odoo page.
         onPatched(() => {
-            const moveId = this.state.pendingScrollMoveId;
-            if (!moveId) {
+            const target = this._pendingScanTarget;
+            if (!target) {
                 return;
             }
-            this.state.pendingScrollMoveId = false;
-            const el = document.querySelector(
-                `[data-move-row="${moveId}"]`
-            );
-            if (el && el.scrollIntoView) {
-                el.scrollIntoView({ block: "center", inline: "nearest" });
+            this._pendingScanTarget = null;
+            const container = document.querySelector(".o_picking_scan_moves");
+            if (!container) {
+                return;
+            }
+            const lotKey = `${target.rowKey}:${target.lotId}`;
+            const el = container.querySelector(`[data-scan-lot="${lotKey}"]`)
+                || container.querySelector(`[data-scan-row="${target.rowKey}"]`);
+            if (!el) {
+                return;
+            }
+            const margin = 8;
+            const containerRect = container.getBoundingClientRect();
+            const targetRect = el.getBoundingClientRect();
+            if (targetRect.top < containerRect.top + margin) {
+                container.scrollTop -= containerRect.top + margin - targetRect.top;
+            } else if (targetRect.bottom > containerRect.bottom - margin) {
+                container.scrollTop += targetRect.bottom - containerRect.bottom + margin;
             }
         });
 
@@ -163,6 +177,7 @@ export class PickingScanApp extends Component {
         });
         onWillUnmount(() => {
             window.removeEventListener("popstate", this._onPopState, { capture: true });
+            clearTimeout(this._highlightTimer);
         });
     }
 
@@ -241,11 +256,14 @@ export class PickingScanApp extends Component {
         // scan through — the backend guard only accepts picking-name
         // scans while the selector is open, and rejects everything else.
         this.state.scanning = true;
-        // Snapshot each move's picked-lot count before the scan so we can
-        // detect which move received a new picked lot afterward (for scroll).
-        const pickedCountBefore = {};
+        // Snapshot picked lot ids per package row so the exact scanned lot
+        // can be located after the backend refresh.
+        const pickedLotIdsBefore = new Map();
         for (const mv of this.state.move_ids) {
-            pickedCountBefore[mv.id] = (mv.pickedLots || []).length;
+            pickedLotIdsBefore.set(
+                mv.row_key,
+                new Set((mv.pickedLots || []).map((lot) => lot.id))
+            );
         }
         try {
             const res = await this.orm.call(
@@ -259,18 +277,32 @@ export class PickingScanApp extends Component {
             if (["error", "not_found", "more_match"].includes(this.state.message_type)) {
                 this._playAlert();
             }
-            // Scroll to the move that gained a picked lot (quick jump).
-            let scannedMoveId = false;
+            // Locate the exact newly picked lot. Move it to the end of the
+            // client-only pickedLots list so the collapsed row displays the
+            // lot just scanned, even when reserved lines were scanned out of order.
+            let scannedTarget = null;
             for (const mv of this.state.move_ids) {
-                const before = pickedCountBefore[mv.id] || 0;
-                const after = (mv.pickedLots || []).length;
-                if (after > before) {
-                    scannedMoveId = mv.id;
-                    break;
+                const before = pickedLotIdsBefore.get(mv.row_key) || new Set();
+                const scannedLot = (mv.pickedLots || []).find((lot) => !before.has(lot.id));
+                if (!scannedLot) {
+                    continue;
                 }
+                mv.pickedLots = mv.pickedLots.filter((lot) => lot.id !== scannedLot.id);
+                mv.pickedLots.push(scannedLot);
+                mv.latest_lot_id = scannedLot.id;
+                scannedTarget = { rowKey: mv.row_key, lotId: scannedLot.id };
+                break;
             }
-            if (scannedMoveId) {
-                this.state.pendingScrollMoveId = scannedMoveId;
+            if (scannedTarget) {
+                const lotKey = `${scannedTarget.rowKey}:${scannedTarget.lotId}`;
+                this._pendingScanTarget = scannedTarget;
+                this.state.recentScanLotKey = lotKey;
+                clearTimeout(this._highlightTimer);
+                this._highlightTimer = setTimeout(() => {
+                    if (this.state.recentScanLotKey === lotKey) {
+                        this.state.recentScanLotKey = "";
+                    }
+                }, 2000);
             }
             // Remember the barcode when it was not found, so the
             // operator can force-add it. Clear on any other outcome.
