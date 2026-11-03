@@ -222,6 +222,103 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertIn("over demand", wiz.message)
         self.assertFalse(wiz.visible_force_done)
 
+    def test_excess_policy_allow_adds_extra_new_serial_on_receipt(self):
+        """Allow must also apply after the receipt demand is fully picked."""
+        receipt_type = self.env.ref("stock.picking_type_in")
+        receipt_type.barcode_excess_qty_policy = "allow"
+        receipt_type.use_create_lots = True
+        receipt_type.barcode_scan_source_location = False
+        receipt_type.barcode_scan_dest_location = False
+        product = self._create_serial_product(
+            "Receipt Serial Allow", "PROD-SN-RECEIPT-ALLOW"
+        )
+        supplier = self.env.ref("stock.stock_location_suppliers")
+        picking = self.StockPicking.create({
+            "picking_type_id": receipt_type.id,
+            "location_id": supplier.id,
+            "location_dest_id": self.stock_location.id,
+        })
+        self.StockMove.create({
+            "product_id": product.id,
+            "product_uom_qty": 1.0,
+            "product_uom": product.uom_id.id,
+            "picking_id": picking.id,
+            "location_id": supplier.id,
+            "location_dest_id": self.stock_location.id,
+        })
+        picking.action_confirm()
+        picking.action_assign()
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned("SN-RECEIPT-ALLOW-001")
+        self.assertEqual(
+            sum(l.quantity for l in picking.move_line_ids if l.picked), 1.0
+        )
+
+        wiz.on_barcode_scanned("SN-RECEIPT-ALLOW-002")
+
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("over demand", wiz.message)
+        self.assertEqual(
+            sum(l.quantity for l in picking.move_line_ids if l.picked), 2.0
+        )
+        self.assertTrue(
+            picking.move_line_ids.filtered(
+                lambda l: l.lot_id.name == "SN-RECEIPT-ALLOW-002" and l.picked
+            )
+        )
+
+    def test_excess_policy_warn_allows_existing_serial_on_receipt(self):
+        """Receipts must not require incoming serial stock at the vendor."""
+        receipt_type = self.env.ref("stock.picking_type_in")
+        receipt_type.barcode_excess_qty_policy = "warn"
+        receipt_type.use_create_lots = True
+        receipt_type.barcode_scan_source_location = False
+        receipt_type.barcode_scan_dest_location = False
+        product = self._create_serial_product(
+            "Receipt Serial Warn", "PROD-SN-RECEIPT-WARN"
+        )
+        supplier = self.env.ref("stock.stock_location_suppliers")
+        picking = self.StockPicking.create({
+            "picking_type_id": receipt_type.id,
+            "location_id": supplier.id,
+            "location_dest_id": self.stock_location.id,
+        })
+        self.StockMove.create({
+            "product_id": product.id,
+            "product_uom_qty": 1.0,
+            "product_uom": product.uom_id.id,
+            "picking_id": picking.id,
+            "location_id": supplier.id,
+            "location_dest_id": self.stock_location.id,
+        })
+        picking.action_confirm()
+        picking.action_assign()
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned("SN-RECEIPT-WARN-001")
+        self.assertEqual(
+            sum(l.quantity for l in picking.move_line_ids if l.picked), 1.0
+        )
+        existing_lot = self.env["stock.lot"].create({
+            "name": "SN-RECEIPT-WARN-002",
+            "product_id": product.id,
+            "company_id": False,
+        })
+
+        wiz.on_barcode_scanned(existing_lot.name)
+
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_force_done)
+        self.assertEqual(
+            sum(l.quantity for l in picking.move_line_ids if l.picked), 1.0
+        )
+        wiz.action_force_done()
+        self.assertFalse(wiz.visible_force_done)
+        self.assertEqual(
+            sum(l.quantity for l in picking.move_line_ids if l.picked), 2.0
+        )
+
     def test_excess_policy_forbid_rejects(self):
         """Policy 'forbid' rejects the scan and blocks force_done."""
         self.picking_type.barcode_excess_qty_policy = "forbid"

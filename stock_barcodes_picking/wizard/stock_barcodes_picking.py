@@ -990,7 +990,13 @@ class WizStockBarcodesPicking(models.TransientModel):
                 picked = sum(
                     l.quantity for l in move.move_line_ids if l.picked
                 )
-                if picked >= move.product_uom_qty:
+                # The explicit "allow" policy overrides this heuristic:
+                # the operator may intentionally receive extra serials,
+                # and action_confirm will record the over-picked quantity.
+                if (
+                    picked >= move.product_uom_qty
+                    and self._get_excess_qty_policy() != "allow"
+                ):
                     self.product_id = False
                     self.lot_id = False
                     self.lot_name = False
@@ -1203,12 +1209,15 @@ class WizStockBarcodesPicking(models.TransientModel):
     def _get_serial_pick_error(self, lot, quants=None):
         """Return why ``lot`` cannot be picked from the scanned source.
 
-        This module only drives outgoing transfers, so an existing serial
-        number must physically be in the scanned source location and must
-        not be delivered already or reserved by another transfer. Returning
-        the reason at scan time avoids core's validation-time error, which
-        reports a single serial per attempt and forces a back-and-forth
-        cleanup loop.
+        Outgoing and internal transfers require an existing serial number
+        to be physically in the scanned source location. Incoming receipts
+        are exempt: their serials are arriving from the supplier, so an
+        existing lot legitimately may have no quant at the vendor location.
+        The reservation check below applies to every transfer type.
+
+        Returning the reason at scan time avoids core's validation-time
+        error, which reports a single serial per attempt and forces a
+        back-and-forth cleanup loop.
 
         :return: translated error message, or False when the serial can be
             picked.
@@ -1225,37 +1234,38 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not location:
             return False
         quants = self._get_lot_quants(lot, quants=quants)
-        # Already delivered: sending it again would create a second unit
-        # of the same serial at the customer location.
-        if quants.filtered(lambda q: q.location_id.usage == "customer"):
-            return self.env._(
-                "Serial number %(sn)s has already been delivered and "
-                "cannot be picked again.",
-                sn=lot.name,
-            )
-        in_source = quants.filtered(
-            lambda q: q.location_id.parent_path.startswith(
-                location.parent_path
-            )
-        )
-        if not in_source:
-            if quants:
+        if self.picking_type_code != "incoming":
+            # Already delivered: sending it again would create a second unit
+            # of the same serial at the customer location.
+            if quants.filtered(lambda q: q.location_id.usage == "customer"):
                 return self.env._(
-                    "Serial number %(sn)s is not in location %(location)s "
-                    "(currently in: %(locations)s). It was not added to "
-                    "this transfer.",
+                    "Serial number %(sn)s has already been delivered and "
+                    "cannot be picked again.",
+                    sn=lot.name,
+                )
+            in_source = quants.filtered(
+                lambda q: q.location_id.parent_path.startswith(
+                    location.parent_path
+                )
+            )
+            if not in_source:
+                if quants:
+                    return self.env._(
+                        "Serial number %(sn)s is not in location %(location)s "
+                        "(currently in: %(locations)s). It was not added to "
+                        "this transfer.",
+                        sn=lot.name,
+                        location=location.display_name,
+                        locations=", ".join(
+                            quants.mapped("location_id.display_name")
+                        ),
+                    )
+                return self.env._(
+                    "Serial number %(sn)s has no stock in location "
+                    "%(location)s. It was not added to this transfer.",
                     sn=lot.name,
                     location=location.display_name,
-                    locations=", ".join(
-                        quants.mapped("location_id.display_name")
-                    ),
                 )
-            return self.env._(
-                "Serial number %(sn)s has no stock in location "
-                "%(location)s. It was not added to this transfer.",
-                sn=lot.name,
-                location=location.display_name,
-            )
         # Reserved by another transfer: picking it here would move stock
         # promised elsewhere (core reports this only at validation).
         other_lines = self.env["stock.move.line"].search([
