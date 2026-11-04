@@ -119,6 +119,10 @@ export class PickingScanApp extends Component {
             last_unmatched_barcode: "",
             editingQtyMoveId: false,
             draftQty: "",
+            // Exact lot/move-line inline correction state.
+            editingLotKey: "",
+            editingLotLineId: false,
+            draftLotQty: "",
             // Composite row_key:lot_id highlighted for two seconds after scanning.
             recentScanLotKey: "",
             // Package rename inline editor (AutoComplete with existing names)
@@ -231,6 +235,13 @@ export class PickingScanApp extends Component {
      */
     async _onScan(barcode) {
         if (!barcode) {
+            return;
+        }
+        if (this.isQuantityEditing) {
+            this.notification.add(
+                _t("Finish or cancel quantity editing before scanning."),
+                { type: "warning" }
+            );
             return;
         }
         this._scanQueue.push(barcode);
@@ -454,13 +465,21 @@ export class PickingScanApp extends Component {
         }
     }
 
+    get isQuantityEditing() {
+        return Boolean(this.state.editingQtyMoveId || this.state.editingLotKey);
+    }
+
     /** Enter inline quantity-edit mode for a move row (pencil button).
      *  Pre-fills the draft with the move demand. */
     onEditMoveQty(rowKey) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
         const mv = this.state.move_ids.find((m) => m.row_key === rowKey);
         if (!mv) {
             return;
         }
+        this.onCancelLotQty();
         this.state.editingQtyMoveId = rowKey;
         this.state.draftQty = String(mv.product_uom_qty || 0);
     }
@@ -541,22 +560,144 @@ export class PickingScanApp extends Component {
         this.state.draftQty = "";
     }
 
-    /**
-     * Remove a scanned lot/SN from a move. Used by the trash button on
-     * each lot badge so the operator can correct a mis-scanned serial
-     * without leaving the scan flow.
-     */
-    async onRemoveMoveLot(moveId, lotId) {
+    _findLot(rowKey, lotKey) {
+        const mv = this.state.move_ids.find((m) => m.row_key === rowKey);
+        return mv?.lots.find((lot) => lot.key === lotKey);
+    }
+
+    /** Open the exact-line editor for one picked lot badge. */
+    onEditLotQty(rowKey, lotKey) {
         if (this.state.scanning || !this.wizId) {
             return;
         }
+        const lot = this._findLot(rowKey, lotKey);
+        if (!lot?.picked || !lot.lines?.length) {
+            return;
+        }
+        this.onCancelMoveQty();
+        this.state.editingLotKey = `${rowKey}:${lotKey}`;
+        this.state.editingLotLineId = false;
+        this.state.draftLotQty = "";
+        if (lot.lines.length === 1) {
+            this.onSelectLotLine(lot.lines[0]);
+        }
+    }
+
+    onSelectLotLine(line) {
+        this.state.editingLotLineId = line.id;
+        this.state.draftLotQty = String(line.quantity || 0);
+    }
+
+    onDraftLotQtyInput(ev) {
+        this.state.draftLotQty = ev.currentTarget.value;
+    }
+
+    onDraftLotQtyKeydown(ev) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this.onConfirmLotQty();
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this.onCancelLotQty();
+        }
+    }
+
+    onCancelLotQty() {
+        this.state.editingLotKey = "";
+        this.state.editingLotLineId = false;
+        this.state.draftLotQty = "";
+    }
+
+    /** Save one exact line; a warn policy requires a second confirmation. */
+    async onConfirmLotQty() {
+        if (this.state.scanning || !this.wizId || !this.state.editingLotLineId) {
+            return;
+        }
+        const lineId = this.state.editingLotLineId;
+        const qty = parseFloat(this.state.draftLotQty);
+        if (!qty || qty <= 0) {
+            this.notification.add(_t("Please enter a positive quantity"), {
+                type: "danger",
+            });
+            this._playAlert();
+            return;
+        }
+        this.state.scanning = true;
         try {
-            await this.orm.call(
+            let res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_edit_move_line_qty",
+                [[this.wizId], lineId, qty]
+            );
+            if (res === false) {
+                await this._refreshState();
+                if (this.state.message_type !== "more_match") {
+                    this._playAlert();
+                    return;
+                }
+                const force = window.confirm(
+                    `${this.state.message}\n${_t("Continue?")}`
+                );
+                if (!force) {
+                    return;
+                }
+                res = await this.orm.call(
+                    "wiz.stock.barcodes.picking",
+                    "action_edit_move_line_qty",
+                    [[this.wizId], lineId, qty, true]
+                );
+            }
+            await this._handleActionResult(res, "Edit lot quantity");
+            if (res) {
+                this.onCancelLotQty();
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Edit lot quantity failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /**
+     * Remove from the exact line. A multi-line badge first expands its real
+     * source/package lines so the operator can choose which one to correct.
+     */
+    async onRemoveMoveLot(rowKey, lotKey) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        const lot = this._findLot(rowKey, lotKey);
+        if (!lot?.picked || !lot.lines?.length) {
+            return;
+        }
+        if (lot.lines.length > 1) {
+            this.onEditLotQty(rowKey, lotKey);
+            return;
+        }
+        await this._removeMoveLine(lot.lines[0].id);
+    }
+
+    async _removeMoveLine(lineId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
                 "wiz.stock.barcodes.picking",
                 "action_remove_move_lot",
-                [[this.wizId], moveId, lotId]
+                [[this.wizId], lineId]
             );
-            await this._refreshState();
+            await this._handleActionResult(res, "Remove lot");
+            if (res) {
+                this.onCancelLotQty();
+            }
         } catch (err) {
             this.notification.add(
                 _t("Remove lot failed: %(err)s", {
@@ -565,6 +706,8 @@ export class PickingScanApp extends Component {
                 { type: "danger" }
             );
             this._playAlert();
+        } finally {
+            this.state.scanning = false;
         }
     }
 

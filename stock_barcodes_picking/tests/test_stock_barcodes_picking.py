@@ -114,6 +114,25 @@ class TestStockBarcodesPicking(TransactionCase):
             "company_id": self.env.company.id,
         })
 
+    def _create_picked_lot_line(
+        self, picking, lot, quantity, package=None, picked=True
+    ):
+        move = picking.move_ids.filtered(
+            lambda m: m.product_id == lot.product_id
+        )[:1]
+        return self.env["stock.move.line"].create({
+            "move_id": move.id,
+            "picking_id": picking.id,
+            "product_id": lot.product_id.id,
+            "product_uom_id": lot.product_id.uom_id.id,
+            "lot_id": lot.id,
+            "quantity": quantity,
+            "picked": picked,
+            "location_id": picking.location_id.id,
+            "location_dest_id": picking.location_dest_id.id,
+            "result_package_id": package.id if package else False,
+        })
+
     def _prepare_outside_serial_scan(self, policy="allow", location=None):
         """Build an outgoing transfer and an outside serial ready to scan."""
         self.picking_type.barcode_new_product_policy = policy
@@ -761,6 +780,180 @@ class TestStockBarcodesPicking(TransactionCase):
         )
         self.assertEqual(len(rows_by_package["PKG-LOT-1"]["lots"]), 1)
         self.assertEqual(len(rows_by_package["PKG-LOT-2"]["lots"]), 1)
+        package_1_lines = move.move_line_ids.filtered(
+            lambda l: l.result_package_id == package_1
+        ).sorted(key=lambda l: l.id)
+        line_states = rows_by_package["PKG-LOT-1"]["lots"][0]["lines"]
+        self.assertEqual(
+            [line["id"] for line in line_states], package_1_lines.ids
+        )
+        self.assertEqual(
+            [line["quantity"] for line in line_states], [2.0, 3.0]
+        )
+        for line_state in line_states:
+            self.assertEqual(line_state["package_id"], package_1.id)
+            self.assertEqual(line_state["package_name"], "PKG-LOT-1")
+            self.assertEqual(
+                line_state["location_name"], picking.location_id.display_name
+            )
+
+    def test_edit_lot_quantity_targets_exact_line(self):
+        """Editing one of several same-lot lines leaves all others intact."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        lot = self._create_lot(self.product_lot, "TR-EDIT-EXACT")
+        line_1 = self._create_picked_lot_line(picking, lot, 2.0)
+        line_2 = self._create_picked_lot_line(picking, lot, 3.0)
+        wiz = self._create_wiz(picking)
+
+        self.assertTrue(wiz.action_edit_move_line_qty(line_2.id, 7.0))
+
+        self.assertEqual(line_1.quantity, 2.0)
+        self.assertEqual(line_2.quantity, 7.0)
+
+    def test_edit_lot_quantity_does_not_touch_other_package(self):
+        """An explicit package-line edit cannot leak into another package."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        lot = self._create_lot(self.product_lot, "TR-EDIT-PACKAGE")
+        package_1 = self.env["stock.package"].create({"name": "PKG-EDIT-1"})
+        package_2 = self.env["stock.package"].create({"name": "PKG-EDIT-2"})
+        line_1 = self._create_picked_lot_line(
+            picking, lot, 2.0, package=package_1
+        )
+        line_2 = self._create_picked_lot_line(
+            picking, lot, 4.0, package=package_2
+        )
+        wiz = self._create_wiz(picking)
+
+        self.assertTrue(wiz.action_edit_move_line_qty(line_2.id, 6.0))
+
+        self.assertEqual(line_1.quantity, 2.0)
+        self.assertEqual(line_2.quantity, 6.0)
+
+    def test_lot_corrections_reject_foreign_and_unpicked_lines(self):
+        """RPC IDs cannot cross pickings or modify reserved-only lines."""
+        picking_a = self._create_in_picking(self.product_lot, qty=20.0)
+        picking_b = self._create_in_picking(self.product_lot, qty=20.0)
+        lot_a = self._create_lot(self.product_lot, "TR-EDIT-OWN")
+        lot_b = self._create_lot(self.product_lot, "TR-EDIT-FOREIGN")
+        reserved = self._create_picked_lot_line(
+            picking_a, lot_a, 2.0, picked=False
+        )
+        foreign = self._create_picked_lot_line(picking_b, lot_b, 3.0)
+        wiz = self._create_wiz(picking_a)
+
+        self.assertFalse(wiz.action_edit_move_line_qty(foreign.id, 8.0))
+        self.assertFalse(wiz.action_remove_move_lot(foreign.id))
+        self.assertTrue(foreign.exists())
+        self.assertEqual(foreign.quantity, 3.0)
+        self.assertFalse(wiz.action_edit_move_line_qty(reserved.id, 8.0))
+        self.assertFalse(wiz.action_remove_move_lot(reserved.id))
+        self.assertTrue(reserved.exists())
+        self.assertEqual(reserved.quantity, 2.0)
+        self.assertFalse(reserved.picked)
+
+    def test_lot_corrections_are_blocked_by_candidate_selector(self):
+        """Edit and delete share the mutating-action selector guard."""
+        picking_a = self._create_in_picking(self.product_lot, qty=20.0)
+        picking_b = self._create_in_picking(self.product_lot, qty=20.0)
+        lot = self._create_lot(self.product_lot, "TR-EDIT-SELECTOR")
+        line = self._create_picked_lot_line(picking_a, lot, 4.0)
+        wiz = self._create_wiz(picking_a)
+        self._open_selector(wiz, picking_a | picking_b)
+
+        self.assertFalse(wiz.action_edit_move_line_qty(line.id, 6.0))
+        self.assertFalse(wiz.action_remove_move_lot(line.id))
+
+        self.assertTrue(line.exists())
+        self.assertEqual(line.quantity, 4.0)
+        self.assertTrue(line.picked)
+        self.assertEqual(wiz.message_type, "error")
+
+    def test_edit_lot_quantity_follows_excess_policy(self):
+        """Allow writes, warn needs force, and forbid always rejects."""
+        for policy in ("allow", "warn", "forbid"):
+            with self.subTest(policy=policy):
+                picking = self._create_in_picking(self.product_lot, qty=10.0)
+                picking.picking_type_id.barcode_excess_qty_policy = policy
+                lot = self._create_lot(
+                    self.product_lot, "TR-EDIT-POLICY-%s" % policy
+                )
+                other = self._create_picked_lot_line(picking, lot, 4.0)
+                target = self._create_picked_lot_line(picking, lot, 2.0)
+                wiz = self._create_wiz(picking)
+
+                result = wiz.action_edit_move_line_qty(target.id, 8.0)
+
+                if policy == "allow":
+                    self.assertTrue(result)
+                    self.assertEqual(target.quantity, 8.0)
+                elif policy == "warn":
+                    self.assertFalse(result)
+                    self.assertEqual(wiz.message_type, "more_match")
+                    self.assertEqual(target.quantity, 2.0)
+                    self.assertTrue(
+                        wiz.action_edit_move_line_qty(target.id, 8.0, force=True)
+                    )
+                    self.assertEqual(target.quantity, 8.0)
+                else:
+                    self.assertFalse(result)
+                    self.assertEqual(wiz.message_type, "error")
+                    self.assertFalse(
+                        wiz.action_edit_move_line_qty(target.id, 8.0, force=True)
+                    )
+                    self.assertEqual(target.quantity, 2.0)
+                self.assertEqual(other.quantity, 4.0)
+
+    def test_edit_lot_quantity_requires_positive_number(self):
+        """Zero and negative corrections never clear or alter a line."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        lot = self._create_lot(self.product_lot, "TR-EDIT-POSITIVE")
+        line = self._create_picked_lot_line(picking, lot, 3.0)
+        wiz = self._create_wiz(picking)
+
+        for qty in (0.0, -1.0):
+            with self.subTest(qty=qty):
+                self.assertFalse(wiz.action_edit_move_line_qty(line.id, qty))
+                self.assertEqual(line.quantity, 3.0)
+                self.assertEqual(wiz.message_type, "error")
+
+    def test_serial_quantity_edit_rejected_and_delete_targets_exact_sn(self):
+        """SN quantity stays fixed at 1 while its trash action still works."""
+        product = self._create_serial_product(
+            "Serial Exact Edit", "PROD-SN-EXACT-EDIT"
+        )
+        picking = self._create_in_picking(product, qty=2.0)
+        lot_1 = self._create_lot(product, "SN-EXACT-EDIT-1")
+        lot_2 = self._create_lot(product, "SN-EXACT-EDIT-2")
+        line_1 = self._create_picked_lot_line(picking, lot_1, 1.0)
+        line_2 = self._create_picked_lot_line(picking, lot_2, 1.0)
+        wiz = self._create_wiz(picking)
+
+        self.assertFalse(wiz.action_edit_move_line_qty(line_1.id, 1.0))
+        self.assertEqual(line_1.quantity, 1.0)
+        self.assertTrue(wiz.action_remove_move_lot(line_2.id))
+        self.assertTrue(line_1.exists())
+        self.assertFalse(line_2.exists())
+
+    def test_remove_lot_uses_exact_line_and_keeps_decrement_semantics(self):
+        """Trash decrements only its target line and unlinks it at qty 1."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        lot = self._create_lot(self.product_lot, "TR-REMOVE-EXACT")
+        line_1 = self._create_picked_lot_line(picking, lot, 3.0)
+        line_2 = self._create_picked_lot_line(picking, lot, 1.0)
+        wiz = self._create_wiz(picking)
+
+        self.assertTrue(wiz.action_remove_move_lot(line_1.id))
+        self.assertEqual(line_1.quantity, 2.0)
+        self.assertEqual(line_2.quantity, 1.0)
+        self.assertTrue(wiz.action_remove_move_lot(line_2.id))
+        self.assertTrue(line_1.exists())
+        self.assertFalse(line_2.exists())
+        self.assertEqual(line_1.quantity, 2.0)
+        self.assertTrue(wiz.action_remove_move_lot(line_1.id))
+        self.assertEqual(line_1.quantity, 1.0)
+        self.assertTrue(wiz.action_remove_move_lot(line_1.id))
+        self.assertFalse(line_1.exists())
+        self.assertTrue(lot.exists())
 
     def test_existing_lot_without_product_scan_accumulates(self):
         """Global lot fallback also picks immediately and then accumulates."""

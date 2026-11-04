@@ -2,7 +2,7 @@
 
 > 模块：`stock_barcodes_picking`  
 > 版本基线：`19.0.1.1.1`  
-> 当前增量：`19.0.1.1.4`（全部批号始终展开并分别显示已拣数量，见第 22 节）
+> 当前增量：`19.0.1.1.5`（批号按真实明细精确修改与删除，见第 23 节）
 > 整理日期：2026-11-04  
 > 用途：统一现行规则口径、核对实现颗粒度、登记重复或冲突点，供后续开发与回归测试使用。
 
@@ -435,3 +435,38 @@ RULES.md 是否同步：
 |---|---|---|
 | `test_multiple_lots_scans_accumulate_independently` | 除 A=3、B=2 的业务明细外，同时验证状态快照分别返回两个批号数量、总行合计为 5；同批号预留明细单独显示待拣、已拣数量为 0，模板 key 不重复。 | [Tests:662-721](tests/test_stock_barcodes_picking.py#L662-L721) |
 | `test_scan_state_lot_quantities_grouped_per_package` | 同批号在包装 1 的两条明细 2+3 合并显示 5，包装 2 独立显示 4；各包装行合计与批号数量一致。 | [Tests:723-763](tests/test_stock_barcodes_picking.py#L723-L763) |
+
+隔离测试统计 `stock_barcodes_picking` 共执行 **65 个测试**，无 `FAIL` 或 `ERROR`。
+
+## 23. `19.0.1.1.5` 批号按真实明细精确修改与删除
+
+### 23.1 展示合计与操作身份分离
+
+- 已拣批号仍按“包装＋批号”汇总显示 `picked_quantity`，第 22 节的全部批号展开方式不变；同时每个已拣批号返回真实 `lines` 数组，逐项包含 `stock.move.line.id`、数量、源库位和包装元数据。预留待拣批号的 `lines` 为空，不能修改或删除。 | [Wizard:481-545](wizard/stock_barcodes_picking.py#L481-L545) |
+- 非跟踪产品继续使用产品标题的数量铅笔；普通批号在各自批号标签显示铅笔；SN 固定数量 1，不显示修改铅笔。 | [OWL XML:147-168](static/src/picking_scan_app.xml#L147-L168)、[OWL XML:251-282](static/src/picking_scan_app.xml#L251-L282) |
+- 批号只有一条真实明细时，点击铅笔直接显示该明细数量输入框；同批号有多条真实明细时，先展开明细列表，显示源库位、包装和各自数量，再由操作员逐行点击修改或删除。 | [OWL JS:563-609](static/src/picking_scan_app.esm.js#L563-L609)、[OWL XML:283-345](static/src/picking_scan_app.xml#L283-L345) |
+- 数量输入支持 Enter 保存、Esc 取消；普通产品或批号数量编辑期间，硬件扫码和手工扫码输入均被拦截，必须先保存或取消。 | [OWL JS:230-249](static/src/picking_scan_app.esm.js#L230-L249)、[OWL JS:591-603](static/src/picking_scan_app.esm.js#L591-L603) |
+
+### 23.2 服务端精确修改与删除
+
+- `_get_picked_lot_line()` 是修改和删除的统一入口守卫：先解决候选调拨单，再检查当前 picking 和单据状态，按“真实明细 ID＋当前 picking”定位，排除完成/取消明细，并要求目标为带批号的可跟踪产品及 `picked=True`。外部 picking 的明细 ID、未拣预留明细均拒绝。 | [Wizard:2241-2277](wizard/stock_barcodes_picking.py#L2241-L2277) |
+- `action_edit_move_line_qty(line_id, qty, force=False)` 只对指定明细的 `quantity` 做 SET，不按 `move_id＋lot_id` 搜索，也不重分配或改动同批号、同产品的其他明细。数量必须大于 0，SN 不允许修改固定数量 1。 | [Wizard:2279-2344](wizard/stock_barcodes_picking.py#L2279-L2344) |
+- 修改的超量上限沿用扫码的产品级口径：`总需求－除目标行外的其他已拣数量`。`allow` 直接写入；`warn` 第一次返回 `more_match`，前端二次确认后以 `force=True` 重试；`forbid` 即使传 `force=True` 也拒绝。 | [Wizard:2301-2333](wizard/stock_barcodes_picking.py#L2301-L2333)、[OWL JS:611-665](static/src/picking_scan_app.esm.js#L611-L665) |
+- `action_remove_move_lot(line_id)` 只操作指定真实明细：普通批号数量大于 1 时减 1，数量为 1 时删除该行，SN 删除对应行；不会删除 `stock.lot` 主数据。多明细批号点击标签删除按钮时先展开明细，不默认操作第一条。 | [Wizard:2346-2367](wizard/stock_barcodes_picking.py#L2346-L2367)、[OWL JS:667-712](static/src/picking_scan_app.esm.js#L667-L712) |
+- 本增量只纠正显式修改/删除的目标身份；普通扫码实时累加、多批号独立累加、已包装明细的普通扫码匹配及 active move 写入颗粒度不在本次变更范围内。
+
+### 23.3 回归测试
+
+| 测试方法 | 覆盖场景 | 源码依据 |
+|---|---|---|
+| `test_scan_state_lot_quantities_grouped_per_package` | 同包装同批号仍合计展示，同时返回每条真实明细的正确 ID、数量、源库位和包装元数据。 | [Tests:742-798](tests/test_stock_barcodes_picking.py#L742-L798) |
+| `test_edit_lot_quantity_targets_exact_line` | 同批号多明细只修改目标行，其他行数量不变。 | [Tests:800-811](tests/test_stock_barcodes_picking.py#L800-L811) |
+| `test_edit_lot_quantity_does_not_touch_other_package` | 跨包装修改不影响另一包装的同批号明细。 | [Tests:813-830](tests/test_stock_barcodes_picking.py#L813-L830) |
+| `test_lot_corrections_reject_foreign_and_unpicked_lines` | 外部 picking 明细 ID 和未拣预留明细均被拒绝且不产生写入。 | [Tests:832-852](tests/test_stock_barcodes_picking.py#L832-L852) |
+| `test_lot_corrections_are_blocked_by_candidate_selector` | 候选单未解决时修改和删除均被拦截，目标行 ID、数量及 picked 状态不变。 | [Tests:854-869](tests/test_stock_barcodes_picking.py#L854-L869) |
+| `test_edit_lot_quantity_follows_excess_policy` | `allow/warn/forbid` 的写入、二次确认及禁止强制绕过行为与扫码一致。 | [Tests:871-904](tests/test_stock_barcodes_picking.py#L871-L904) |
+| `test_edit_lot_quantity_requires_positive_number` | 零和负数不会清空或改变目标明细。 | [Tests:906-917](tests/test_stock_barcodes_picking.py#L906-L917) |
+| `test_serial_quantity_edit_rejected_and_delete_targets_exact_sn` | SN 数量固定为 1，删除只影响目标 SN 行。 | [Tests:919-935](tests/test_stock_barcodes_picking.py#L919-L935) |
+| `test_remove_lot_uses_exact_line_and_keeps_decrement_semantics` | 普通批号精确减 1、数量为 1 时删行，其他同批号明细及 lot 主数据不变。 | [Tests:937-956](tests/test_stock_barcodes_picking.py#L937-L956) |
+
+独立临时数据库完整运行 `stock_barcodes_picking`，共执行 **71 个测试**，结果为 **0 failed、0 error**；测试数据库已清理。

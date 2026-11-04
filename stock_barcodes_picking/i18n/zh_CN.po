@@ -1358,3 +1358,39 @@ msgstr "未装包"
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "目的库位"
 msgstr "目的库位"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Continue?"
+msgstr "是否继续？"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Edit lot quantity failed: %(err)s"
+msgstr "修改批号数量失败：%(err)s"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Finish or cancel quantity editing before scanning."
+msgstr "请先保存或取消数量修改，再扫描条码。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Only picked lot/SN lines can be corrected"
+msgstr "只能修改已拣的批号/序列号明细"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Serial number quantity is fixed at 1"
+msgstr "序列号数量固定为 1"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Updated lot/SN quantity: %(lot)s x%(qty)s"
+msgstr "已更新批号/序列号数量：%(lot)s × %(qty)s"

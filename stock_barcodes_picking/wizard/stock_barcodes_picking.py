@@ -461,6 +461,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         package_name_by_id = {
             pkg.id: pkg.name for pkg in all_lines.result_package_id
         }
+        location_name_by_id = {
+            location.id: location.display_name or ""
+            for location in all_lines.location_id
+        }
         product_info_by_id = {
             prod.id: (prod.display_name or "", prod.tracking or "none")
             for prod in active_moves.product_id
@@ -508,8 +512,22 @@ class WizStockBarcodesPicking(models.TransientModel):
                             "name": lot_name_by_id.get(l.lot_id.id, ""),
                             "picked": True,
                             "picked_quantity": 0.0,
+                            # Real move-line identities allow corrections to
+                            # target one source/package line instead of the
+                            # first line matching move + lot.
+                            "lines": [],
                         }
                     lots_by_key[lot_key]["picked_quantity"] += l.quantity
+                    lots_by_key[lot_key]["lines"].append({
+                        "id": l.id,
+                        "quantity": l.quantity,
+                        "location_id": l.location_id.id or False,
+                        "location_name": location_name_by_id.get(
+                            l.location_id.id, ""
+                        ),
+                        "package_id": pkg_id,
+                        "package_name": pkg_name,
+                    })
                 # Reserved (unpicked) lots go to the unpacked group only.
                 if show_reserved and not pkg_id:
                     reserved_lines = move_lines.filtered(
@@ -524,6 +542,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                                 "name": lot_name_by_id.get(l.lot_id.id, ""),
                                 "picked": False,
                                 "picked_quantity": 0.0,
+                                "lines": [],
                             }
                 lots = list(lots_by_key.values())
                 picked_lot_ids = [
@@ -2219,44 +2238,122 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         return self.action_force_add(product_id=product.id)
 
-    # --- Remove a scanned lot / SN ---
-    def action_remove_move_lot(self, move_id, lot_id):
-        """Remove a scanned lot/SN from a picking move.
+    # --- Correct a scanned lot / SN by exact move line ---
+    def _get_picked_lot_line(self, line_id):
+        """Return an editable picked line owned by the current picking.
 
-        Lets the operator correct a mis-scanned serial or lot without
-        leaving the scan flow. Behaviour mirrors the move-line lifecycle:
-          - serial (1 line = 1 SN = qty 1): unlink the move line.
-          - lot (qty > 1 on a single line): decrement quantity by 1; if
-            it reaches 0, unlink the line.
-
-        Does NOT delete the ``stock.lot`` record itself — it is an
-        inventory entity; only the picking move line is undone.
-
-        After removal the move's ``picked`` flag recomputes from its
-        remaining move lines automatically.
-
-        :param move_id: stock.move id (must belong to this picking)
-        :param lot_id: stock.lot id to remove from that move
-        :return: True on success, False if move_id/lot_id invalid
+        Every correction RPC passes through the same candidate-selector,
+        transfer-state, ownership and picked-state guards. In particular,
+        a line ID copied from another picking can never be used to mutate
+        that other transfer.
         """
         self.ensure_one()
+        if not self._check_selector_resolved():
+            return self.env["stock.move.line"]
         if not self.picking_id:
             self._set_message("error", self.env._("No transfer selected"))
-            return False
-        move = self.picking_id.move_ids.filtered(lambda m: m.id == move_id)
-        if not move:
-            self._set_message("error", self.env._("Move not found in this transfer"))
-            return False
-        # Use search instead of move.move_line_ids to avoid stale cache.
-        lines = self.env["stock.move.line"].search([
-            ("move_id", "=", move_id),
-            ("lot_id", "=", lot_id),
+            return self.env["stock.move.line"]
+        if self.picking_state in ("draft", "done", "cancel"):
+            self._set_message(
+                "error",
+                self.env._("Transfer is %(state)s, cannot scan", **{
+                    "state": self.picking_state,
+                }),
+            )
+            return self.env["stock.move.line"]
+        line = self.env["stock.move.line"].search([
+            ("id", "=", line_id),
+            ("picking_id", "=", self.picking_id.id),
             ("state", "not in", ("done", "cancel")),
         ])
-        if not lines:
+        if not line or not line.lot_id or line.product_id.tracking == "none":
             self._set_message("error", self.env._("Lot/SN not found on this move"))
+            return self.env["stock.move.line"]
+        if not line.picked:
+            self._set_message(
+                "error", self.env._("Only picked lot/SN lines can be corrected")
+            )
+            return self.env["stock.move.line"]
+        return line
+
+    def action_edit_move_line_qty(self, line_id, qty, force=False):
+        """SET the quantity of one exact picked lot line.
+
+        Other lines of the same lot or product are deliberately untouched.
+        Demand is calculated with the same product-wide scope as scanning;
+        the configured allow/warn/forbid policy also remains unchanged.
+        ``force`` only bypasses a warn, never a forbid policy.
+        """
+        self.ensure_one()
+        line = self._get_picked_lot_line(line_id)
+        if not line:
             return False
-        line = lines[0]
+        if line.product_id.tracking == "serial":
+            self._set_message(
+                "error", self.env._("Serial number quantity is fixed at 1")
+            )
+            return False
+        qty = float(qty) if qty else 0.0
+        if qty <= 0:
+            self._set_message("error", self.env._("Quantity must be positive"))
+            return False
+
+        product = line.product_id
+        moves = self.picking_id.move_ids.filtered(
+            lambda m: m.product_id == product and m.state != "cancel"
+        )
+        total_demand = sum(m.product_uom_qty for m in moves)
+        other_picked_qty = sum(
+            other.quantity
+            for other in moves.move_line_ids
+            if other.picked and other.id != line.id
+        )
+        max_quantity = total_demand - other_picked_qty
+        exceeds = float_compare(
+            qty,
+            max_quantity,
+            precision_rounding=product.uom_id.rounding,
+        ) > 0
+        policy = self._get_excess_qty_policy()
+        if exceeds and policy == "forbid":
+            self._set_message(
+                "error",
+                self.env._(
+                    "Quantity exceeds demand (max: %(max)s). "
+                    "Over-picking is forbidden for this operation type.",
+                    max=max_quantity,
+                ),
+            )
+            return False
+        if exceeds and policy == "warn" and not force:
+            self._set_message(
+                "more_match",
+                self.env._("Quantity exceeds demand (max: %s)", max_quantity),
+            )
+            return False
+
+        line.quantity = qty
+        self._set_message(
+            "success",
+            self.env._(
+                "Updated lot/SN quantity: %(lot)s x%(qty)s",
+                lot=line.lot_id.name,
+                qty=qty,
+            ),
+        )
+        return True
+
+    def action_remove_move_lot(self, line_id):
+        """Remove one unit from an exact picked lot/SN move line.
+
+        Ordinary lot lines keep their existing behaviour: quantity > 1 is
+        decremented by one; quantity 1 and serial lines are unlinked. The
+        ``stock.lot`` inventory record itself is never deleted.
+        """
+        self.ensure_one()
+        line = self._get_picked_lot_line(line_id)
+        if not line:
+            return False
         if line.quantity > 1:
             line.quantity -= 1
             if line.quantity <= 0:

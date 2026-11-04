@@ -24,7 +24,7 @@
                             type="text"
                             class="form-control form-control-lg o_picking_scan_input"
                             t-att-placeholder="barcodePlaceholder"
-                            t-att-disabled="state.scanning or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
+                            t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
                             t-on-keydown="onManualScanEnter"
                         />
                     </div>
@@ -144,8 +144,8 @@
                                                 </t>
                                             </div>
                                         </div>
-                                        <!-- Inline qty edit (pencil) — only for non-serial tracking, placed in the header for compactness -->
-                                        <t t-if="group.move.tracking !== 'serial'">
+                                        <!-- Product-level qty edit is only for non-tracked products. -->
+                                        <t t-if="group.move.tracking === 'none'">
                                             <t t-if="state.editingQtyMoveId === group.rows[0].row_key">
                                                 <div class="d-flex align-items-center gap-1" t-on-click.stop="">
                                                     <input
@@ -259,20 +259,90 @@
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="lot.name" />
                                                     <strong class="ms-1">× <t t-out="lot.picked_quantity" /></strong>
+                                                    <button t-if="mv.tracking !== 'serial'"
+                                                            type="button"
+                                                            class="btn btn-link btn-sm p-0 ms-1 text-white"
+                                                            title="Edit quantity"
+                                                            t-on-click.stop="() => this.onEditLotQty(mv.row_key, lot.key)">
+                                                        <i class="fa fa-pencil"/>
+                                                    </button>
                                                     <button type="button"
                                                             class="btn btn-link btn-sm p-0 ms-1 text-danger"
                                                             t-att-title="'Remove ' + lot.name"
-                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.id, lot.id)">
+                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.row_key, lot.key)">
                                                         <i class="fa fa-trash"/>
                                                     </button>
                                                 </span>
-                                                <!-- Reserved (unpicked) lots: greyed "pending", no delete -->
+                                                <!-- Reserved (unpicked) lots: greyed "pending", no edit/delete -->
                                                 <span t-else=""
                                                       class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
                                                     <i class="fa fa-clock-o"/>
                                                     <t t-out="lot.name" />
                                                     <span class="small opacity-75">待拣</span>
                                                 </span>
+                                                <!-- Single-line lots open the input directly. Multiple lines
+                                                     expose their real source/package identities first. -->
+                                                <div t-if="lot.picked and state.editingLotKey === mv.row_key + ':' + lot.key"
+                                                     class="d-flex flex-column gap-1 border rounded p-2 bg-white text-dark w-100">
+                                                    <t t-foreach="lot.lines" t-as="line" t-key="line.id">
+                                                        <div class="d-flex align-items-center gap-2 flex-wrap small">
+                                                            <span t-if="lot.lines.length > 1" class="text-muted">
+                                                                <i class="fa fa-map-marker"/>
+                                                                <t t-out="line.location_name" />
+                                                                <span class="mx-1">·</span>
+                                                                <i class="fa fa-archive"/>
+                                                                <t t-out="line.package_name || '未装包'" />
+                                                            </span>
+                                                            <t t-if="state.editingLotLineId === line.id">
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="any"
+                                                                    class="form-control form-control-sm"
+                                                                    style="width: 6rem;"
+                                                                    t-att-value="state.draftLotQty"
+                                                                    t-on-input="(ev) => this.onDraftLotQtyInput(ev)"
+                                                                    t-on-keydown="(ev) => this.onDraftLotQtyKeydown(ev)"
+                                                                />
+                                                                <button type="button"
+                                                                        class="btn btn-sm btn-success"
+                                                                        title="Confirm quantity"
+                                                                        t-on-click.stop="() => this.onConfirmLotQty()">
+                                                                    <i class="fa fa-check"/>
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn btn-sm btn-outline-secondary"
+                                                                        title="Cancel"
+                                                                        t-on-click.stop="() => this.onCancelLotQty()">
+                                                                    <i class="fa fa-times"/>
+                                                                </button>
+                                                            </t>
+                                                            <t t-else="">
+                                                                <strong>× <t t-out="line.quantity" /></strong>
+                                                                <button t-if="mv.tracking !== 'serial'"
+                                                                        type="button"
+                                                                        class="btn btn-sm btn-outline-primary p-0 px-1"
+                                                                        title="Edit quantity"
+                                                                        t-on-click.stop="() => this.onSelectLotLine(line)">
+                                                                    <i class="fa fa-pencil"/>
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn btn-sm btn-outline-danger p-0 px-1"
+                                                                        t-att-title="'Remove ' + lot.name"
+                                                                        t-on-click.stop="() => this._removeMoveLine(line.id)">
+                                                                    <i class="fa fa-trash"/>
+                                                                </button>
+                                                            </t>
+                                                        </div>
+                                                    </t>
+                                                    <button t-if="!state.editingLotLineId"
+                                                            type="button"
+                                                            class="btn btn-sm btn-outline-secondary align-self-end"
+                                                            title="Cancel"
+                                                            t-on-click.stop="() => this.onCancelLotQty()">
+                                                        <i class="fa fa-times"/>
+                                                    </button>
+                                                </div>
                                             </t>
                                         </div>
                                     </td>
