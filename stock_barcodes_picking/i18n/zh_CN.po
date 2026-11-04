@@ -453,6 +453,18 @@ msgid "Lot: %s. Enter qty and confirm."
 msgstr "批次：%s。输入数量并确认。"
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Lot: %(lot)s. Quantity: %(qty)s. Scan again to add 1 or Confirm."
+msgstr "批号：%(lot)s；数量：%(qty)s。再次扫描加 1，或点击 Confirm。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "New lot: %(lot)s. Quantity: %(qty)s. Scan again to add 1 or Confirm to create it."
+msgstr "新批号：%(lot)s；数量：%(qty)s。再次扫描加 1，或点击 Confirm 创建。"
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__manual_entry
 msgid "Manual"
 msgstr "手动"

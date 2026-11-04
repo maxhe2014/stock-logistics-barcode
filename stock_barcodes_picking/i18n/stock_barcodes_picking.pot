@@ -428,6 +428,18 @@ msgid "Lot: %s. Enter qty and confirm."
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Lot: %(lot)s. Quantity: %(qty)s. Scan again to add 1 or Confirm."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "New lot: %(lot)s. Quantity: %(qty)s. Scan again to add 1 or Confirm to create it."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__manual_entry
 msgid "Manual"
 msgstr ""
