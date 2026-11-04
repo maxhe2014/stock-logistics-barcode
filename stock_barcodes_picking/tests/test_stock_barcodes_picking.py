@@ -150,6 +150,35 @@ class TestStockBarcodesPicking(TransactionCase):
         picking.action_assign()
         return picking
 
+    def _create_in_picking(self, product, return_of=None):
+        """Incoming picking for a supplier receipt or a customer return."""
+        receipt_type = self.env.ref("stock.picking_type_in")
+        receipt_type.barcode_scan_source_location = False
+        receipt_type.barcode_scan_dest_location = False
+        receipt_type.use_create_lots = True
+        source = (
+            self.customer_location
+            if return_of
+            else self.env.ref("stock.stock_location_suppliers")
+        )
+        picking = self.StockPicking.create({
+            "picking_type_id": receipt_type.id,
+            "location_id": source.id,
+            "location_dest_id": self.stock_location.id,
+            "return_id": return_of.id if return_of else False,
+        })
+        self.StockMove.create({
+            "product_id": product.id,
+            "product_uom_qty": 1.0,
+            "product_uom": product.uom_id.id,
+            "picking_id": picking.id,
+            "location_id": source.id,
+            "location_dest_id": self.stock_location.id,
+        })
+        picking.action_confirm()
+        picking.action_assign()
+        return picking
+
     # --- SET semantics ---
     def test_set_semantics_replace_quantity(self):
         """Re-scanning a product with a different qty SETS (not ADDS).
@@ -868,6 +897,69 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertFalse(
             picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
         )
+
+    def test_scan_return_serial_from_destination_rejected(self):
+        """A customer return rejects a serial that is still in stock."""
+        product = self._create_serial_product(
+            "Return Serial Elsewhere", "PROD-SN-RETURN-ELSEWHERE"
+        )
+        lot = self._create_lot(product, "SN-RETURN-ELSEWHERE-001")
+        original = self._create_out_picking(product)
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot
+        )
+        picking = self._create_in_picking(product, return_of=original)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(product.barcode)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("not in location", wiz.message)
+        self.assertIn(self.customer_location.display_name, wiz.message)
+        self.assertIn(self.stock_location.display_name, wiz.message)
+        self.assertFalse(
+            picking.move_line_ids.filtered(lambda l: l.lot_id == lot),
+            "the serial must not be added to the customer return",
+        )
+
+    def test_scan_return_serial_from_customer_allowed(self):
+        """A customer return accepts its serial at the customer source."""
+        product = self._create_serial_product(
+            "Return Serial Valid", "PROD-SN-RETURN-VALID"
+        )
+        lot = self._create_lot(product, "SN-RETURN-VALID-001")
+        original = self._create_out_picking(product)
+        self.StockQuant._update_available_quantity(
+            product, self.customer_location, 1.0, lot_id=lot
+        )
+        picking = self._create_in_picking(product, return_of=original)
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        line = picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(line), 1)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
+
+    def test_scan_receipt_existing_serial_needs_no_vendor_stock(self):
+        """A regular supplier receipt keeps the source-stock exemption."""
+        product = self._create_serial_product(
+            "Receipt Existing Serial", "PROD-SN-RECEIPT-EXISTING"
+        )
+        lot = self._create_lot(product, "SN-RECEIPT-EXISTING-001")
+        picking = self._create_in_picking(product)
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        line = picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(line), 1)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
 
     def test_scan_serial_reserved_by_other_transfer_rejected(self):
         """A serial reserved by another transfer is rejected at scan time."""

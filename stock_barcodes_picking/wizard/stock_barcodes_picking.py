@@ -1337,10 +1337,12 @@ class WizStockBarcodesPicking(models.TransientModel):
         """Return why ``lot`` cannot be picked from the scanned source.
 
         Outgoing and internal transfers require an existing serial number
-        to be physically in the scanned source location. Incoming receipts
+        to be physically in the scanned source location. Supplier receipts
         are exempt: their serials are arriving from the supplier, so an
         existing lot legitimately may have no quant at the vendor location.
-        The reservation check below applies to every transfer type.
+        Customer returns are incoming transfers too, but must have the
+        serial at the customer source location. The reservation check below
+        applies to every transfer type.
 
         Returning the reason at scan time avoids core's validation-time
         error, which reports a single serial per attempt and forces a
@@ -1361,15 +1363,21 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not location:
             return False
         quants = self._get_lot_quants(lot, quants=quants)
+        is_customer_return = (
+            self.picking_type_code == "incoming"
+            and bool(self.picking_id.return_id)
+        )
         if self.picking_type_code != "incoming":
             # Already delivered: sending it again would create a second unit
-            # of the same serial at the customer location.
+            # of the same serial at the customer location. A customer return
+            # legitimately starts there, so this guard excludes all incoming.
             if quants.filtered(lambda q: q.location_id.usage == "customer"):
                 return self.env._(
                     "Serial number %(sn)s has already been delivered and "
                     "cannot be picked again.",
                     sn=lot.name,
                 )
+        if self.picking_type_code != "incoming" or is_customer_return:
             in_source = quants.filtered(
                 lambda q: q.location_id.parent_path.startswith(
                     location.parent_path
@@ -1449,6 +1457,25 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("error", self.env._("Quantity must be positive"))
             return False
 
+        # A pre-existing serial must physically be in the scanned source
+        # location. This catches wrong/past serials at scan time instead
+        # of at validation, where core reports one serial per attempt and
+        # forces the operator to go back and delete it manually. Run this
+        # before the duplicate check so an already-added bad line still
+        # reports the source-location problem that must be corrected.
+        # Serials created on the fly (use_create_lots) are exempt: whether
+        # creating them is allowed is decided by the operation type.
+        new_lot = not self.lot_id and bool(self.lot_name)
+        if (
+            not new_lot
+            and self.product_id.tracking == "serial"
+            and self.lot_id
+        ):
+            error = self._get_serial_pick_error(self.lot_id, quants=lot_quants)
+            if error:
+                self._set_message("error", error)
+                return False
+
         # A serial can only be picked once per transfer. Without this the
         # second scan silently matches the existing picked line and
         # reports success, so the operator cannot tell the scan was
@@ -1464,23 +1491,6 @@ class WizStockBarcodesPicking(models.TransientModel):
                       "transfer. Do not scan it again.",
                       sn=self.lot_id.name),
                 )
-                return False
-
-        # A pre-existing serial must physically be in the scanned source
-        # location. This catches wrong/past serials at scan time instead
-        # of at validation, where core reports one serial per attempt and
-        # forces the operator to go back and delete it manually.
-        # Serials created on the fly (use_create_lots) are exempt: whether
-        # creating them is allowed is decided by the operation type.
-        new_lot = not self.lot_id and bool(self.lot_name)
-        if (
-            not new_lot
-            and self.product_id.tracking == "serial"
-            and self.lot_id
-        ):
-            error = self._get_serial_pick_error(self.lot_id, quants=lot_quants)
-            if error:
-                self._set_message("error", error)
                 return False
 
         if not self.lot_id and self.lot_name and self.product_id.tracking != "none":
