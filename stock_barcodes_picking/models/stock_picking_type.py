@@ -58,6 +58,22 @@ class PickingType(models.Model):
              "- Forbid: the scan is rejected and no confirmation is "
              "offered.",
     )
+    barcode_new_product_policy = fields.Selection(
+        string="New Product Scan Policy",
+        selection=[
+            ("allow", "Allow"),
+            ("warn", "Warn and Require Confirmation"),
+            ("forbid", "Forbid"),
+        ],
+        default="forbid",
+        help="Controls scanning an existing serial number whose product is "
+             "not part of the transfer:\n"
+             "- Allow: add a move for one unit and pick the serial directly.\n"
+             "- Warn and Require Confirmation: show the product and serial, "
+             "then add them only after confirmation.\n"
+             "- Forbid: reject the scan. Unknown barcodes never create a "
+             "product automatically.",
+    )
     barcode_validation_all_packed = fields.Boolean(
         string="Require All Products Packed Before Validation",
         default=False,

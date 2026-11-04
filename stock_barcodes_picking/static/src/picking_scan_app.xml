@@ -24,7 +24,7 @@
                             type="text"
                             class="form-control form-control-lg o_picking_scan_input"
                             t-att-placeholder="barcodePlaceholder"
-                            t-att-disabled="state.scanning or state.visible_switch_selector ? 'disabled' : ''"
+                            t-att-disabled="state.scanning or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
                             t-on-keydown="onManualScanEnter"
                         />
                     </div>
@@ -384,6 +384,20 @@
                         class="btn btn-primary btn-lg"
                         t-on-click="onConfirm"
                     >Confirm</button>
+
+                    <button
+                        t-if="state.visible_force_add"
+                        type="button"
+                        class="btn btn-warning btn-lg"
+                        t-on-click="onConfirmNewProduct"
+                    >Add Product and Pick</button>
+
+                    <button
+                        t-if="state.visible_force_add"
+                        type="button"
+                        class="btn btn-outline-secondary btn-lg"
+                        t-on-click="onCancelNewProduct"
+                    >Cancel</button>
 
                     <button
                         t-if="state.visible_force_done"

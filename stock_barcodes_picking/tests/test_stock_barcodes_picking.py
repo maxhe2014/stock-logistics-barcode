@@ -114,6 +114,21 @@ class TestStockBarcodesPicking(TransactionCase):
             "company_id": self.env.company.id,
         })
 
+    def _prepare_outside_serial_scan(self, policy="allow", location=None):
+        """Build an outgoing transfer and an outside serial ready to scan."""
+        self.picking_type.barcode_new_product_policy = policy
+        product = self._create_serial_product(
+            "Outside Serial", "PROD-OUTSIDE-SERIAL"
+        )
+        lot = self._create_lot(product, "SN-OUTSIDE-001")
+        self.StockQuant._update_available_quantity(
+            product, location or self.stock_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(self.product_simple)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        return product, lot, picking, wiz
+
     def _create_out_picking(self, product, qty=1.0):
         """Outgoing picking without pre-filling stock, so serial quantities
         stay exactly as the test sets them."""
@@ -975,6 +990,254 @@ class TestStockBarcodesPicking(TransactionCase):
             ),
             0,
         )
+
+    # --- outside-product serial policy ---
+    def test_new_product_allow_creates_move_and_picks_serial(self):
+        """Allow adds one demanded unit and picks the scanned serial."""
+        product, lot, picking, wiz = self._prepare_outside_serial_scan("allow")
+        before = len(picking.move_ids)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        self.assertEqual(len(picking.move_ids), before + 1)
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+        self.assertEqual(len(move), 1)
+        self.assertEqual(move.product_uom_qty, 1.0)
+        line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(line), 1)
+        self.assertEqual(line.quantity, 1.0)
+        self.assertTrue(line.picked)
+        self.assertEqual(wiz.active_move_id, move)
+        self.assertNotEqual(picking.state, "done")
+
+    def test_new_product_warn_writes_only_after_confirmation(self):
+        """Warn prepares the scan but creates no business records upfront."""
+        product, lot, picking, wiz = self._prepare_outside_serial_scan("warn")
+        before = len(picking.move_ids)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_force_add)
+        self.assertEqual(wiz.product_id, product)
+        self.assertEqual(wiz.lot_id, lot)
+        self.assertEqual(len(picking.move_ids), before)
+        self.assertFalse(picking.move_line_ids.filtered(lambda l: l.lot_id == lot))
+
+        self.assertTrue(wiz.action_confirm_new_product())
+        self.assertFalse(wiz.visible_force_add)
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+        self.assertEqual(move.product_uom_qty, 1.0)
+        line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
+
+    def test_new_product_warn_cancel_leaves_picking_unchanged(self):
+        """Cancelling the warning clears only the wizard scan context."""
+        product, lot, picking, wiz = self._prepare_outside_serial_scan("warn")
+        before_moves = picking.move_ids
+        before_lines = picking.move_line_ids
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertTrue(wiz.action_cancel_new_product())
+
+        self.assertFalse(wiz.visible_force_add)
+        self.assertFalse(wiz.product_id)
+        self.assertFalse(wiz.lot_id)
+        self.assertEqual(picking.move_ids, before_moves)
+        self.assertEqual(picking.move_line_ids, before_lines)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_warn_rechecks_stock_on_confirmation(self):
+        """Confirmation revalidates stock instead of trusting the preview."""
+        product, lot, picking, wiz = self._prepare_outside_serial_scan("warn")
+        wiz.on_barcode_scanned(lot.name)
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, -1.0, lot_id=lot
+        )
+
+        self.assertFalse(wiz.action_confirm_new_product())
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("no stock", wiz.message)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_allow_rejects_serial_in_other_location(self):
+        """The outside-product flow keeps the source-location safety check."""
+        other_location = self.StockLocation.create({
+            "name": "Outside Serial Stock",
+            "usage": "internal",
+            "location_id": self.warehouse.view_location_id.id,
+        })
+        product, lot, picking, wiz = self._prepare_outside_serial_scan(
+            "allow", location=other_location
+        )
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn(other_location.display_name, wiz.message)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_allow_rejects_serial_reserved_elsewhere(self):
+        """An outside serial reserved by another transfer is not added."""
+        product, lot, picking, wiz = self._prepare_outside_serial_scan("allow")
+        other_picking = self._create_out_picking(product)
+        self.assertTrue(other_picking.move_line_ids.filtered(lambda l: l.lot_id == lot))
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("reserved by another transfer", wiz.message)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_allow_serial_overrides_selected_product(self):
+        """A unique outside serial supersedes product A's pending input."""
+        self.picking_type.barcode_new_product_policy = "allow"
+        selected = self._create_serial_product(
+            "Selected Serial", "PROD-SELECTED-SERIAL"
+        )
+        outside = self._create_serial_product(
+            "Other Selected Serial", "PROD-OTHER-SELECTED-SERIAL"
+        )
+        lot = self._create_lot(outside, "SN-OTHER-SELECTED-001")
+        self.StockQuant._update_available_quantity(
+            outside, self.stock_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(selected)
+        selected_move = picking.move_ids
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(selected.barcode)
+        wiz.lot_name = "SN-PENDING-A"
+        wiz.product_qty = 1.0
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        outside_move = picking.move_ids.filtered(lambda m: m.product_id == outside)
+        self.assertEqual(len(outside_move), 1)
+        self.assertEqual(outside_move.product_uom_qty, 1.0)
+        self.assertTrue(
+            outside_move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        )
+        self.assertEqual(wiz.active_move_id, outside_move)
+        self.assertFalse(selected_move.move_line_ids)
+        self.assertFalse(wiz.lot_name)
+
+    def test_new_product_warn_serial_overrides_nontracked_pending_qty(self):
+        """Warn also applies when a non-tracked product has a pending qty."""
+        product, lot, picking, wiz = self._prepare_outside_serial_scan("warn")
+        selected_move = picking.move_ids
+        wiz.product_id = self.product_simple
+        wiz.active_move_id = selected_move
+        wiz.product_qty = 5.0
+        before_moves = picking.move_ids
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_force_add)
+        self.assertEqual(wiz.product_id, product)
+        self.assertEqual(wiz.product_qty, 1.0)
+        self.assertFalse(wiz.active_move_id)
+        self.assertEqual(picking.move_ids, before_moves)
+        self.assertTrue(wiz.action_confirm_new_product())
+        self.assertEqual(
+            picking.move_ids.filtered(
+                lambda m: m.product_id == product
+            ).product_uom_qty,
+            1.0,
+        )
+
+    def test_new_product_forbid_preserves_selected_product_context(self):
+        """Forbid rejects the serial without discarding product A's input."""
+        product, lot, picking, wiz = self._prepare_outside_serial_scan("forbid")
+        selected_move = picking.move_ids
+        wiz.product_id = self.product_simple
+        wiz.active_move_id = selected_move
+        wiz.product_qty = 5.0
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("not part of this transfer", wiz.message)
+        self.assertEqual(wiz.product_id, self.product_simple)
+        self.assertEqual(wiz.active_move_id, selected_move)
+        self.assertEqual(wiz.product_qty, 5.0)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_then_excess_policy_controls_next_serial(self):
+        """After the first add, further serials use the excess policy."""
+        self.picking_type.barcode_excess_qty_policy = "forbid"
+        product, lot_1, picking, wiz = self._prepare_outside_serial_scan("allow")
+        lot_2 = self._create_lot(product, "SN-OUTSIDE-002")
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot_2
+        )
+        wiz.on_barcode_scanned(lot_1.name)
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+        self.assertEqual(move.product_uom_qty, 1.0)
+
+        wiz.on_barcode_scanned(lot_2.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("forbidden", wiz.message)
+        self.assertFalse(move.move_line_ids.filtered(lambda l: l.lot_id == lot_2))
+        self.assertEqual(move.product_uom_qty, 1.0)
+
+    def test_new_product_allow_does_not_create_from_unknown_barcode(self):
+        """An unknown barcode cannot infer or auto-create a product."""
+        self.picking_type.barcode_new_product_policy = "allow"
+        picking = self._create_out_picking(self.product_simple)
+        before = len(picking.move_ids)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+
+        wiz.on_barcode_scanned("SN-OUTSIDE-UNKNOWN")
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertEqual(len(picking.move_ids), before)
+        self.assertFalse(
+            self.env["stock.lot"].search([("name", "=", "SN-OUTSIDE-UNKNOWN")])
+        )
+
+    def test_new_product_allow_on_receipt_needs_no_vendor_stock(self):
+        """Incoming outside serials keep the receipt stock-check exemption."""
+        receipt_type = self.env.ref("stock.picking_type_in")
+        receipt_type.barcode_new_product_policy = "allow"
+        receipt_type.barcode_scan_source_location = False
+        receipt_type.barcode_scan_dest_location = False
+        product = self._create_serial_product(
+            "Outside Receipt Serial", "PROD-OUTSIDE-RECEIPT"
+        )
+        lot = self._create_lot(product, "SN-OUTSIDE-RECEIPT-001")
+        supplier = self.env.ref("stock.stock_location_suppliers")
+        picking = self.StockPicking.create({
+            "picking_type_id": receipt_type.id,
+            "location_id": supplier.id,
+            "location_dest_id": self.stock_location.id,
+        })
+        self.StockMove.create({
+            "product_id": self.product_simple.id,
+            "product_uom_qty": 1.0,
+            "product_uom": self.product_simple.uom_id.id,
+            "picking_id": picking.id,
+            "location_id": supplier.id,
+            "location_dest_id": self.stock_location.id,
+        })
+        picking.action_confirm()
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+        self.assertEqual(move.product_uom_qty, 1.0)
+        line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
 
     # --- action_force_add ---
     def test_force_add_creates_move_and_picks(self):

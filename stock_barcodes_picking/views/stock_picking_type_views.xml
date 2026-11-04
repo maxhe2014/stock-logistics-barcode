@@ -21,6 +21,7 @@
                     </group>
                     <group name="quantity_control" string="Quantity Control">
                         <field name="barcode_excess_qty_policy"/>
+                        <field name="barcode_new_product_policy"/>
                     </group>
                     <group string="Packaging" groups="stock.group_tracking_lot">
                         <field name="barcode_require_pack"/>

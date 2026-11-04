@@ -1021,6 +1021,71 @@ msgid "Show Reserved Serial Numbers"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
+msgid "New Product Scan Policy"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
+msgid ""
+"Controls scanning an existing serial number whose product is not part of "
+"the transfer:\n"
+"- Allow: add a move for one unit and pick the serial directly.\n"
+"- Warn and Require Confirmation: show the product and serial, then add "
+"them only after confirmation.\n"
+"- Forbid: reject the scan. Unknown barcodes never create a product "
+"automatically."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Added product %(product)s with demand 1 and picked serial number %(sn)s."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Add Product and Pick"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Confirm or cancel adding the current product before scanning another "
+"barcode."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Confirm or cancel the new product…"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "No product addition is awaiting confirmation."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Product %(name)s is already part of this transfer"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s belongs to product %(product)s, which is not in "
+"transfer %(picking)s. Confirm adding 1 unit and picking it."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
 msgid "Over-picking Policy"
 msgstr ""
@@ -1038,16 +1103,19 @@ msgstr ""
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__allow
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__allow
 msgid "Allow"
 msgstr ""
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__forbid
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__forbid
 msgid "Forbid"
 msgstr ""
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__warn
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__warn
 msgid "Warn and Require Confirmation"
 msgstr ""
 

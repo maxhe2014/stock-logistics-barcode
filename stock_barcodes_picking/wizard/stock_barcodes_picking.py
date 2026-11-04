@@ -655,6 +655,15 @@ class WizStockBarcodesPicking(models.TransientModel):
                     self.env._("Select a transfer or scan a transfer name to continue"),
                 )
             return True
+        if self.visible_force_add:
+            self._set_message(
+                "more_match",
+                self.env._(
+                    "Confirm or cancel adding the current product before "
+                    "scanning another barcode."
+                ),
+            )
+            return True
         if self._scan_picking(barcode):
             return True
         if self._scan_location(barcode):
@@ -883,7 +892,9 @@ class WizStockBarcodesPicking(models.TransientModel):
             # of scanning the product barcode or tapping a row first.
             return self._scan_lot_fallback(barcode)
         if search_product.tracking == "none":
-            return False
+            # A globally unique existing serial still identifies its product
+            # when a non-tracked product happens to be selected.
+            return self._scan_lot_fallback(barcode)
         lot_domain = [("name", "=", barcode), ("product_id", "=", search_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
         if not lots:
@@ -1085,11 +1096,121 @@ class WizStockBarcodesPicking(models.TransientModel):
         )
         return True
 
+    def _get_new_product_policy(self):
+        """Return how serials of products outside the transfer are handled."""
+        self.ensure_one()
+        return (
+            self.picking_id.picking_type_id.barcode_new_product_policy
+            or "forbid"
+        )
+
+    def _scan_new_product_serial(self, lot, product):
+        """Let a unique existing serial supersede the current scan context."""
+        # The operator explicitly scanned a different product's serial. Drop
+        # any unconfirmed product/lot/quantity input and stale confirmations
+        # before binding the newly identified product.
+        self.visible_force_done = False
+        self.visible_force_add = False
+        self.product_id = product
+        self.product_uom_id = product.uom_id
+        self.active_move_id = False
+        self.lot_id = lot
+        self.lot_name = lot.name
+        self.product_qty = 1.0
+        lot_quants = self._compute_qty_available()
+        error = self._get_serial_pick_error(lot, quants=lot_quants)
+        if error:
+            self._set_message("error", error)
+            return True
+        if self._get_new_product_policy() == "warn":
+            # Only wizard state is written before confirmation. The stock
+            # move and move line are created by action_confirm_new_product.
+            self.visible_force_add = True
+            self._set_message(
+                "more_match",
+                self.env._(
+                    "Serial number %(sn)s belongs to product %(product)s, "
+                    "which is not in transfer %(picking)s. Confirm adding "
+                    "1 unit and picking it.",
+                    sn=lot.name,
+                    product=product.name,
+                    picking=self.picking_id.name,
+                ),
+            )
+            return True
+        return self._confirm_new_product_serial(lot_quants=lot_quants)
+
+    def _confirm_new_product_serial(self, lot_quants=None):
+        """Validate and add the prepared outside product and its serial."""
+        self.ensure_one()
+        product = self.product_id
+        lot = self.lot_id
+        if (
+            not product
+            or product.tracking != "serial"
+            or not lot
+            or lot.product_id != product
+        ):
+            self._set_message(
+                "error", self.env._("No product addition is awaiting confirmation.")
+            )
+            return False
+        component_moves = self.picking_id.move_ids.filtered(
+            lambda m: m.product_id == product and m.state != "cancel"
+        )
+        if component_moves:
+            self._set_message(
+                "error",
+                self.env._(
+                    "Product %(name)s is already part of this transfer",
+                    name=product.name,
+                ),
+            )
+            return False
+        result = self.with_context(
+            allow_new_product_serial=True
+        ).action_confirm(lot_quants=lot_quants)
+        if not result:
+            return False
+        self._set_message(
+            "success",
+            self.env._(
+                "Added product %(product)s with demand 1 and picked serial "
+                "number %(sn)s.",
+                product=product.name,
+                sn=lot.name,
+            ),
+        )
+        return result
+
+    def action_confirm_new_product(self):
+        """RPC confirmation for the outside-product warning."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        if (
+            not self.visible_force_add
+            or self._get_new_product_policy() == "forbid"
+        ):
+            self.visible_force_add = False
+            self._set_message(
+                "error", self.env._("No product addition is awaiting confirmation.")
+            )
+            return False
+        return self._confirm_new_product_serial()
+
+    def action_cancel_new_product(self):
+        """Discard the outside-product preview without changing the picking."""
+        self.ensure_one()
+        self._clean_values()
+        return True
+
     def _resolve_lot_owner(self, lot, product):
         """Identify whether ``product`` belongs to this picking.
 
-        - Product in picking.move_ids → switch product_id and bind lot.
-        - Unrelated product → error.
+        Products already on the transfer follow the normal scan flow. A
+        unique existing serial takes priority over the current scan context;
+        an outside product is then handled by its picking-type policy.
         """
         self.ensure_one()
         if not self.picking_id:
@@ -1145,6 +1266,12 @@ class WizStockBarcodesPicking(models.TransientModel):
                     self.step = self._step_index("qty")
             self._set_message_step()
             return True
+        if (
+            lot
+            and product.tracking == "serial"
+            and self._get_new_product_policy() != "forbid"
+        ):
+            return self._scan_new_product_serial(lot, product)
         self._set_message(
             "error",
             self.env._("Lot belongs to product %(name)s which is not part of this transfer", **{"name": product.name}),
@@ -1358,6 +1485,17 @@ class WizStockBarcodesPicking(models.TransientModel):
 
         if not self.lot_id and self.lot_name and self.product_id.tracking != "none":
             self.lot_id = self._create_new_lot()
+
+        if self.env.context.get("allow_new_product_serial"):
+            component_moves = self.picking_id.move_ids.filtered(
+                lambda m: m.product_id == self.product_id and m.state != "cancel"
+            )
+            if not component_moves:
+                # All scan, location and serial safety checks above have
+                # passed. Only now is it safe to create business records.
+                self.active_move_id = self._create_picking_move(
+                    self.product_id, self.product_qty
+                )
 
         move_dic = self._process_stock_move_line()
         if move_dic:
@@ -1918,6 +2056,29 @@ class WizStockBarcodesPicking(models.TransientModel):
         self._set_message_step()
         return True
 
+    def _create_picking_move(self, product, quantity):
+        """Create and confirm a distinct move using the scan locations."""
+        self.ensure_one()
+        move = self.env["stock.move"].create({
+            "product_id": product.id,
+            "product_uom_qty": quantity,
+            "product_uom": self.product_uom_id.id or product.uom_id.id,
+            "picking_id": self.picking_id.id,
+            "location_id": self.location_id.id,
+            "location_dest_id": (
+                self.location_dest_id.id
+                if self.location_dest_id
+                else self.picking_id.location_dest_id.id
+            ),
+        })
+        # merge=False keeps the new move distinct from existing moves for
+        # the same product (otherwise _action_confirm merges them and the
+        # newly-created record is unlinked, breaking active_move_id).
+        move._action_confirm(merge=False)
+        # Refresh the cached move collection for the following line write.
+        self.picking_id.invalidate_recordset(["move_ids"])
+        return move
+
     def action_force_add(self, product_id=None):
         """Temporarily add a non-tracked product to the picking and
         consume the scanned quantity.
@@ -1955,27 +2116,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self.product_qty or self.product_qty <= 0:
             self._set_message("error", self.env._("Quantity must be positive"))
             return False
-        # Create the new move on the picking. location_dest_id is taken
-        # from the picking (the new move has no inheritance chain).
-        move = self.env["stock.move"].create({
-            "product_id": product.id,
-            "product_uom_qty": self.product_qty,
-            "product_uom": self.product_uom_id.id or product.uom_id.id,
-            "picking_id": self.picking_id.id,
-            "location_id": self.location_id.id,
-            "location_dest_id": (
-                self.location_dest_id.id
-                if self.location_dest_id
-                else self.picking_id.location_dest_id.id
-            ),
-        })
-        # merge=False keeps the new move distinct from existing moves for
-        # the same product (otherwise _action_confirm merges them and the
-        # newly-created record is unlinked, breaking active_move_id).
-        move._action_confirm(merge=False)
-        # Refresh the picking's move_ids cache so _process_stock_move_line
-        # (which searches self.picking_id.move_ids) sees the new move.
-        self.picking_id.invalidate_recordset(["move_ids"])
+        move = self._create_picking_move(product, self.product_qty)
         # Set product context so _process_stock_move_line finds the move
         self.product_id = product
         self.product_uom_id = self.product_uom_id or product.uom_id

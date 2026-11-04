@@ -1054,6 +1054,77 @@ msgid "Show Reserved Serial Numbers"
 msgstr "显示预留序列号"
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
+msgid "New Product Scan Policy"
+msgstr "单据外产品扫码策略"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
+msgid ""
+"Controls scanning an existing serial number whose product is not part of "
+"the transfer:\n"
+"- Allow: add a move for one unit and pick the serial directly.\n"
+"- Warn and Require Confirmation: show the product and serial, then add "
+"them only after confirmation.\n"
+"- Forbid: reject the scan. Unknown barcodes never create a product "
+"automatically."
+msgstr ""
+"控制扫描已存在、但其产品不在调拨单中的序列号时的处理方式：\n"
+"- 允许：直接创建需求为 1 的产品行并拣货该序列号。\n"
+"- 警告并要求确认：先显示产品和序列号，确认后才添加。\n"
+"- 禁止：拒绝扫码。未知条码不会自动创建产品。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Added product %(product)s with demand 1 and picked serial number %(sn)s."
+msgstr "已添加产品 %(product)s，需求数量为 1，并已拣货序列号 %(sn)s。"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Add Product and Pick"
+msgstr "添加产品并拣货"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Confirm or cancel adding the current product before scanning another "
+"barcode."
+msgstr "请先确认或取消添加当前产品，再扫描其他条码。"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Confirm or cancel the new product…"
+msgstr "请确认或取消添加新产品…"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "No product addition is awaiting confirmation."
+msgstr "当前没有等待确认的产品添加操作。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Product %(name)s is already part of this transfer"
+msgstr "产品 %(name)s 已在此调拨单中"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s belongs to product %(product)s, which is not in "
+"transfer %(picking)s. Confirm adding 1 unit and picking it."
+msgstr ""
+"序列号 %(sn)s 属于产品 %(product)s，该产品不在调拨单 %(picking)s 中。"
+"请确认是否添加 1 件并拣货。"
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
 msgid "Over-picking Policy"
 msgstr "超量扫码策略"
@@ -1075,16 +1146,19 @@ msgstr ""
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__allow
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__allow
 msgid "Allow"
 msgstr "允许"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__forbid
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__forbid
 msgid "Forbid"
 msgstr "禁止"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__warn
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__warn
 msgid "Warn and Require Confirmation"
 msgstr "警告并要求确认"
 

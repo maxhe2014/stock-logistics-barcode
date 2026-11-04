@@ -419,6 +419,18 @@ export class PickingScanApp extends Component {
         return this._callAction("action_force_done", _t("Force Consume"));
     }
 
+    /** Confirm or discard an outside product identified by its serial. */
+    onConfirmNewProduct() {
+        return this._callAction(
+            "action_confirm_new_product",
+            _t("Add Product and Pick")
+        );
+    }
+
+    onCancelNewProduct() {
+        return this._callAction("action_cancel_new_product", _t("Cancel"));
+    }
+
     /**
      * Click a move row to preselect the target move.
      * Narrow subsequent lot/qty scans to this move.
@@ -926,6 +938,9 @@ export class PickingScanApp extends Component {
     // --- Computed getters for template visibility ---
 
     get barcodePlaceholder() {
+        if (this.state.visible_force_add) {
+            return _t("Confirm or cancel the new product…");
+        }
         return this.state.visible_switch_selector
             ? _t("Select a transfer below…")
             : _t("Scan or type barcode…");
@@ -950,6 +965,7 @@ export class PickingScanApp extends Component {
         return (
             !!this.state.picking_id &&
             !!this.state.product_id &&
+            !this.state.visible_force_add &&
             (this.state.product_qty || 0) > 0
         );
     }
