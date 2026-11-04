@@ -2,7 +2,7 @@
 
 > 模块：`stock_barcodes_picking`  
 > 版本基线：`19.0.1.1.1`  
-> 当前增量：`19.0.1.1.2`（批号待确认数量，见第 20 节）  
+> 当前增量：`19.0.1.1.3`（批号实时已拣与多批号独立累加，见第 21 节）
 > 整理日期：2026-11-04  
 > 用途：统一现行规则口径、核对实现颗粒度、登记重复或冲突点，供后续开发与回归测试使用。
 
@@ -380,3 +380,34 @@ RULES.md 是否同步：
 | `test_existing_lot_from_active_move_scans_accumulate` | 已存在批次连续扫描两次得到数量 2，Confirm 后写入已拣明细。 | [Tests:702-717](tests/test_stock_barcodes_picking.py#L702-L717) |
 
 第 18 节的 **59 个测试方法**仍是 `19.0.1.1.1` 静态审计基线。本次新增以上 3 个测试；隔离测试日志统计 `stock_barcodes_picking` 共执行 **64 个测试**，无 `FAIL` 或 `ERROR`。
+
+> 历史说明：第 20 节记录的是 `19.0.1.1.2` 的“待确认数量”规则；`19.0.1.1.3` 已按新的业务要求改为每次扫码立即写入已拣，现行行为以第 21 节为准。
+
+## 21. `19.0.1.1.3` 批号实时已拣与多批号独立累加
+
+### 21.1 现行规则覆盖
+
+| 基线/增量规则 | 现行规则 | 源码依据 |
+|---|---|---|
+| LOT-007、第 20 节 | 已存在普通批号每次扫描都立即调用确认写入，不再等待手工 Confirm。目标数量是该产品、该源库位、该批号当前已拣数量加 1，再按既有 SET 语义写入，因此连续扫描得到 1、2、…、n。 | [Wizard:905-919](wizard/stock_barcodes_picking.py#L905-L919)、[Wizard:1414-1447](wizard/stock_barcodes_picking.py#L1414-L1447) |
+| LOT-010、第 20 节 | 新普通批号第一次扫描就创建 `stock.lot`，并立即写入数量 1 的已拣明细；后续扫描按已存在批号继续累加。 | [Wizard:1034-1045](wizard/stock_barcodes_picking.py#L1034-L1045)、[Wizard:1414-1447](wizard/stock_barcodes_picking.py#L1414-L1447) |
+| LOT-005、LOT-007 | 未先选产品时，全局批号回退识别出本单产品后，同样立即已拣并累加，不再停留在 qty 步等待 Confirm。 | [Wizard:1236-1242](wizard/stock_barcodes_picking.py#L1236-L1242) |
+| QTY-002、QTY-003 | 同一产品的不同批号分别使用各自已拣明细和数量；交叉扫描 A、B、A 时，只增加本次扫描批号，另一批号数量不变。 | [Wizard:1422-1435](wizard/stock_barcodes_picking.py#L1422-L1435)、[Wizard:1590-1758](wizard/stock_barcodes_picking.py#L1590-L1758) |
+| LOT-006、LOT-010（SN 分支） | 序列号仍固定数量 1 并自动确认，重复 SN 校验不变；非跟踪产品的手工数量确认也不受本次修改影响。 | [Wizard:911-917](wizard/stock_barcodes_picking.py#L911-L917)、[Wizard:1037-1043](wizard/stock_barcodes_picking.py#L1037-L1043) |
+
+### 21.2 消息与后续扫描
+
+- 每次成功写入后显示“批号 + 已拣数量 + 再次扫描加 1”。
+- 成功后仍按既有 `_clean_values()` 清理本次产品/批号输入，但保留 `active_move_id`，因此可以继续扫同产品的下一批号，不需要重新点击产品行。
+- 超量 `allow/warn/forbid`、源库位、单据状态等既有服务端校验仍由 `action_confirm()` 和 `_process_stock_move_line()` 执行。
+
+### 21.3 回归测试
+
+| 测试方法 | 覆盖场景 | 源码依据 |
+|---|---|---|
+| `test_new_lot_from_active_move_scans_accumulate_immediately` | 新批号每次扫描立即创建/更新已拣明细，连续三次得到 1、2、3。 | [Tests:638-660](tests/test_stock_barcodes_picking.py#L638-L660) |
+| `test_multiple_lots_scans_accumulate_independently` | 同产品按 A、B、A、B、A 交叉扫描，最终 A=3、B=2，总已拣为 5。 | [Tests:662-682](tests/test_stock_barcodes_picking.py#L662-L682) |
+| `test_existing_lot_without_product_scan_accumulates` | 未选产品时通过全局批号回退立即已拣，第二次扫描继续累加。 | [Tests:684-696](tests/test_stock_barcodes_picking.py#L684-L696) |
+| `test_tracked_lot_full_flow`、`test_create_new_lot_search_then_create` | 更新原完整流程和唯一性测试，验证首次扫描即创建并已拣、再次扫描复用批号且数量加 1。 | [Tests:616-636](tests/test_stock_barcodes_picking.py#L616-L636)、[Tests:700-726](tests/test_stock_barcodes_picking.py#L700-L726) |
+
+隔离测试统计 `stock_barcodes_picking` 共执行 **64 个测试**，无 `FAIL` 或 `ERROR`。

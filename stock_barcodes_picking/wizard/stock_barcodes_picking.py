@@ -903,9 +903,6 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("more_match", self.env._("Multiple lots found"))
             return True
         lot = lots
-        same_pending_lot = (
-            self.lot_id == lot and self.step == self._step_index("qty")
-        )
         self.lot_id = lot
         self.lot_name = lot.name
         self.product_id = lot.product_id
@@ -918,21 +915,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             # operator scans the source location.
             self.action_confirm(lot_quants=lot_quants)
             return True
-        if same_pending_lot and self.product_qty > 0:
-            self.product_qty += 1.0
-        else:
-            self.product_qty = 1.0
-        self.step = self._step_index("qty")
-        self._set_message_step()
-        self._set_message(
-            "info",
-            self.env._(
-                "Lot: %(lot)s. Quantity: %(qty)s. Scan again to add 1 "
-                "or Confirm.",
-                lot=lot.name,
-                qty=self.product_qty,
-            ),
-        )
+        self._confirm_scanned_lot(lot_quants=lot_quants)
         return True
 
     def _scan_lot_fallback(self, barcode):
@@ -1048,11 +1031,6 @@ class WizStockBarcodesPicking(models.TransientModel):
                 self.env._("Scan a product barcode or click a product row first."),
             )
             return True
-        same_pending_lot = (
-            not self.lot_id
-            and self.lot_name == barcode
-            and self.step == self._step_index("qty")
-        )
         self.lot_name = barcode
         self.lot_id = False
         self.qty_available = 0.0
@@ -1063,21 +1041,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             # operator scans the source location.
             self.action_confirm()
             return True
-        if same_pending_lot and self.product_qty > 0:
-            self.product_qty += 1.0
-        else:
-            self.product_qty = 1.0
-        self.step = self._step_index("qty")
-        self._set_message_step()
-        self._set_message(
-            "info",
-            self.env._(
-                "New lot: %(lot)s. Quantity: %(qty)s. Scan again to add 1 "
-                "or Confirm to create it.",
-                lot=barcode,
-                qty=self.product_qty,
-            ),
-        )
+        self._confirm_scanned_lot()
         return True
 
     def _scan_package(self, barcode):
@@ -1274,10 +1238,8 @@ class WizStockBarcodesPicking(models.TransientModel):
                           sn=lot.name),
                     )
                     return True
-                self._set_message(
-                    "info", self.env._("Lot: %s. Enter qty and confirm.", lot.name)
-                )
-                self.step = self._step_index("qty")
+                self._confirm_scanned_lot(lot_quants=lot_quants)
+                return True
             else:
                 self.lot_id = False
                 self.lot_name = False
@@ -1446,6 +1408,41 @@ class WizStockBarcodesPicking(models.TransientModel):
                 pickings=", ".join(other_lines.picking_id.mapped("name")),
             )
         return False
+
+    def _confirm_scanned_lot(self, lot_quants=None):
+        """Immediately add one to the picked quantity of the scanned lot.
+
+        ``_process_stock_move_line`` uses SET semantics, so the target
+        quantity must include what was already picked for this lot. Other
+        lots of the same product keep their own picked move lines.
+        """
+        self.ensure_one()
+        lot_name = self.lot_id.name or self.lot_name
+        picked_qty = 0.0
+        if self.lot_id:
+            picked_qty = sum(
+                line.quantity
+                for line in self.picking_id.move_line_ids
+                if line.picked
+                and line.lot_id == self.lot_id
+                and line.product_id == self.product_id
+                and (not self.location_id or line.location_id == self.location_id)
+            )
+        self.product_qty = picked_qty + 1.0
+        quantity = self.product_qty
+        self.step = self._step_index("qty")
+        result = self.action_confirm(lot_quants=lot_quants)
+        if result:
+            self._set_message(
+                "success",
+                self.env._(
+                    "Lot: %(lot)s. Picked quantity: %(qty)s. "
+                    "Scan again to add 1.",
+                    lot=lot_name,
+                    qty=quantity,
+                ),
+            )
+        return result
 
     def action_confirm(self, lot_quants=None):
         """Confirm the scanned product and update stock move lines.

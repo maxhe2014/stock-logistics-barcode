@@ -614,37 +614,29 @@ class TestStockBarcodesPicking(TransactionCase):
 
     # --- Tracked full flow ---
     def test_tracked_lot_full_flow(self):
-        """product → lot → qty → confirm for a lot-tracked product."""
+        """product → lot immediately creates and picks one unit."""
         picking = self._create_picking(self.product_lot, qty=10.0)
         move = picking.move_ids[0]
         wiz = self._create_wiz(picking)
 
-        # Step 1: scan location
         wiz.on_barcode_scanned(self.stock_location.barcode)
         self.assertEqual(wiz.step, wiz._step_index("product"))
-
-        # Step 2: scan product
         wiz.on_barcode_scanned(self.product_lot.barcode)
         self.assertEqual(wiz.product_id, self.product_lot)
         self.assertEqual(wiz.step, wiz._step_index("lot"))
 
-        # Step 3: scan an unknown lot name → creates new lot, goes to qty
         wiz.on_barcode_scanned("NEW-LOT-001")
-        self.assertTrue(wiz.lot_name, "lot_name should be set")
-        self.assertEqual(wiz.step, wiz._step_index("qty"))
-
-        # Step 4: set qty and confirm
-        wiz.product_qty = 3.0
-        self.assertTrue(wiz.action_confirm())
         line = move.move_line_ids.filtered(lambda l: l.lot_id)
         self.assertTrue(line)
         self.assertEqual(line.lot_id.name, "NEW-LOT-001")
-        self.assertEqual(line.quantity, 3.0)
+        self.assertEqual(line.quantity, 1.0)
         self.assertTrue(line.picked)
         self.assertTrue(move.picked)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("NEW-LOT-001", wiz.message)
 
-    def test_new_lot_from_active_move_scans_accumulate_before_confirm(self):
-        """Click a row, then scan the same new lot: pending qty is 1, 2, 3."""
+    def test_new_lot_from_active_move_scans_accumulate_immediately(self):
+        """Each scan immediately picks one more unit of the same new lot."""
         picking = self._create_in_picking(self.product_lot, qty=20.0)
         move = picking.move_ids[0]
         wiz = self._create_wiz(picking)
@@ -654,67 +646,54 @@ class TestStockBarcodesPicking(TransactionCase):
 
         for expected_qty in (1.0, 2.0, 3.0):
             wiz.on_barcode_scanned("TR-NEW-COUNT")
-            self.assertEqual(wiz.product_id, self.product_lot)
-            self.assertEqual(wiz.lot_name, "TR-NEW-COUNT")
-            self.assertFalse(wiz.lot_id)
-            self.assertEqual(wiz.product_qty, expected_qty)
-            self.assertEqual(wiz.step, wiz._step_index("qty"))
+            lot = self.env["stock.lot"].search([
+                ("name", "=", "TR-NEW-COUNT"),
+                ("product_id", "=", self.product_lot.id),
+            ])
+            self.assertEqual(len(lot), 1)
+            line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+            self.assertEqual(len(line), 1)
+            self.assertEqual(line.quantity, expected_qty)
+            self.assertTrue(line.picked)
+            self.assertEqual(wiz.message_type, "success")
             self.assertIn("TR-NEW-COUNT", wiz.message)
-            self.assertEqual(
-                self.env["stock.lot"].search_count([
-                    ("name", "=", "TR-NEW-COUNT"),
-                    ("product_id", "=", self.product_lot.id),
-                ]),
-                0,
-                "The lot must not be created before Confirm",
-            )
+            self.assertIn("Picked quantity", wiz.message)
 
-        self.assertTrue(wiz.action_confirm())
-        lot = self.env["stock.lot"].search([
-            ("name", "=", "TR-NEW-COUNT"),
-            ("product_id", "=", self.product_lot.id),
-        ])
-        self.assertTrue(lot)
-        line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
-        self.assertEqual(len(line), 1)
-        self.assertEqual(line.quantity, 3.0)
-        self.assertTrue(line.picked)
-
-        # A new pending operation after Confirm starts from one again.
-        wiz.on_barcode_scanned("TR-NEW-COUNT")
-        self.assertEqual(wiz.product_qty, 1.0)
-
-    def test_new_lot_default_qty_can_be_edited_before_confirm(self):
-        """The default one remains editable, e.g. to receive the demand 20."""
+    def test_multiple_lots_scans_accumulate_independently(self):
+        """Interleaved lots of one product keep independent picked totals."""
         picking = self._create_in_picking(self.product_lot, qty=20.0)
         move = picking.move_ids[0]
         wiz = self._create_wiz(picking)
         wiz.set_active_move(move.id)
-        wiz.on_barcode_scanned("TR-NEW-EDIT")
-        self.assertEqual(wiz.product_qty, 1.0)
 
-        self.assertTrue(wiz.action_consume_with_qty(20.0))
-        line = move.move_line_ids.filtered(lambda l: l.lot_id)
-        self.assertEqual(line.lot_id.name, "TR-NEW-EDIT")
-        self.assertEqual(line.quantity, 20.0)
-        self.assertTrue(line.picked)
+        for barcode in (
+            "TR-MULTI-A", "TR-MULTI-B", "TR-MULTI-A",
+            "TR-MULTI-B", "TR-MULTI-A",
+        ):
+            wiz.on_barcode_scanned(barcode)
+            self.assertEqual(wiz.message_type, "success")
 
-    def test_existing_lot_from_active_move_scans_accumulate(self):
-        """Existing lots follow the same pending quantity counting rule."""
+        picked_lines = move.move_line_ids.filtered(lambda l: l.lot_id and l.picked)
+        quantities = {
+            line.lot_id.name: line.quantity
+            for line in picked_lines
+        }
+        self.assertEqual(quantities, {"TR-MULTI-A": 3.0, "TR-MULTI-B": 2.0})
+        self.assertEqual(sum(picked_lines.mapped("quantity")), 5.0)
+
+    def test_existing_lot_without_product_scan_accumulates(self):
+        """Global lot fallback also picks immediately and then accumulates."""
         picking = self._create_in_picking(self.product_lot, qty=20.0)
         move = picking.move_ids[0]
         lot = self._create_lot(self.product_lot, "TR-EXISTING-COUNT")
         wiz = self._create_wiz(picking)
-        wiz.set_active_move(move.id)
 
-        wiz.on_barcode_scanned(lot.name)
-        self.assertEqual(wiz.product_qty, 1.0)
-        wiz.on_barcode_scanned(lot.name)
-        self.assertEqual(wiz.product_qty, 2.0)
-        self.assertTrue(wiz.action_confirm())
-        line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
-        self.assertEqual(line.quantity, 2.0)
-        self.assertTrue(line.picked)
+        for expected_qty in (1.0, 2.0):
+            wiz.on_barcode_scanned(lot.name)
+            line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+            self.assertEqual(line.quantity, expected_qty)
+            self.assertTrue(line.picked)
+            self.assertEqual(wiz.message_type, "success")
 
     # --- New lot uniqueness ---
     def test_create_new_lot_search_then_create(self):
@@ -726,28 +705,24 @@ class TestStockBarcodesPicking(TransactionCase):
         wiz.on_barcode_scanned(self.stock_location.barcode)
         wiz.on_barcode_scanned(self.product_lot.barcode)
         wiz.on_barcode_scanned("LOT-UNIQUE-001")
-        # lot_id is set only during action_confirm (via _create_new_lot)
-        self.assertFalse(wiz.lot_id)
-        self.assertEqual(wiz.lot_name, "LOT-UNIQUE-001")
-        wiz.product_qty = 1.0
-        wiz.action_confirm()
-        # _clean_values clears wiz.lot_id, so query by name
         lot_1 = self.env["stock.lot"].search([
             ("name", "=", "LOT-UNIQUE-001"),
             ("product_id", "=", self.product_lot.id),
         ])
-        self.assertTrue(lot_1, "lot should be created on confirm")
+        self.assertTrue(lot_1, "the first scan should create and pick the lot")
 
-        # Scan same lot barcode again
+        # Scan same lot barcode again: reuse the record and pick one more.
         wiz.on_barcode_scanned(self.stock_location.barcode)
         wiz.on_barcode_scanned(self.product_lot.barcode)
         wiz.on_barcode_scanned("LOT-UNIQUE-001")
-        # Search-then-create must reuse lot_1, not create a duplicate
         count = self.env["stock.lot"].search_count([
             ("name", "=", "LOT-UNIQUE-001"),
             ("product_id", "=", self.product_lot.id),
         ])
         self.assertEqual(count, 1)
+        line = picking.move_line_ids.filtered(lambda l: l.lot_id == lot_1)
+        self.assertEqual(line.quantity, 2.0)
+        self.assertTrue(line.picked)
 
     # --- _resolve_lot_owner: non-picking product ---
     def test_resolve_lot_owner_non_picking_product(self):
