@@ -2,7 +2,7 @@
 
 > 模块：`stock_barcodes_picking`  
 > 版本基线：`19.0.1.1.1`  
-> 当前增量：`19.0.1.1.3`（批号实时已拣与多批号独立累加，见第 21 节）
+> 当前增量：`19.0.1.1.4`（全部批号始终展开并分别显示已拣数量，见第 22 节）
 > 整理日期：2026-11-04  
 > 用途：统一现行规则口径、核对实现颗粒度、登记重复或冲突点，供后续开发与回归测试使用。
 
@@ -230,7 +230,7 @@
 | 规则 ID | 触发/前提 | 当前规则 | 源码依据 | 测试/核对状态 |
 |---|---|---|---|---|
 | ACT-001 | 删除批次/SN | 验证 move 属于当前 picking，搜索该 move＋lot 的活动明细并只取第一条；quantity 大于 1 时减 1，否则删除整条。不会删除 stock.lot 本身。 | [Wizard:2187-2234](wizard/stock_barcodes_picking.py#L2187-L2234) | 未见直接测试；守卫见 ISS-008 |
-| ACT-002 | 删除按钮显示 | OWL 只对 picked 批次/SN 显示删除按钮；待拣预留 SN 无删除按钮。 | [XML:253-340](static/src/picking_scan_app.xml#L253-L340) | 前后端范围不同 |
+| ACT-002 | 删除按钮显示 | OWL 只对 picked 批次/SN 显示删除按钮；待拣预留 SN 无删除按钮。 | [XML:253-275](static/src/picking_scan_app.xml#L253-L275) | 前后端范围不同 |
 | ACT-003 | Validate | 先检查候选单、picking 和包装，再调用原生 `button_validate()`；返回 dict 时补默认 views 并交给 OWL 打开。 | [Wizard:1832-1871](wizard/stock_barcodes_picking.py#L1832-L1871) | 已覆盖直接验证；包装/向导分支未覆盖 |
 | ACT-004 | Backorder | 无论验证直接返回 True 还是打开确认向导，关闭后都尝试切换；只有原 picking 已 done 且存在 backorder 时切到第一张 backorder。 | [Wizard:1873-1890](wizard/stock_barcodes_picking.py#L1873-L1890)、[OWL:802-867](static/src/picking_scan_app.esm.js#L802-L867) | 未见直接 backorder 测试 |
 
@@ -243,11 +243,12 @@
 | UI-003 | 提示音 | `error`、`not_found`、`more_match` 播放错误音；普通 success/info 不播放。 | [OWL:276-281](static/src/picking_scan_app.esm.js#L276-L281) | 未见直接前端测试 |
 | UI-004 | 手动输入禁用 | RPC 进行中、候选单待选或单据外产品待确认时禁用手动输入；硬件扫码仍可到后端，由后端守卫拦截。 | [XML:23-29](static/src/picking_scan_app.xml#L23-L29)、[OWL:255-260](static/src/picking_scan_app.esm.js#L255-L260) | 未见直接前端测试 |
 | UI-005 | 未匹配条码 | 仅当消息类型为 `not_found` 时记录并展示 Force add；任何其他结果都会清掉该条码。 | [OWL:309-315](static/src/picking_scan_app.esm.js#L309-L315) | 未见直接前端测试 |
-| UI-006 | 新扫 SN 高亮 | 对比刷新前后 picked lot，将新扫项移到 pickedLots 末尾并高亮约 2 秒。 | [OWL:261-307](static/src/picking_scan_app.esm.js#L261-L307) | 未见直接前端测试 |
-| UI-007 | 产品/包装分组 | 后端一个 move 可返回多个包装行；前端按 move ID 合组并合计 picked 数量，而不是按产品合并多个 move。 | [OWL:1011-1028](static/src/picking_scan_app.esm.js#L1011-L1028) | 未见直接前端测试 |
-| UI-008 | 按钮可见性 | Confirm：有 picking、产品、正数量且无新产品待确认；Consume by demand：当前产品非跟踪；Force Consume：由后端标志控制。 | [OWL:962-988](static/src/picking_scan_app.esm.js#L962-L988)、[XML:374-407](static/src/picking_scan_app.xml#L374-L407) | 未见直接前端测试 |
-| UI-009 | 消息类型映射 | 前端支持 info、success、warning、error、not_found、more_match 的样式；后端字段 Selection 未定义 warning，现行后端主要使用其余类型。 | [Wizard:89-100](wizard/stock_barcodes_picking.py#L89-L100)、[OWL:949-960](static/src/picking_scan_app.esm.js#L949-L960) | 低优先级口径差异 |
+| UI-006 | 新扫 SN 高亮 | 对比刷新前后 picked lot，识别新扫项并高亮约 2 秒；全部批号始终显示，不再通过展开按钮查看。 | [OWL:258-304](static/src/picking_scan_app.esm.js#L258-L304) | 未见直接前端测试 |
+| UI-007 | 产品/包装分组 | 后端一个 move 可返回多个包装行；前端按 move ID 合组并合计 picked 数量，而不是按产品合并多个 move。 | [OWL:1000-1013](static/src/picking_scan_app.esm.js#L1000-L1013) | 未见直接前端测试 |
+| UI-008 | 按钮可见性 | Confirm：有 picking、产品、正数量且无新产品待确认；Consume by demand：当前产品非跟踪；Force Consume：由后端标志控制。 | [OWL:946-972](static/src/picking_scan_app.esm.js#L946-L972)、[XML:309-342](static/src/picking_scan_app.xml#L309-L342) | 未见直接前端测试 |
+| UI-009 | 消息类型映射 | 前端支持 info、success、warning、error、not_found、more_match 的样式；后端字段 Selection 未定义 warning，现行后端主要使用其余类型。 | [Wizard:89-100](wizard/stock_barcodes_picking.py#L89-L100)、[OWL:933-944](static/src/picking_scan_app.esm.js#L933-L944) | 低优先级口径差异 |
 | UI-010 | 成功消息覆盖 | 多处先写具体操作消息，再调用 `_set_message_step()`，最终显示步骤 info；唯一 SN 自动匹配等路径又在步骤提示后重写 success。 | [Wizard:871-883](wizard/stock_barcodes_picking.py#L871-L883)、[Wizard:1233-1248](wizard/stock_barcodes_picking.py#L1233-L1248) | 消息差异见 ISS-018 |
+| UI-011 | 批号已拣数量 | 每个包装分组下的全部批号始终显示为“批号 × 已拣数量”；同批号多明细合并，跨包装分别统计，预留批号仍显示待拣且已拣数量为 0。 | [Wizard:495-528](wizard/stock_barcodes_picking.py#L495-L528)、[XML:251-277](static/src/picking_scan_app.xml#L251-L277) | 已覆盖后端状态数据 |
 
 ## 16. 安装、视图与辅助规则
 
@@ -255,7 +256,7 @@
 |---|---|---|
 | AUX-001 | 库位表单补充原生 barcode 字段，供源/目标库位扫码使用。 | [stock_location_views.xml](views/stock_location_views.xml) |
 | AUX-002 | OWL Back 使用历史返回；另保存进入扫码页前的 session action，以保留列表菜单上下文。 | [OWL:47-77](static/src/picking_scan_app.esm.js#L47-L77)、[OWL:345-348](static/src/picking_scan_app.esm.js#L345-L348) |
-| AUX-003 | 后端状态快照排除 done/cancel move；各包装行 quantity 只汇总该行 picked 明细。 | [Wizard:456-539](wizard/stock_barcodes_picking.py#L456-L539) |
+| AUX-003 | 后端状态快照排除 done/cancel move；各包装行 quantity 只汇总该行 picked 明细，并为每个批号返回 picked_quantity。 | [Wizard:456-550](wizard/stock_barcodes_picking.py#L456-L550) |
 | AUX-004 | README 当前只覆盖基础流程和超量策略，不能作为本模块完整规则来源。 | [README.rst](README.rst) |
 
 ## 17. 重复、冲突与混乱项清单
@@ -411,3 +412,26 @@ RULES.md 是否同步：
 | `test_tracked_lot_full_flow`、`test_create_new_lot_search_then_create` | 更新原完整流程和唯一性测试，验证首次扫描即创建并已拣、再次扫描复用批号且数量加 1。 | [Tests:616-636](tests/test_stock_barcodes_picking.py#L616-L636)、[Tests:700-726](tests/test_stock_barcodes_picking.py#L700-L726) |
 
 隔离测试统计 `stock_barcodes_picking` 共执行 **64 个测试**，无 `FAIL` 或 `ERROR`。
+
+## 22. `19.0.1.1.4` 全部批号始终展开并分别显示已拣数量
+
+### 22.1 展示规则
+
+- 用户确认采用“始终展开批号明细”：不再显示“共 N 个”或“查看”按钮，也不需要点击展开；每个包装分组下直接列出全部批号。
+- 已拣批号显示为“批号 × 已拣数量”，产品标题的需求和已拣合计保持不变。数量来自实际 `picked=True` 的 `stock.move.line.quantity`，不是另行保存的历史扫码次数。
+- 同一包装分组内，同批号、同已拣状态的多条明细合并；同批号跨包装时分别显示各包装数量，不跨包装混合。
+- 预留但未拣批号继续显示“待拣”，其 `picked_quantity` 为 0；同一批号同时存在已拣和待拣明细时使用不同模板 key。
+- 序列号标签使用同一展示结构，因此显示固定数量 1；普通批号显示各自累计数量。
+
+### 22.2 修改边界
+
+- `get_scan_state()` 为每个批号增加 `key` 和 `picked_quantity`；OWL 删除批号手风琴状态及展开/收起方法。
+- 第 21 节的实时已拣、多批号独立累加、超量策略、库位校验、明细写入和删除接口均未改变。
+- 清理仅用于旧展开/收起界面的“共”“个”“个待拣”“查看”翻译条目。
+
+### 22.3 回归测试
+
+| 测试方法 | 覆盖场景 | 源码依据 |
+|---|---|---|
+| `test_multiple_lots_scans_accumulate_independently` | 除 A=3、B=2 的业务明细外，同时验证状态快照分别返回两个批号数量、总行合计为 5；同批号预留明细单独显示待拣、已拣数量为 0，模板 key 不重复。 | [Tests:662-721](tests/test_stock_barcodes_picking.py#L662-L721) |
+| `test_scan_state_lot_quantities_grouped_per_package` | 同批号在包装 1 的两条明细 2+3 合并显示 5，包装 2 独立显示 4；各包装行合计与批号数量一致。 | [Tests:723-763](tests/test_stock_barcodes_picking.py#L723-L763) |

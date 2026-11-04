@@ -681,6 +681,87 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertEqual(quantities, {"TR-MULTI-A": 3.0, "TR-MULTI-B": 2.0})
         self.assertEqual(sum(picked_lines.mapped("quantity")), 5.0)
 
+        # The scan state exposes each lot's actual picked quantity. A reserved
+        # line of the same lot remains a separate pending entry with zero
+        # picked quantity and a unique template key.
+        picking.picking_type_id.barcode_show_reserved_sns = True
+        lot_a = picked_lines.filtered(
+            lambda l: l.lot_id.name == "TR-MULTI-A"
+        ).lot_id
+        self.env["stock.move.line"].create({
+            "move_id": move.id,
+            "picking_id": picking.id,
+            "product_id": self.product_lot.id,
+            "product_uom_id": self.product_lot.uom_id.id,
+            "lot_id": lot_a.id,
+            "quantity": 1.0,
+            "picked": False,
+            "location_id": picking.location_id.id,
+            "location_dest_id": picking.location_dest_id.id,
+        })
+        state_move = next(
+            m for m in wiz.get_scan_state()["move_ids"] if m["id"] == move.id
+        )
+        self.assertEqual(state_move["quantity"], 5.0)
+        self.assertEqual(len(state_move["lots"]), 3)
+        self.assertEqual(
+            {
+                lot["name"]: lot["picked_quantity"]
+                for lot in state_move["lots"]
+                if lot["picked"]
+            },
+            {"TR-MULTI-A": 3.0, "TR-MULTI-B": 2.0},
+        )
+        reserved = next(lot for lot in state_move["lots"] if not lot["picked"])
+        self.assertEqual(reserved["name"], "TR-MULTI-A")
+        self.assertEqual(reserved["picked_quantity"], 0.0)
+        self.assertEqual(
+            len({lot["key"] for lot in state_move["lots"]}),
+            len(state_move["lots"]),
+        )
+
+    def test_scan_state_lot_quantities_grouped_per_package(self):
+        """Same-lot lines merge inside each package, not across packages."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        move = picking.move_ids[0]
+        wiz = self._create_wiz(picking)
+        lot = self._create_lot(self.product_lot, "TR-PACKAGE-QTY")
+        package_1 = self.env["stock.package"].create({"name": "PKG-LOT-1"})
+        package_2 = self.env["stock.package"].create({"name": "PKG-LOT-2"})
+        for package, quantity in (
+            (package_1, 2.0),
+            (package_1, 3.0),
+            (package_2, 4.0),
+        ):
+            self.env["stock.move.line"].create({
+                "move_id": move.id,
+                "picking_id": picking.id,
+                "product_id": self.product_lot.id,
+                "product_uom_id": self.product_lot.uom_id.id,
+                "lot_id": lot.id,
+                "quantity": quantity,
+                "picked": True,
+                "location_id": picking.location_id.id,
+                "location_dest_id": picking.location_dest_id.id,
+                "result_package_id": package.id,
+            })
+
+        rows = [
+            m for m in wiz.get_scan_state()["move_ids"] if m["id"] == move.id
+        ]
+        self.assertEqual(len(rows), 2)
+        rows_by_package = {row["package_name"]: row for row in rows}
+        self.assertEqual(rows_by_package["PKG-LOT-1"]["quantity"], 5.0)
+        self.assertEqual(rows_by_package["PKG-LOT-2"]["quantity"], 4.0)
+        self.assertEqual(
+            rows_by_package["PKG-LOT-1"]["lots"][0]["picked_quantity"], 5.0
+        )
+        self.assertEqual(
+            rows_by_package["PKG-LOT-2"]["lots"][0]["picked_quantity"], 4.0
+        )
+        self.assertEqual(len(rows_by_package["PKG-LOT-1"]["lots"]), 1)
+        self.assertEqual(len(rows_by_package["PKG-LOT-2"]["lots"]), 1)
+
     def test_existing_lot_without_product_scan_accumulates(self):
         """Global lot fallback also picks immediately and then accumulates."""
         picking = self._create_in_picking(self.product_lot, qty=20.0)

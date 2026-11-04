@@ -1272,27 +1272,9 @@ msgid "Wizard to read barcode on pickings"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "个"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "个待拣"
-msgstr ""
-
-#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "产品"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "共"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -1323,12 +1305,6 @@ msgstr ""
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "未装包"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "查看"
 msgstr ""
 
 #. module: stock_barcodes_picking

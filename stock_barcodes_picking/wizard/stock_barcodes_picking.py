@@ -493,28 +493,39 @@ class WizStockBarcodesPicking(models.TransientModel):
             # the "未装包" label on the unpacked group).
             has_packaged = any(k[0] for k in package_groups)
             for (pkg_id, pkg_name), lines in package_groups.items():
-                lots = [
-                    {
-                        "id": l.lot_id.id,
-                        "name": lot_name_by_id.get(l.lot_id.id, ""),
-                        "picked": True,
-                    }
-                    for l in lines
-                    if l.lot_id
-                ]
+                # Show one entry per lot and picked state within this package
+                # group. Multiple lines of the same lot contribute to one
+                # picked quantity; other packages keep their own quantity.
+                lots_by_key = {}
+                for l in lines:
+                    if not l.lot_id:
+                        continue
+                    lot_key = (l.lot_id.id, True)
+                    if lot_key not in lots_by_key:
+                        lots_by_key[lot_key] = {
+                            "id": l.lot_id.id,
+                            "key": "%s_picked" % l.lot_id.id,
+                            "name": lot_name_by_id.get(l.lot_id.id, ""),
+                            "picked": True,
+                            "picked_quantity": 0.0,
+                        }
+                    lots_by_key[lot_key]["picked_quantity"] += l.quantity
                 # Reserved (unpicked) lots go to the unpacked group only.
                 if show_reserved and not pkg_id:
                     reserved_lines = move_lines.filtered(
                         lambda l: not l.picked and l.lot_id
                     ).sorted(key=lambda l: l.id)
-                    lots += [
-                        {
-                            "id": l.lot_id.id,
-                            "name": lot_name_by_id.get(l.lot_id.id, ""),
-                            "picked": False,
-                        }
-                        for l in reserved_lines
-                    ]
+                    for l in reserved_lines:
+                        lot_key = (l.lot_id.id, False)
+                        if lot_key not in lots_by_key:
+                            lots_by_key[lot_key] = {
+                                "id": l.lot_id.id,
+                                "key": "%s_reserved" % l.lot_id.id,
+                                "name": lot_name_by_id.get(l.lot_id.id, ""),
+                                "picked": False,
+                                "picked_quantity": 0.0,
+                            }
+                lots = list(lots_by_key.values())
                 picked_lot_ids = [
                     l.lot_id.id for l in lines if l.lot_id
                 ]

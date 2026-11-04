@@ -248,75 +248,9 @@
                                                 </t>
                                             </t>
                                         </div>
-                                        <!-- Lots + actions -->
+                                        <!-- All lots are always visible with their picked quantities. -->
                                         <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                                            <!-- Single SN: show inline with delete -->
-                                            <t t-if="mv.lots.length === 1">
-                                                <!-- Picked SN -->
-                                                <span t-if="mv.lots[0].picked"
-                                                      t-att-class="'badge bg-secondary d-inline-flex align-items-center gap-1' + (state.recentScanLotKey === mv.row_key + ':' + mv.lots[0].id ? ' o_picking_scan_recent' : '')"
-                                                      t-att-data-scan-lot="mv.row_key + ':' + mv.lots[0].id">
-                                                    <i class="fa fa-barcode"/>
-                                                    <t t-out="mv.lots[0].name" />
-                                                    <button type="button"
-                                                            class="btn btn-link btn-sm p-0 ms-1 text-danger"
-                                                            t-att-title="'Remove ' + mv.lots[0].name"
-                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.lots[0].id)">
-                                                        <i class="fa fa-trash"/>
-                                                    </button>
-                                                </span>
-                                                <!-- Reserved (unpicked) SN: greyed "pending", no delete -->
-                                                <span t-else=""
-                                                      class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
-                                                    <i class="fa fa-clock-o"/>
-                                                    <t t-out="mv.lots[0].name" />
-                                                    <span class="small opacity-75">待拣</span>
-                                                </span>
-                                            </t>
-                                            <!-- Multi-SN: show the LATEST PICKED SN inline + count badge to expand all -->
-                                            <t t-if="mv.pickedLots.length > 0 and (mv.pickedLots.length > 1 or mv.lots.length > mv.pickedLots.length)">
-                                                <span t-att-class="'badge bg-info d-inline-flex align-items-center gap-1' + (state.recentScanLotKey === mv.row_key + ':' + mv.pickedLots[mv.pickedLots.length - 1].id ? ' o_picking_scan_recent' : '')"
-                                                      t-att-data-scan-lot="mv.row_key + ':' + mv.pickedLots[mv.pickedLots.length - 1].id">
-                                                    <i class="fa fa-barcode"/>
-                                                    <t t-out="mv.pickedLots[mv.pickedLots.length - 1].name" />
-                                                    <button type="button"
-                                                            class="btn btn-link btn-sm p-0 ms-1 text-danger"
-                                                            t-att-title="'Remove ' + mv.pickedLots[mv.pickedLots.length - 1].name"
-                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.id, mv.pickedLots[mv.pickedLots.length - 1].id)">
-                                                        <i class="fa fa-trash"/>
-                                                    </button>
-                                                </span>
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                                                        t-att-title="state.expandedMoveId === mv.row_key ? '收起全部' : '展开全部'"
-                                                        t-on-click.stop="() => this.onToggleMoveLots(mv.row_key)">
-                                                    <i t-att-class="state.expandedMoveId === mv.row_key ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
-                                                    共 <t t-out="mv.pickedLots.length" /> 个
-                                                </button>
-                                            </t>
-                                            <!-- Reserved SNs only (none picked yet) -->
-                                            <t t-if="mv.pickedLots.length === 0 and mv.lots.length > 0">
-                                                <span class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
-                                                    <i class="fa fa-clock-o"/>
-                                                    <t t-out="mv.lots.length" /> 个待拣
-                                                </span>
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                                                        t-att-title="state.expandedMoveId === mv.row_key ? '收起全部' : '展开全部'"
-                                                        t-on-click.stop="() => this.onToggleMoveLots(mv.row_key)">
-                                                    <i t-att-class="state.expandedMoveId === mv.row_key ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
-                                                    查看
-                                                </button>
-                                            </t>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <!-- Multi-SN expansion row (accordion) -->
-                                <tr t-if="state.expandedMoveId === mv.row_key and mv.lots.length > 1"
-                                    class="o_picking_scan_lot_expand">
-                                    <td colspan="2" class="p-0">
-                                        <div class="d-flex flex-wrap gap-2 p-2 bg-light border-top">
-                                            <t t-foreach="mv.lots" t-as="lot" t-key="lot.id">
+                                            <t t-foreach="mv.lots" t-as="lot" t-key="lot.key">
                                                 <!-- Picked lots: latest highlighted, others grey -->
                                                 <span t-if="lot.picked"
                                                     t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-info' : 'bg-secondary') + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ' o_picking_scan_recent' : '')"
@@ -324,6 +258,7 @@
                                                 >
                                                     <i class="fa fa-barcode"/>
                                                     <t t-out="lot.name" />
+                                                    <strong class="ms-1">× <t t-out="lot.picked_quantity" /></strong>
                                                     <button type="button"
                                                             class="btn btn-link btn-sm p-0 ms-1 text-danger"
                                                             t-att-title="'Remove ' + lot.name"

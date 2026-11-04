@@ -119,9 +119,6 @@ export class PickingScanApp extends Component {
             last_unmatched_barcode: "",
             editingQtyMoveId: false,
             draftQty: "",
-            // Multi-SN accordion: the move id whose lot list is expanded,
-            // or false when all are collapsed (default).
-            expandedMoveId: false,
             // Composite row_key:lot_id highlighted for two seconds after scanning.
             recentScanLotKey: "",
             // Package rename inline editor (AutoComplete with existing names)
@@ -198,8 +195,8 @@ export class PickingScanApp extends Component {
     }
 
     /**
-     * Add a `pickedLots` filtered array to each move so the template can
-     * distinguish picked (scanned) lots from reserved (unpicked) ones.
+     * Add a `pickedLots` filtered array to each move so a newly picked lot
+     * can be located after the backend refresh.
      * Must be called after every state assignment from the backend.
      */
     _enrichMoves() {
@@ -568,18 +565,6 @@ export class PickingScanApp extends Component {
                 { type: "danger" }
             );
             this._playAlert();
-        }
-    }
-
-    /**
-     * Accordion toggle for a move's multi-SN list. Opening one move
-     * collapses any other. Clicking the already-open move collapses it.
-     */
-    onToggleMoveLots(rowKey) {
-        if (this.state.expandedMoveId === rowKey) {
-            this.state.expandedMoveId = false;
-        } else {
-            this.state.expandedMoveId = rowKey;
         }
     }
 
