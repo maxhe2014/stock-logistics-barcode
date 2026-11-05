@@ -125,6 +125,9 @@ export class PickingScanApp extends Component {
             draftLotQty: "",
             // Composite row_key:lot_id highlighted for two seconds after scanning.
             recentScanLotKey: "",
+            // Changes on every lot scan so repeating the same lot restarts
+            // the CSS animation instead of reusing the existing DOM node.
+            recentScanLotNonce: 0,
             // Package rename inline editor (AutoComplete with existing names)
             editingPackageMoveId: false,
             editingPackageId: false,
@@ -266,14 +269,17 @@ export class PickingScanApp extends Component {
         // scan through — the backend guard only accepts picking-name
         // scans while the selector is open, and rejects everything else.
         this.state.scanning = true;
-        // Snapshot picked lot ids per package row so the exact scanned lot
-        // can be located after the backend refresh.
-        const pickedLotIdsBefore = new Map();
+        // Snapshot picked quantities per package row and lot. Comparing only
+        // lot IDs misses repeated scans of an existing lot (the common case
+        // when a lot is already packed or unpacked).
+        const pickedLotQuantitiesBefore = new Map();
         for (const mv of this.state.move_ids) {
-            pickedLotIdsBefore.set(
-                mv.row_key,
-                new Set((mv.pickedLots || []).map((lot) => lot.id))
-            );
+            for (const lot of mv.pickedLots || []) {
+                pickedLotQuantitiesBefore.set(
+                    `${mv.row_key}:${lot.id}`,
+                    lot.picked_quantity || 0
+                );
+            }
         }
         try {
             const res = await this.orm.call(
@@ -287,13 +293,17 @@ export class PickingScanApp extends Component {
             if (["error", "not_found", "more_match"].includes(this.state.message_type)) {
                 this._playAlert();
             }
-            // Locate the exact newly picked lot. Move it to the end of the
-            // client-only pickedLots list so the collapsed row displays the
-            // lot just scanned, even when reserved lines were scanned out of order.
+            // Locate the lot whose picked quantity increased. The row key is
+            // part of the identity so equal lot IDs in different packages
+            // cannot steal the highlight from the actual scanned row.
             let scannedTarget = null;
             for (const mv of this.state.move_ids) {
-                const before = pickedLotIdsBefore.get(mv.row_key) || new Set();
-                const scannedLot = (mv.pickedLots || []).find((lot) => !before.has(lot.id));
+                const scannedLot = (mv.pickedLots || []).find((lot) => {
+                    const beforeQty = pickedLotQuantitiesBefore.get(
+                        `${mv.row_key}:${lot.id}`
+                    ) || 0;
+                    return (lot.picked_quantity || 0) > beforeQty;
+                });
                 if (!scannedLot) {
                     continue;
                 }
@@ -306,6 +316,9 @@ export class PickingScanApp extends Component {
             if (scannedTarget) {
                 const lotKey = `${scannedTarget.rowKey}:${scannedTarget.lotId}`;
                 this._pendingScanTarget = scannedTarget;
+                // A new nonce changes the keyed DOM node on repeated scans,
+                // restarting the CSS flash even when lotKey stays identical.
+                this.state.recentScanLotNonce += 1;
                 this.state.recentScanLotKey = lotKey;
                 clearTimeout(this._highlightTimer);
                 this._highlightTimer = setTimeout(() => {

@@ -250,7 +250,7 @@
                                         </div>
                                         <!-- All lots are always visible with their picked quantities. -->
                                         <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                                            <t t-foreach="mv.lots" t-as="lot" t-key="lot.key">
+                                            <t t-foreach="mv.lots" t-as="lot" t-key="lot.key + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ':scan-' + state.recentScanLotNonce : '')">
                                                 <!-- Picked lots: latest highlighted, others grey -->
                                                 <span t-if="lot.picked"
                                                     t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-info' : 'bg-secondary') + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ' o_picking_scan_recent' : '')"

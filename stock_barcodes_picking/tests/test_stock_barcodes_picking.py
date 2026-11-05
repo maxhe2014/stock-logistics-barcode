@@ -1031,6 +1031,44 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertEqual(unpacked.quantity, 3.0)
         self.assertFalse(unpacked.result_package_id)
 
+    def test_scan_state_repeated_lot_delta_identifies_unpacked_row(self):
+        """A repeated lot scan exposes one positive delta for UI highlighting."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        lot = self._create_lot(self.product_lot, "TR-HIGHLIGHT-REPEAT")
+        package = self.env["stock.package"].create({"name": "PKG-HIGHLIGHT"})
+        self._create_picked_lot_line(picking, lot, 1.0, package=package)
+        self._create_picked_lot_line(picking, lot, 10.0)
+        wiz = self._create_wiz(picking)
+
+        before = wiz.get_scan_state()["move_ids"]
+        result = wiz.process_barcode_and_dispatch(lot.name)
+        after = result["state"]["move_ids"]
+
+        def picked_quantities(rows):
+            return {
+                (row["row_key"], lot_state["id"]): lot_state["picked_quantity"]
+                for row in rows
+                for lot_state in row["lots"]
+                if lot_state["picked"]
+            }
+
+        before_qty = picked_quantities(before)
+        after_qty = picked_quantities(after)
+        increased = [
+            (row_key, lot_id, before_qty.get((row_key, lot_id), 0.0), quantity)
+            for (row_key, lot_id), quantity in after_qty.items()
+            if quantity > before_qty.get((row_key, lot_id), 0.0)
+        ]
+        unpacked_row_key = next(
+            row["row_key"] for row in before if not row["package_id"]
+        )
+        self.assertEqual(
+            increased,
+            [(unpacked_row_key, lot.id, 10.0, 11.0)],
+        )
+        packed_row = next(row for row in after if row["package_id"] == package.id)
+        self.assertEqual(packed_row["lots"][0]["picked_quantity"], 1.0)
+
     def test_scan_new_lot_allow_never_redistributes_packed_quantity(self):
         """Allowed over-picking cannot take quantity from a sealed package."""
         picking = self._create_in_picking(self.product_lot, qty=5.0)
