@@ -9,6 +9,7 @@ import { standardActionServiceProps } from "@web/webclient/actions/action_servic
 import { AutoComplete } from "@web/core/autocomplete/autocomplete";
 import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog";
 import { browser } from "@web/core/browser/browser";
+import { scanBarcode } from "@web/core/barcode/barcode_dialog";
 
 /**
  * PickingScanApp — thin OWL client action for the outgoing-picking
@@ -360,6 +361,30 @@ export class PickingScanApp extends Component {
         if (value) {
             this._onScan(value);
             ev.currentTarget.value = "";
+        }
+    }
+
+    /** Open the device camera and feed the detected code into the normal scan queue. */
+    async onCameraScan() {
+        if (
+            this.state.scanning ||
+            this.isQuantityEditing ||
+            this.state.visible_switch_selector ||
+            this.state.visible_force_add
+        ) {
+            return;
+        }
+        try {
+            const barcode = await scanBarcode(this.env, "environment");
+            if (barcode?.trim()) {
+                await this._onScan(barcode.trim());
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Scan failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
+            this._playAlert();
         }
     }
 

@@ -105,6 +105,12 @@ msgid "Back"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Scan with camera"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__barcode
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.stock_location_form_inherit_barcode
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
