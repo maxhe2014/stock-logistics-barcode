@@ -652,6 +652,52 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertTrue(wiz.action_force_done())
         self.assertEqual(sum(move.move_line_ids.mapped("quantity")), 3.0)
 
+    def test_18b_lot_overscan_preserves_picked_lot(self):
+        """A new lot must not eat an already picked lot before force."""
+        move = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_tracked
+        )
+        _, res = self._scan_component(
+            self.production, self.component_tracked,
+            "PROD-COMP-T", 2.0, lot_barcode="LOT-COMP-001",
+        )
+        self.assertTrue(res)
+        first_line = move.move_line_ids.filtered(
+            lambda l: l.lot_id == self.component_lot
+        )
+        self.assertTrue(first_line.picked)
+
+        wiz, res = self._scan_component(
+            self.production, self.component_tracked,
+            "PROD-COMP-T", 2.0, lot_barcode="LOT-PICKED-OVER-001",
+        )
+
+        self.assertFalse(res)
+        self.assertTrue(wiz.visible_force_done)
+        first_line = move.move_line_ids.filtered(
+            lambda l: l.lot_id == self.component_lot
+        )
+        self.assertTrue(first_line, "First picked lot must not be eaten")
+        self.assertEqual(first_line.quantity, 2.0)
+        new_lot = self.StockProductionLot.search([
+            ("name", "=", "LOT-PICKED-OVER-001"),
+            ("product_id", "=", self.component_tracked.id),
+        ])
+        self.assertTrue(new_lot)
+        self.assertFalse(move.move_line_ids.filtered(lambda l: l.lot_id == new_lot))
+
+        self.assertTrue(wiz.action_force_done())
+        lines = move.move_line_ids.filtered(
+            lambda l: l.lot_id in (self.component_lot | new_lot)
+        )
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(sum(lines.mapped("quantity")), 4.0)
+        self.assertEqual(
+            {line.lot_id.name: line.quantity for line in lines},
+            {"LOT-COMP-001": 2.0, "LOT-PICKED-OVER-001": 2.0},
+        )
+        self.assertTrue(all(lines.mapped("picked")))
+
     def test_19_reapply_different_finished_lot_replaces(self):
         """Applying a second finished lot replaces the first (no UserError).
 

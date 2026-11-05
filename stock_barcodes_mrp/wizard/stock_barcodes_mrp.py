@@ -1921,22 +1921,14 @@ class WizStockBarcodesMrp(models.TransientModel):
             # not silently double consumption (mirrors enterprise _find_quant
             # behaviour). Only the un-absorbable excess requires force.
             #
-            # Task 5: for SERIAL products, one scanned SN is one physical
-            # item, so move lines that the operator has already picked
-            # (picked=True) MUST survive — absorbing them would silently eat
-            # a previously scanned SN. Lines with picked=False are reservation
-            # placeholders (created by _action_assign before any scan) and may
-            # be released/absorbed so the scanned SN replaces the reserved
-            # one. If the excess cannot be covered by unpicked placeholders,
-            # fall through to the Force Consume prompt. For lot-tracked /
-            # untracked products a lot may represent several units and lot
-            # substitution is expected, so the original behaviour (absorbing
-            # the reserved lot line) is preserved.
-            is_serial = self.product_id.tracking == "serial"
+            # Operator-picked lines must survive for every tracking type.
+            # Only unpicked reservation placeholders may be released to
+            # substitute a lot. If picked lines leave an excess, require
+            # Force Consume before adding the new line.
             excess = other_lines_qty + self.product_qty - total_demand
             if excess > 0:
                 for line in other_lines.sorted(key=lambda l: l.id):
-                    if is_serial and line.picked:
+                    if line.picked:
                         continue
                     take = min(line.quantity, excess)
                     line.quantity = line.quantity - take
