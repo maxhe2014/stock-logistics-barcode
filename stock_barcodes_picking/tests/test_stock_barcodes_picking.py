@@ -148,6 +148,27 @@ class TestStockBarcodesPicking(TransactionCase):
         wiz.on_barcode_scanned(self.stock_location.barcode)
         return product, lot, picking, wiz
 
+    def _prepare_outside_lot_scan(
+        self, policy="allow", location=None, quantity=10.0
+    ):
+        """Build an outgoing transfer and an outside lot ready to scan."""
+        self.picking_type.barcode_new_product_policy = policy
+        product = self.Product.create({
+            "name": "Outside Lot",
+            "type": "consu",
+            "is_storable": True,
+            "tracking": "lot",
+            "barcode": "PROD-OUTSIDE-LOT",
+        })
+        lot = self._create_lot(product, "LOT-OUTSIDE-001")
+        self.StockQuant._update_available_quantity(
+            product, location or self.stock_location, quantity, lot_id=lot
+        )
+        picking = self._create_out_picking(self.product_simple)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        return product, lot, picking, wiz
+
     def _create_out_picking(self, product, qty=1.0):
         """Outgoing picking without pre-filling stock, so serial quantities
         stay exactly as the test sets them."""
@@ -1845,6 +1866,119 @@ class TestStockBarcodesPicking(TransactionCase):
         line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
         self.assertTrue(line.picked)
         self.assertEqual(line.quantity, 1.0)
+
+    # --- outside-product lot policy ---
+    def test_new_product_allow_creates_move_and_picks_lot(self):
+        """Allow adds one demanded unit and picks the scanned lot."""
+        product, lot, picking, wiz = self._prepare_outside_lot_scan("allow")
+        before = len(picking.move_ids)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        self.assertEqual(len(picking.move_ids), before + 1)
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+        self.assertEqual(len(move), 1)
+        self.assertEqual(move.product_uom_qty, 1.0)
+        line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(line), 1)
+        self.assertEqual(line.quantity, 1.0)
+        self.assertTrue(line.picked)
+        self.assertFalse(line.result_package_id)
+        self.assertEqual(wiz.active_move_id, move)
+
+    def test_new_product_warn_lot_writes_only_after_confirmation(self):
+        """Warn prepares an outside lot without creating business records."""
+        product, lot, picking, wiz = self._prepare_outside_lot_scan("warn")
+        before_moves = picking.move_ids
+        before_lines = picking.move_line_ids
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_force_add)
+        self.assertEqual(wiz.product_id, product)
+        self.assertEqual(wiz.lot_id, lot)
+        self.assertEqual(wiz.product_qty, 1.0)
+        self.assertEqual(picking.move_ids, before_moves)
+        self.assertEqual(picking.move_line_ids, before_lines)
+
+        self.assertTrue(wiz.action_confirm_new_product())
+        self.assertFalse(wiz.visible_force_add)
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+        self.assertEqual(move.product_uom_qty, 1.0)
+        line = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(line.quantity, 1.0)
+        self.assertTrue(line.picked)
+        self.assertFalse(line.result_package_id)
+
+    def test_new_product_warn_lot_cancel_leaves_picking_unchanged(self):
+        """Cancelling an outside-lot preview only clears the wizard."""
+        product, lot, picking, wiz = self._prepare_outside_lot_scan("warn")
+        before_moves = picking.move_ids
+        before_lines = picking.move_line_ids
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertTrue(wiz.action_cancel_new_product())
+
+        self.assertFalse(wiz.visible_force_add)
+        self.assertFalse(wiz.product_id)
+        self.assertFalse(wiz.lot_id)
+        self.assertEqual(picking.move_ids, before_moves)
+        self.assertEqual(picking.move_line_ids, before_lines)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_warn_lot_rechecks_stock_on_confirmation(self):
+        """Outside-lot confirmation revalidates the source stock."""
+        product, lot, picking, wiz = self._prepare_outside_lot_scan(
+            "warn", quantity=1.0
+        )
+        wiz.on_barcode_scanned(lot.name)
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, -1.0, lot_id=lot
+        )
+
+        self.assertFalse(wiz.action_confirm_new_product())
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("no stock", wiz.message)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_forbid_lot_preserves_selected_product_context(self):
+        """Forbid rejects an outside lot without discarding pending input."""
+        product, lot, picking, wiz = self._prepare_outside_lot_scan("forbid")
+        selected_move = picking.move_ids
+        wiz.product_id = self.product_simple
+        wiz.active_move_id = selected_move
+        wiz.product_qty = 5.0
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("not part of this transfer", wiz.message)
+        self.assertFalse(wiz.visible_force_add)
+        self.assertEqual(wiz.product_id, self.product_simple)
+        self.assertEqual(wiz.active_move_id, selected_move)
+        self.assertEqual(wiz.product_qty, 5.0)
+        self.assertFalse(picking.move_ids.filtered(lambda m: m.product_id == product))
+
+    def test_new_product_lot_then_excess_policy_controls_next_scan(self):
+        """After confirmation, the same lot uses normal accumulation rules."""
+        self.picking_type.barcode_excess_qty_policy = "allow"
+        product, lot, picking, wiz = self._prepare_outside_lot_scan("warn")
+        wiz.on_barcode_scanned(lot.name)
+        self.assertTrue(wiz.action_confirm_new_product())
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        self.assertEqual(move.product_uom_qty, 1.0)
+        lines = move.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines.quantity, 2.0)
+        self.assertTrue(lines.picked)
+        self.assertFalse(lines.result_package_id)
 
     # --- action_force_add ---
     def test_force_add_creates_move_and_picks(self):

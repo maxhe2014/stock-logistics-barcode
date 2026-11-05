@@ -66,11 +66,12 @@ class PickingType(models.Model):
             ("forbid", "Forbid"),
         ],
         default="forbid",
-        help="Controls scanning an existing serial number whose product is "
-             "not part of the transfer:\n"
-             "- Allow: add a move for one unit and pick the serial directly.\n"
-             "- Warn and Require Confirmation: show the product and serial, "
-             "then add them only after confirmation.\n"
+        help="Controls scanning an existing lot/serial number whose product "
+             "is not part of the transfer:\n"
+             "- Allow: add a move for one unit and pick the lot/serial "
+             "directly.\n"
+             "- Warn and Require Confirmation: show the product and "
+             "lot/serial, then add them only after confirmation.\n"
              "- Forbid: reject the scan. Unknown barcodes never create a "
              "product automatically.",
     )

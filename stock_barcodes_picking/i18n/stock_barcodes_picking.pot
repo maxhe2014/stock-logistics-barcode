@@ -996,7 +996,15 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Serial number %(sn)s has no stock in location %(location)s. It was not "
+"Insufficient unreserved stock for lot %(sn)s in location %(location)s "
+"(available: %(available)s, required: %(required)s)."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Lot/serial number %(sn)s has no stock in location %(location)s. It was not "
 "added to this transfer."
 msgstr ""
 
@@ -1004,7 +1012,7 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Serial number %(sn)s is not in location %(location)s (currently in: "
+"Lot/serial number %(sn)s is not in location %(location)s (currently in: "
 "%(locations)s). It was not added to this transfer."
 msgstr ""
 
@@ -1034,10 +1042,10 @@ msgstr ""
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
 msgid ""
-"Controls scanning an existing serial number whose product is not part of "
-"the transfer:\n"
-"- Allow: add a move for one unit and pick the serial directly.\n"
-"- Warn and Require Confirmation: show the product and serial, then add "
+"Controls scanning an existing lot/serial number whose product is not part "
+"of the transfer:\n"
+"- Allow: add a move for one unit and pick the lot/serial directly.\n"
+"- Warn and Require Confirmation: show the product and lot/serial, then add "
 "them only after confirmation.\n"
 "- Forbid: reject the scan. Unknown barcodes never create a product "
 "automatically."
@@ -1047,7 +1055,7 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Added product %(product)s with demand 1 and picked serial number %(sn)s."
+"Added product %(product)s with demand 1 and picked lot/serial number %(sn)s."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -1087,7 +1095,7 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Serial number %(sn)s belongs to product %(product)s, which is not in "
+"Lot/serial number %(sn)s belongs to product %(product)s, which is not in "
 "transfer %(picking)s. Confirm adding 1 unit and picking it."
 msgstr ""
 

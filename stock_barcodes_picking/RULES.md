@@ -2,7 +2,7 @@
 
 > 模块：`stock_barcodes_picking`  
 > 版本基线：`19.0.1.1.1`  
-> 当前增量：`19.0.1.1.8`（扫码页接入手机摄像头，见第 26 节）
+> 当前增量：`19.0.1.1.9`（单据外产品策略支持普通批号，见第 27 节）
 > 整理日期：2026-11-04  
 > 用途：统一现行规则口径、核对实现颗粒度、登记重复或冲突点，供后续开发与回归测试使用。
 
@@ -59,7 +59,7 @@
 | CFG-004 | `barcode_require_pack` | 默认 `no`；选项为 `mandatory`、`optional`、`no`。代码中它参与验证前包装检查，不参与每次产品确认的写入条件。 | [Picking Type:32-43](models/stock_picking_type.py#L32-L43)、[Wizard:587-595](wizard/stock_barcodes_picking.py#L587-L595) | 未见直接测试；口径待对齐 |
 | CFG-005 | `barcode_validation_all_packed` | 默认 `False`。仅在 `barcode_require_pack=optional` 时追加“验证前全部已拣明细必须包装”；`mandatory` 无论此字段与否都要求包装。 | [Picking Type:77-83](models/stock_picking_type.py#L77-L83)、[Wizard:587-595](wizard/stock_barcodes_picking.py#L587-L595) | 未见直接测试 |
 | CFG-006 | `barcode_excess_qty_policy` | 默认 `warn`。`allow` 直接写入；`warn` 首次拦截并要求 Force Consume；`forbid` 拒绝。无 picking type 时回退 `warn`。 | [Picking Type:44-60](models/stock_picking_type.py#L44-L60)、[Wizard:1553-1563](wizard/stock_barcodes_picking.py#L1553-L1563) | 已覆盖主要分支 |
-| CFG-007 | `barcode_new_product_policy` | 默认 `forbid`。只处理“已存在序列号所属产品不在当前单据”的场景，不是通用的产品强制添加开关。 | [Picking Type:61-76](models/stock_picking_type.py#L61-L76)、[Wizard:1099-1105](wizard/stock_barcodes_picking.py#L1099-L1105) | 已覆盖主要分支 |
+| CFG-007 | `barcode_new_product_policy` | 默认 `forbid`。处理“已存在普通批号或序列号所属产品不在当前单据”的场景，不是通用的产品强制添加开关。`allow` 直接添加 1 件，`warn` 确认后添加，`forbid` 拒绝。 | [Picking Type:61-76](models/stock_picking_type.py#L61-L76)、[Wizard:1121-1303](wizard/stock_barcodes_picking.py#L1121-L1303) | 已覆盖主要分支 |
 | CFG-008 | 原生 `picking_type.use_create_lots` | 控制未知批次/SN 是否可按当前产品创建；关闭时未知名称直接报错。 | [Wizard:978-1053](wizard/stock_barcodes_picking.py#L978-L1053) | 部分覆盖 |
 | CFG-009 | `barcode.max_time_between_keys_in_ms` | 安装时设为 `1500`；`noupdate=1`，后续升级不覆盖管理员修改。 | [ir_config_parameter.xml:14-19](data/ir_config_parameter.xml#L14-L19) | 安装配置 |
 | CFG-010 | 安装/升级回填 | 安装 hook 和 `19.0.1.1.0` migration 都把源库位扫描的 False/NULL 回填为 True，用于保持旧版强制扫源位行为。 | [hooks.py:4-21](hooks.py#L4-L21)、[migration:16-22](migrations/19.0.1.1.0/post-update_fields.py#L16-L22) | 有意分支；覆盖语义见 ISS-020 |
@@ -546,3 +546,23 @@ RULES.md 是否同步：
 - 浏览器必须支持摄像头并授予权限；除 localhost 外，手机访问通常需要 HTTPS 安全上下文。
 - JS `node --check`、OWL XML 解析、PO/POT 解析及 `git diff --check` 均通过。
 - 独立临时数据库完整回归共执行 **78 个测试**，结果为 **0 failed、0 error**；测试数据库已清理。
+
+## 27. `19.0.1.1.9` 单据外产品策略支持普通批号
+
+### 27.1 扫码与确认规则
+
+- `barcode_new_product_policy` 同时适用于已存在的普通批号（`tracking="lot"`）和序列号（`tracking="serial"`），其产品不在当前调拨单时进入该策略；未知条码仍不会自动推断或创建产品。
+- `allow` 直接创建需求为 1 的产品需求行，并创建同批号、已拣、未包装的明细；`warn` 先只写向导预览并显示 `Add Product and Pick`，点击确认后才创建业务记录；`forbid` 拒绝扫码并保留当前产品上下文。
+- 取消普通批号确认只清理向导，不改变 picking。确认时再次检查产品、批号归属和库存，避免预览后库存变化仍被直接添加。
+- 首次添加成功后保留目标 `active_move_id`。后续扫同批号进入现有 `_confirm_scanned_lot()` 累加路径，并继续受超量策略控制；不会再次创建单据外产品需求行。
+
+### 27.2 库存校验
+
+- 出库、内部调拨及客户退货要求批号在扫描源库位具有足够的未预留库存；普通批号按首次添加数量 1 检查 `available_quantity`。
+- 供应商收货保持既有豁免，不要求供应商库位已有实物 quant。序列号原有的已交付和跨单占用校验保持不变。
+- 普通批号扫码、警告、成功及库位错误文案统一使用“批次/序列号”，配置帮助不再声明该策略只支持序列号。
+
+### 27.3 回归覆盖
+
+- 新增 6 个普通批号用例，覆盖 `allow`、`warn` 确认前不写业务记录、取消、确认时库存复核、`forbid` 保留上下文，以及确认后同批号按超量策略继续累加。
+- 新增用例在旧代码上出现 4 个预期失败；实现后独立临时数据库完整回归共执行 **84 个测试**，结果为 **0 failed、0 error**。
