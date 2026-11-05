@@ -64,7 +64,7 @@
 | CFG-009 | `barcode.max_time_between_keys_in_ms` | 安装时设为 `1500`；`noupdate=1`，后续升级不覆盖管理员修改。 | [ir_config_parameter.xml:14-19](data/ir_config_parameter.xml#L14-L19) | 安装配置 |
 | CFG-010 | 安装/升级回填 | 安装 hook 和 `19.0.1.1.0` migration 都把源库位扫描的 False/NULL 回填为 True，用于保持旧版强制扫源位行为。 | [hooks.py:4-21](hooks.py#L4-L21)、[migration:16-22](migrations/19.0.1.1.0/post-update_fields.py#L16-L22) | 有意分支；覆盖语义见 ISS-020 |
 | CFG-011 | 包装按钮权限 | 前端以 `stock.group_tracking_lot` 控制 Pack/Select Package 按钮；原生需要包装类型时还可能打开 `stock.put.in.pack` 向导。 | [Wizard:581-584](wizard/stock_barcodes_picking.py#L581-L584)、[OWL:996-1002](static/src/picking_scan_app.esm.js#L996-L1002) | 未见直接测试 |
-| CFG-012 | 配置界面 | 作业类型 Barcode 页签分组为 Location Scanning、Serial Numbers、Quantity Control、Packaging；包装组受同一权限组控制。 | [stock_picking_type_views.xml:13-30](views/stock_picking_type_views.xml#L13-L30) | 界面规则 |
+| CFG-012 | 配置界面 | 作业类型 Barcode 页签分组为 Location Scanning、Serial Numbers、Quantity Control、Packaging；包装组受同一权限组控制。制造作业类型（`code=mrp_operation`）隐藏 Quantity Control 和 Packaging，因为 MRP 扫码不读取 CFG-004～CFG-007；其他作业类型保留。 | [stock_picking_type_views.xml:13-32](views/stock_picking_type_views.xml#L13-L32) | 已覆盖制造隐藏规则 |
 
 ## 4. 入口与单据状态（ENT）
 

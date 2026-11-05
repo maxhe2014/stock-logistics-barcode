@@ -19,11 +19,13 @@
                     <group string="Serial Numbers">
                         <field name="barcode_show_reserved_sns"/>
                     </group>
-                    <group name="quantity_control" string="Quantity Control">
+                    <group name="quantity_control" string="Quantity Control"
+                           invisible="code == 'mrp_operation'">
                         <field name="barcode_excess_qty_policy"/>
                         <field name="barcode_new_product_policy"/>
                     </group>
-                    <group string="Packaging" groups="stock.group_tracking_lot">
+                    <group string="Packaging" groups="stock.group_tracking_lot"
+                           invisible="code == 'mrp_operation'">
                         <field name="barcode_require_pack"/>
                         <field name="barcode_validation_all_packed"/>
                     </group>

@@ -2,6 +2,8 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 from unittest.mock import patch
 
+from lxml import etree
+
 from odoo.tests.common import TransactionCase
 
 
@@ -218,6 +220,33 @@ class TestStockBarcodesPicking(TransactionCase):
         picking.action_confirm()
         picking.action_assign()
         return picking
+
+    # --- Operation type configuration ---
+    def test_mrp_hides_picking_only_barcode_config(self):
+        """Picking-only policies must not appear on manufacturing types."""
+        self.env.user.group_ids = [
+            (4, self.env.ref("stock.group_tracking_lot").id)
+        ]
+        view_id = self.env.ref(
+            "stock_barcodes_picking.view_picking_type_form_inherit_barcode"
+        ).id
+        view = self.env["stock.picking.type"].get_view(
+            view_id=view_id, view_type="form"
+        )
+        arch = etree.fromstring(view["arch"])
+        for field_name in (
+            "barcode_excess_qty_policy",
+            "barcode_new_product_policy",
+            "barcode_require_pack",
+            "barcode_validation_all_packed",
+        ):
+            nodes = arch.xpath("//field[@name='%s']" % field_name)
+            self.assertEqual(len(nodes), 1, field_name)
+            self.assertEqual(
+                nodes[0].getparent().get("invisible"),
+                "code == 'mrp_operation'",
+                field_name,
+            )
 
     # --- SET semantics ---
     def test_set_semantics_replace_quantity(self):
