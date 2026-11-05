@@ -1410,3 +1410,85 @@ msgstr "序列号数量固定为 1"
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Updated lot/SN quantity: %(lot)s x%(qty)s"
 msgstr "已更新批号/序列号数量：%(lot)s × %(qty)s"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
+msgid "Force Lot/Serial scan?"
+msgstr "批次/序列号扫描策略"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_lot_scan_policy__mandatory
+msgid "Mandatory Scan"
+msgstr "强制扫描"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_lot_scan_policy__optional
+msgid "Optional Scan"
+msgstr "可选扫描"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
+msgid ""
+"Mandatory Scan requires scanning every lot/serial number. Optional Scan lets "
+"the operator pick reserved lots/serials with the line buttons or by scanning "
+"the product."
+msgstr ""
+"强制扫描要求逐个扫描批次/序列号。可选扫描允许操作员通过明细行按钮或扫描产品，"
+"直接拣选已预留的批次/序列号。"
+
+#. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Lot/Serial Numbers"
+msgstr "批次/序列号"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Lot/Serial scanning is mandatory for this operation type."
+msgstr "此作业类型要求强制扫描批次/序列号。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Insufficient reserved quantity for %(lot)s, or the quantity would exceed "
+"demand. Scan the lot/serial instead."
+msgstr ""
+"%(lot)s 的预留数量不足，或该数量会超过需求。请改为扫描批次/序列号。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Picked reserved lot/serial: %(prod)s x%(qty)s"
+msgstr "已拣选预留批次/序列号：%(prod)s × %(qty)s"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Picked reserved lot/serial: %(prod)s x1"
+msgstr "已拣选预留批次/序列号：%(prod)s × 1"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Add quantity"
+msgstr "增加数量"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Add quantity failed: %(err)s"
+msgstr "增加数量失败：%(err)s"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Pick reserved lot"
+msgstr "拣选预留批次"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pick reserved lot failed: %(err)s"
+msgstr "拣选预留批次失败：%(err)s"

@@ -2141,3 +2141,141 @@ class TestStockBarcodesPicking(TransactionCase):
         # (picked dual-write failed).
         self.assertIs(result, True)
         self.assertEqual(picking.state, "done")
+
+    # --- Optional lot/serial scanning ---
+    def test_lot_scan_policy_defaults_to_mandatory_and_hides_on_mrp(self):
+        self.assertEqual(self.picking_type.barcode_lot_scan_policy, "mandatory")
+        view = self.env["stock.picking.type"].get_view(
+            view_id=self.env.ref(
+                "stock_barcodes_picking.view_picking_type_form_inherit_barcode"
+            ).id,
+            view_type="form",
+        )
+        arch = etree.fromstring(view["arch"])
+        fields = arch.xpath("//field[@name='barcode_lot_scan_policy']")
+        self.assertEqual(len(fields), 1)
+        page = fields[0].xpath("ancestor::page")[0]
+        self.assertEqual(page.get("invisible"), "code == 'mrp_operation'")
+
+        lot = self._create_lot(self.product_lot, "LOT-MANDATORY-001")
+        self.StockQuant._update_available_quantity(
+            self.product_lot, self.stock_location, 2.0, lot_id=lot
+        )
+        picking = self._create_out_picking(self.product_lot, qty=2.0)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(self.product_lot.barcode)
+        self.assertEqual(wiz.step, wiz._step_index("lot"))
+        self.assertFalse(picking.move_line_ids.filtered("picked"))
+        self.assertFalse(
+            wiz.action_pick_reserved_lot(picking.move_ids.id, lot.id, 1.0)
+        )
+
+    def test_optional_lot_scan_splits_and_button_merges_reservation(self):
+        self.picking_type.barcode_lot_scan_policy = "optional"
+        lot = self._create_lot(self.product_lot, "LOT-OPTIONAL-001")
+        self.StockQuant._update_available_quantity(
+            self.product_lot, self.stock_location, 5.0, lot_id=lot
+        )
+        picking = self._create_out_picking(self.product_lot, qty=5.0)
+        move = picking.move_ids
+        self.assertEqual(len(move.move_line_ids), 1)
+        self.assertEqual(move.move_line_ids.quantity, 5.0)
+        self.assertFalse(move.move_line_ids.picked)
+
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(self.product_lot.barcode)
+        move.invalidate_recordset()
+        picked = move.move_line_ids.filtered("picked")
+        reserved = move.move_line_ids.filtered(lambda line: not line.picked)
+        self.assertEqual(len(picked), 1)
+        self.assertEqual(picked.quantity, 1.0)
+        self.assertEqual(picked.lot_id, lot)
+        self.assertEqual(len(reserved), 1)
+        self.assertEqual(reserved.quantity, 4.0)
+        self.assertEqual(reserved.lot_id, lot)
+
+        result = wiz.action_pick_reserved_lot(move.id, lot.id, 2.0)
+        self.assertTrue(result)
+        move.invalidate_recordset()
+        picked = move.move_line_ids.filtered("picked")
+        reserved = move.move_line_ids.filtered(lambda line: not line.picked)
+        self.assertEqual(len(picked), 1)
+        self.assertEqual(picked.quantity, 3.0)
+        self.assertEqual(len(reserved), 1)
+        self.assertEqual(reserved.quantity, 2.0)
+        self.assertTrue(all(move.move_line_ids.mapped("lot_id")))
+
+        state = wiz.get_scan_state()
+        self.assertEqual(state["barcode_lot_scan_policy"], "optional")
+        state_move = next(row for row in state["move_ids"] if row["id"] == move.id)
+        lots = {row["key"]: row for row in state_move["lots"]}
+        self.assertEqual(lots["%s_picked" % lot.id]["picked_quantity"], 3.0)
+        self.assertEqual(lots["%s_reserved" % lot.id]["reserved_quantity"], 2.0)
+
+    def test_optional_serial_product_scans_use_distinct_reserved_sns(self):
+        self.picking_type.barcode_lot_scan_policy = "optional"
+        product = self._create_serial_product(
+            "Optional Serial Product", "PROD-OPTIONAL-SERIAL"
+        )
+        lots = [
+            self._create_lot(product, "SN-OPTIONAL-001"),
+            self._create_lot(product, "SN-OPTIONAL-002"),
+        ]
+        for lot in lots:
+            self.StockQuant._update_available_quantity(
+                product, self.stock_location, 1.0, lot_id=lot
+            )
+        picking = self._create_out_picking(product, qty=2.0)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        picking.invalidate_recordset()
+        picked = picking.move_line_ids.filtered("picked")
+        self.assertEqual(len(picked), 2)
+        self.assertEqual(set(picked.lot_id.ids), {lot.id for lot in lots})
+        self.assertFalse(picking.move_line_ids.filtered(lambda line: not line.picked))
+
+        wiz.on_barcode_scanned(product.barcode)
+        picking.invalidate_recordset()
+        self.assertEqual(wiz.step, wiz._step_index("lot"))
+        self.assertEqual(len(picking.move_line_ids.filtered("picked")), 2)
+        self.assertEqual(len(picking.move_line_ids), 2)
+
+    def test_optional_lot_shortage_falls_back_without_empty_lot(self):
+        self.picking_type.barcode_lot_scan_policy = "optional"
+        lot = self._create_lot(self.product_lot, "LOT-OPTIONAL-SHORT")
+        self.StockQuant._update_available_quantity(
+            self.product_lot, self.stock_location, 1.0, lot_id=lot
+        )
+        picking = self._create_out_picking(self.product_lot, qty=2.0)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(self.product_lot.barcode)
+        wiz.on_barcode_scanned(self.product_lot.barcode)
+        picking.invalidate_recordset()
+        self.assertEqual(wiz.step, wiz._step_index("lot"))
+        self.assertEqual(sum(
+            line.quantity for line in picking.move_line_ids if line.picked
+        ), 1.0)
+        self.assertTrue(all(picking.move_line_ids.mapped("lot_id")))
+
+    def test_optional_non_tracked_add_one_preserves_set_semantics(self):
+        self.picking_type.barcode_lot_scan_policy = "optional"
+        picking = self._create_picking(self.product_simple, qty=3.0)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        self.assertTrue(wiz.action_add_move_quantity(picking.move_ids.id))
+        self.assertTrue(wiz.action_add_move_quantity(picking.move_ids.id))
+        picking.invalidate_recordset()
+        picked = picking.move_line_ids.filtered("picked")
+        self.assertEqual(sum(picked.mapped("quantity")), 2.0)
+
+        self.picking_type.barcode_lot_scan_policy = "mandatory"
+        self.assertFalse(wiz.action_add_move_quantity(picking.move_ids.id))
+        picking.invalidate_recordset()
+        self.assertEqual(sum(
+            line.quantity for line in picking.move_line_ids if line.picked
+        ), 2.0)

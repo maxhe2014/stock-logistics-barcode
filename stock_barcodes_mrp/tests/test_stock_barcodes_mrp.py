@@ -1,5 +1,7 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+from lxml import etree
+
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
@@ -3112,4 +3114,197 @@ class TestStockBarcodesMrp(TransactionCase):
         self.action_barcode_scanned(wiz, "NEW-FIN-SN-001")
         self.assertEqual(wiz.finished_lot_name, "NEW-FIN-SN-001")
         self.assertEqual(wiz.message_type, "success")
+
+    # --- Optional lot/serial scanning ---
+    def test_lot_scan_policy_defaults_to_mandatory_and_only_shows_on_mrp(self):
+        picking_type = self.production.picking_type_id
+        self.assertEqual(picking_type.barcode_mrp_lot_scan_policy, "mandatory")
+        view = self.env["stock.picking.type"].get_view(
+            view_id=self.env.ref(
+                "stock_barcodes_mrp.view_picking_type_form_inherit_barcode_mrp"
+            ).id,
+            view_type="form",
+        )
+        arch = etree.fromstring(view["arch"])
+        fields = arch.xpath("//field[@name='barcode_mrp_lot_scan_policy']")
+        self.assertEqual(len(fields), 1)
+        page = fields[0].xpath("ancestor::page")[0]
+        self.assertEqual(page.get("invisible"), "code != 'mrp_operation'")
+        for field_name in (
+            "barcode_scan_source_location",
+            "barcode_scan_dest_location",
+            "barcode_show_reserved_sns",
+        ):
+            self.assertEqual(
+                len(page.xpath(".//field[@name='%s']" % field_name)),
+                1,
+                field_name,
+            )
+        for field_name in (
+            "barcode_excess_qty_policy",
+            "barcode_new_product_policy",
+            "barcode_require_pack",
+            "barcode_validation_all_packed",
+        ):
+            self.assertFalse(page.xpath(".//field[@name='%s']" % field_name))
+
+        self.production.action_assign()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, self.components_location.barcode)
+        self.action_barcode_scanned(wiz, self.component_tracked.barcode)
+        self.assertEqual(wiz.step, 3)
+        self.assertFalse(wiz.action_confirm())
+        move = self.production.move_raw_ids.filtered(
+            lambda candidate: candidate.product_id == self.component_tracked
+        )
+        self.assertFalse(move.move_line_ids.filtered("picked"))
+        self.assertFalse(
+            wiz.action_consume_reserved_lot(move.id, self.component_lot.id, 1.0)
+        )
+
+    def test_optional_lot_confirm_splits_and_button_merges_reservation(self):
+        self.production.picking_type_id.barcode_mrp_lot_scan_policy = "optional"
+        self.production.action_assign()
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, self.components_location.barcode)
+        self.action_barcode_scanned(wiz, self.component_tracked.barcode)
+        self.assertEqual(wiz.step, 4)
+        self.assertFalse(wiz.lot_id)
+        self.assertTrue(wiz.action_confirm())
+        move = self.production.move_raw_ids.filtered(
+            lambda candidate: candidate.product_id == self.component_tracked
+        )
+        move.invalidate_recordset()
+        picked = move.move_line_ids.filtered("picked")
+        reserved = move.move_line_ids.filtered(lambda line: not line.picked)
+        self.assertEqual(len(picked), 1)
+        self.assertEqual(picked.quantity, 1.0)
+        self.assertEqual(picked.lot_id, self.component_lot)
+        self.assertEqual(len(reserved), 1)
+        self.assertEqual(reserved.quantity, 1.0)
+        self.assertEqual(reserved.lot_id, self.component_lot)
+
+        result = wiz.action_consume_reserved_lot(
+            move.id, self.component_lot.id, 0.5
+        )
+        self.assertTrue(result)
+        move.invalidate_recordset()
+        picked = move.move_line_ids.filtered("picked")
+        reserved = move.move_line_ids.filtered(lambda line: not line.picked)
+        self.assertEqual(len(picked), 1)
+        self.assertEqual(picked.quantity, 1.5)
+        self.assertEqual(len(reserved), 1)
+        self.assertEqual(reserved.quantity, 0.5)
+        self.assertTrue(all(move.move_line_ids.mapped("lot_id")))
+
+        state = wiz.get_scan_state()
+        self.assertEqual(state["barcode_mrp_lot_scan_policy"], "optional")
+        comp = next(row for row in state["components"] if row["id"] == move.id)
+        lots = {row["key"]: row for row in comp["lots"]}
+        self.assertEqual(
+            lots["%s_picked" % self.component_lot.id]["picked_quantity"], 1.5
+        )
+        self.assertEqual(
+            lots["%s_reserved" % self.component_lot.id]["reserved_quantity"], 0.5
+        )
+
+    def test_optional_serial_confirm_consumes_each_reserved_sn_once(self):
+        first_lot = self.StockProductionLot.create({
+            "name": "SN-SER-A-OPTIONAL-001",
+            "product_id": self.component_serial_a.id,
+            "company_id": False,
+        })
+        second_lot = self.StockProductionLot.create({
+            "name": "SN-SER-A-OPTIONAL-002",
+            "product_id": self.component_serial_a.id,
+            "company_id": False,
+        })
+        for lot in (first_lot, second_lot):
+            self.StockQuant.create({
+                "product_id": self.component_serial_a.id,
+                "lot_id": lot.id,
+                "location_id": self.components_location.id,
+                "quantity": 1.0,
+            })
+        bom = self.MrpBom.create({
+            "product_id": self.finished_product.id,
+            "product_tmpl_id": self.finished_product.product_tmpl_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": self.component_serial_a.id,
+                "product_qty": 2.0,
+                "product_uom_id": self.component_serial_a.uom_id.id,
+            })],
+        })
+        production = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        production.action_confirm()
+        production.action_assign()
+        production.picking_type_id.barcode_mrp_lot_scan_policy = "optional"
+        move = production.move_raw_ids
+        self.assertEqual(len(move.move_line_ids), 2)
+        wiz = self.WizScanMrp.create({"production_id": production.id})
+        self.action_barcode_scanned(wiz, self.components_location.barcode)
+        self.action_barcode_scanned(wiz, self.component_serial_a.barcode)
+        self.assertEqual(wiz.step, 4)
+        wiz.product_qty = 2.0
+        self.assertTrue(wiz.action_confirm())
+        move.invalidate_recordset()
+        picked = move.move_line_ids.filtered("picked")
+        self.assertEqual(len(picked), 2)
+        self.assertEqual(
+            set(picked.lot_id.ids),
+            {first_lot.id, second_lot.id},
+        )
+        self.assertFalse(move.move_line_ids.filtered(lambda line: not line.picked))
+        self.assertFalse(wiz.action_consume_reserved_lot(
+            move.id, first_lot.id, 1.0
+        ))
+        move.invalidate_recordset()
+        self.assertEqual(len(move.move_line_ids.filtered("picked")), 2)
+
+    def test_optional_lot_shortage_returns_to_scan_without_empty_lot(self):
+        self.production.picking_type_id.barcode_mrp_lot_scan_policy = "optional"
+        self.production.action_assign()
+        move = self.production.move_raw_ids.filtered(
+            lambda candidate: candidate.product_id == self.component_tracked
+        )
+        move.move_line_ids.quantity = 1.0
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, self.components_location.barcode)
+        self.action_barcode_scanned(wiz, self.component_tracked.barcode)
+        wiz.product_qty = 2.0
+        self.assertFalse(wiz.action_confirm())
+        move.invalidate_recordset()
+        self.assertEqual(wiz.step, 3)
+        self.assertFalse(move.move_line_ids.filtered("picked"))
+        self.assertEqual(move.move_line_ids.quantity, 1.0)
+        self.assertTrue(all(move.move_line_ids.mapped("lot_id")))
+
+    def test_optional_non_tracked_add_one_preserves_set_semantics(self):
+        self.production.picking_type_id.barcode_mrp_lot_scan_policy = "optional"
+        self.production.action_assign()
+        move = self.production.move_raw_ids.filtered(
+            lambda candidate: candidate.product_id == self.component_simple
+        )
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, self.components_location.barcode)
+        self.assertTrue(wiz.action_add_component_quantity(move.id))
+        self.assertTrue(wiz.action_add_component_quantity(move.id))
+        move.invalidate_recordset()
+        self.assertEqual(sum(
+            line.quantity for line in move.move_line_ids if line.picked
+        ), 2.0)
+
+        self.production.picking_type_id.barcode_mrp_lot_scan_policy = "mandatory"
+        self.assertFalse(wiz.action_add_component_quantity(move.id))
+        move.invalidate_recordset()
+        self.assertEqual(sum(
+            line.quantity for line in move.move_line_ids if line.picked
+        ), 2.0)
 

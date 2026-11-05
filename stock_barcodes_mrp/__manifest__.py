@@ -3,7 +3,7 @@
 {
     "name": "Stock Barcodes MRP",
     "summary": "Barcode scanning for manufacturing orders and material traceability",
-    "version": "19.0.1.7.2",
+    "version": "19.0.1.7.4",
     "author": "OpenViking, Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/stock-logistics-barcode",
     "license": "AGPL-3",
@@ -12,6 +12,7 @@
     "data": [
         "security/ir.model.access.csv",
         "wizard/stock_barcodes_mrp_views.xml",
+        "views/stock_picking_type_views.xml",
         "views/mrp_production_views.xml",
         "views/mrp_workorder_views.xml",
         "report/stock_lot_traceability_report.xml",

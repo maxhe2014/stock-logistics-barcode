@@ -65,6 +65,7 @@ export class MrpScanApp extends Component {
             scanning: false,
             // Button-visibility fields (returned by get_scan_state)
             production_state: "",
+            barcode_mrp_lot_scan_policy: "mandatory",
             finished_product_tracking: "none",
             product_id: false,
             product_tracking: "none",
@@ -82,9 +83,11 @@ export class MrpScanApp extends Component {
             expandedComponentId: false,
             // Composite move_id:lot_id highlighted for two seconds after scanning.
             recentComponentLotKey: "",
-            // Inline quantity editing for non-serial components
+            // Inline quantity editing for components and reserved lots
             editingQtyMoveId: false,
             draftQty: "",
+            editingReservedLotKey: "",
+            draftReservedLotQty: "",
         });
 
         onWillStart(async () => {
@@ -106,7 +109,7 @@ export class MrpScanApp extends Component {
             if (!container) {
                 return;
             }
-            const lotKey = `${target.moveId}:${target.lotId}`;
+            const lotKey = `${target.moveId}:${target.lotKey}`;
             const el = container.querySelector(`[data-scan-lot="${lotKey}"]`)
                 || container.querySelector(`[data-scan-row="${target.moveId}"]`);
             if (!el) {
@@ -171,7 +174,7 @@ export class MrpScanApp extends Component {
         const componentStateBefore = new Map();
         for (const comp of this.state.components) {
             componentStateBefore.set(comp.id, {
-                lotIds: new Set((comp.lots || []).map((lot) => lot.id)),
+                lotKeys: new Set((comp.lots || []).map((lot) => lot.key)),
                 quantity: comp.quantity,
                 picked: comp.picked,
             });
@@ -193,20 +196,20 @@ export class MrpScanApp extends Component {
                 }
                 const componentChanged = comp.quantity !== before.quantity
                     || comp.picked !== before.picked;
-                const scannedLot = (comp.lots || []).find((lot) => !before.lotIds.has(lot.id))
+                const scannedLot = (comp.lots || []).find((lot) => !before.lotKeys.has(lot.key))
                     || (componentChanged
-                        ? (comp.lots || []).find((lot) => lot.name === barcode)
+                        ? (comp.lots || []).find((lot) => lot.name === barcode && lot.picked)
                         : null);
                 if (!scannedLot) {
                     continue;
                 }
-                comp.lots = comp.lots.filter((lot) => lot.id !== scannedLot.id);
+                comp.lots = comp.lots.filter((lot) => lot.key !== scannedLot.key);
                 comp.lots.push(scannedLot);
-                scannedTarget = { moveId: comp.id, lotId: scannedLot.id };
+                scannedTarget = { moveId: comp.id, lotKey: scannedLot.key };
                 break;
             }
             if (scannedTarget) {
-                const lotKey = `${scannedTarget.moveId}:${scannedTarget.lotId}`;
+                const lotKey = `${scannedTarget.moveId}:${scannedTarget.lotKey}`;
                 this._pendingComponentScanTarget = scannedTarget;
                 this.state.recentComponentLotKey = lotKey;
                 clearTimeout(this._highlightTimer);
@@ -326,6 +329,7 @@ export class MrpScanApp extends Component {
         if (!comp) {
             return;
         }
+        this.onCancelReservedLotQty();
         this.state.editingQtyMoveId = moveId;
         this.state.draftQty = comp.total_demand || 0;
     }
@@ -468,6 +472,87 @@ export class MrpScanApp extends Component {
         }
     }
 
+    async onAddComponentQuantity(moveId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            await this._callAction(
+                "action_add_component_quantity",
+                _t("Add quantity"),
+                [moveId]
+            );
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    async _consumeReservedLot(moveId, lotId, quantity) {
+        if (this.state.scanning || !this.wizId) {
+            return false;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this._callAction(
+                "action_consume_reserved_lot",
+                _t("Consume reserved lot"),
+                [moveId, lotId, quantity]
+            );
+            return res !== false;
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    onConsumeReservedLot(moveId, lotId) {
+        return this._consumeReservedLot(moveId, lotId, 1);
+    }
+
+    onEditReservedLotQty(moveId, lotKey) {
+        const comp = this.state.components.find((c) => c.id === moveId);
+        const lot = comp?.lots.find((candidate) => candidate.key === lotKey);
+        if (!lot || lot.picked) {
+            return;
+        }
+        this.onCancelComponentQty();
+        this.state.editingReservedLotKey = `${moveId}:${lotKey}`;
+        this.state.draftReservedLotQty = String(lot.reserved_quantity || 0);
+    }
+
+    onDraftReservedLotQtyInput(ev) {
+        this.state.draftReservedLotQty = ev.currentTarget.value;
+    }
+
+    onCancelReservedLotQty() {
+        this.state.editingReservedLotKey = "";
+        this.state.draftReservedLotQty = "";
+    }
+
+    onDraftReservedLotQtyKeydown(ev, moveId, lotId) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this.onConfirmReservedLotQty(moveId, lotId);
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this.onCancelReservedLotQty();
+        }
+    }
+
+    async onConfirmReservedLotQty(moveId, lotId) {
+        const qty = parseFloat(this.state.draftReservedLotQty);
+        if (!qty || qty <= 0) {
+            this.notification.add(_t("Please enter a positive quantity"), {
+                type: "danger",
+            });
+            return;
+        }
+        const done = await this._consumeReservedLot(moveId, lotId, qty);
+        if (done) {
+            this.onCancelReservedLotQty();
+        }
+    }
+
     /**
      * Reset (undo) a component's consumed quantity. Works for all
      * tracking types (serial SNs are unlinked; lot/none lines are
@@ -531,6 +616,7 @@ export class MrpScanApp extends Component {
             !!this.state.product_id &&
             (this.state.product_qty || 0) > 0 &&
             (this.state.product_tracking === "none" ||
+                this.state.barcode_mrp_lot_scan_policy === "optional" ||
                 !!this.state.lot_id ||
                 !!this.state.lot_name_raw)
         );
@@ -555,12 +641,12 @@ export class MrpScanApp extends Component {
      *   warning / backorder from button_mark_done), doAction it.
      * - Otherwise (True / False / move_lines dict), just refresh state.
      */
-    async _callAction(methodName, errorLabel) {
+    async _callAction(methodName, errorLabel, args = []) {
         try {
             const res = await this.orm.call(
                 "wiz.stock.barcodes.mrp",
                 methodName,
-                [[this.wizId]]
+                [[this.wizId], ...args]
             );
             if (res && typeof res === "object" && res.type) {
                 // Backend returned a dialog action (consumption warning /
@@ -576,6 +662,7 @@ export class MrpScanApp extends Component {
             } else {
                 await this._refreshState();
             }
+            return res;
         } catch (err) {
             this.notification.add(
                 _t("%(label)s failed: %(err)s", {
@@ -587,6 +674,7 @@ export class MrpScanApp extends Component {
                 }),
                 { type: "danger" }
             );
+            return false;
         }
     }
 

@@ -147,25 +147,83 @@
                                          save columns and give the component name full width -->
                                     <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                         <t t-if="comp.lots.length === 1">
-                                            <span t-att-class="'d-inline-flex align-items-center gap-1' + (state.recentComponentLotKey === comp.id + ':' + comp.lots[0].id ? ' badge bg-info o_mrp_scan_recent' : '')"
-                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[0].id">
-                                                <i class="fa fa-barcode text-muted"/>
+                                            <span t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (comp.lots[0].picked ? 'bg-info' : 'bg-light text-muted border') + (state.recentComponentLotKey === comp.id + ':' + comp.lots[0].key ? ' o_mrp_scan_recent' : '')"
+                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[0].key">
+                                                <i class="fa fa-barcode"/>
                                                 <span class="small">
                                                     <t t-out="comp.lots[0].name" />
                                                 </span>
-                                                <button type="button"
+                                                <strong t-if="comp.lots[0].picked">× <t t-out="comp.lots[0].picked_quantity" /></strong>
+                                                <t t-else="">
+                                                    <span class="small opacity-75">待消耗</span>
+                                                    <strong>× <t t-out="comp.lots[0].reserved_quantity" /></strong>
+                                                </t>
+                                                <button t-if="comp.lots[0].picked"
+                                                        type="button"
                                                         class="btn btn-sm btn-link text-danger p-0"
                                                         t-att-title="'Remove ' + comp.lots[0].name"
                                                         t-on-click.stop="() => this.onRemoveComponentLot(comp.id, comp.lots[0].id)">
                                                     <i class="fa fa-trash"/>
                                                 </button>
+                                                <t t-if="!comp.lots[0].picked &amp;&amp; state.barcode_mrp_lot_scan_policy === 'optional'">
+                                                    <button t-if="comp.tracking === 'serial'"
+                                                            type="button"
+                                                            class="btn btn-sm btn-outline-success p-0 px-1"
+                                                            title="Consume reserved lot"
+                                                            t-on-click.stop="() => this.onConsumeReservedLot(comp.id, comp.lots[0].id)">
+                                                        <i class="fa fa-check"/>
+                                                    </button>
+                                                    <t t-else="">
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-success p-0 px-1"
+                                                                title="Consume reserved lot"
+                                                                t-on-click.stop="() => this.onConsumeReservedLot(comp.id, comp.lots[0].id)">
+                                                            +1
+                                                        </button>
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-primary p-0 px-1"
+                                                                title="Edit quantity"
+                                                                t-on-click.stop="() => this.onEditReservedLotQty(comp.id, comp.lots[0].key)">
+                                                            <i class="fa fa-pencil"/>
+                                                        </button>
+                                                    </t>
+                                                </t>
                                             </span>
+                                            <div t-if="!comp.lots[0].picked &amp;&amp; comp.tracking !== 'serial' &amp;&amp; state.editingReservedLotKey === comp.id + ':' + comp.lots[0].key"
+                                                 class="d-flex align-items-center gap-1 border rounded p-2 bg-white text-dark w-100"
+                                                 t-on-click.stop="">
+                                                <input type="number"
+                                                       min="0"
+                                                       step="any"
+                                                       class="form-control form-control-sm"
+                                                       style="width: 6rem;"
+                                                       t-att-value="state.draftReservedLotQty"
+                                                       t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
+                                                       t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, comp.id, comp.lots[0].id)"/>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-success"
+                                                        title="Confirm quantity"
+                                                        t-on-click.stop="() => this.onConfirmReservedLotQty(comp.id, comp.lots[0].id)">
+                                                    <i class="fa fa-check"/>
+                                                </button>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary"
+                                                        title="Cancel"
+                                                        t-on-click.stop="() => this.onCancelReservedLotQty()">
+                                                    <i class="fa fa-times"/>
+                                                </button>
+                                            </div>
                                         </t>
                                         <t t-elif="comp.lots.length > 1">
-                                            <span t-att-class="'badge bg-info d-inline-flex align-items-center gap-1' + (state.recentComponentLotKey === comp.id + ':' + comp.lots[comp.lots.length - 1].id ? ' o_mrp_scan_recent' : '')"
-                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[comp.lots.length - 1].id">
+                                            <span t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (comp.lots[comp.lots.length - 1].picked ? 'bg-info' : 'bg-light text-muted border') + (state.recentComponentLotKey === comp.id + ':' + comp.lots[comp.lots.length - 1].key ? ' o_mrp_scan_recent' : '')"
+                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[comp.lots.length - 1].key">
                                                 <i class="fa fa-barcode"/>
                                                 <t t-out="comp.lots[comp.lots.length - 1].name" />
+                                                <strong t-if="comp.lots[comp.lots.length - 1].picked">× <t t-out="comp.lots[comp.lots.length - 1].picked_quantity" /></strong>
+                                                <t t-else="">
+                                                    <span class="small opacity-75">待消耗</span>
+                                                    <strong>× <t t-out="comp.lots[comp.lots.length - 1].reserved_quantity" /></strong>
+                                                </t>
                                             </span>
                                             <button type="button"
                                                     class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
@@ -182,9 +240,17 @@
                                                 <i class="fa fa-barcode"/>
                                                 请扫描序列号
                                             </span>
-                                            <!-- Non-serial, not consumed: one-click consume by demand
-                                                 + pencil to enter a custom quantity inline. -->
-                                            <t t-if="!comp.picked &amp;&amp; comp.tracking !== 'serial'">
+                                        </t>
+                                        <!-- Non-tracked components keep demand/custom actions and gain +1. -->
+                                        <t t-if="comp.tracking === 'none'">
+                                            <button t-if="state.barcode_mrp_lot_scan_policy === 'optional'"
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-success"
+                                                    title="Add quantity"
+                                                    t-on-click.stop="() => this.onAddComponentQuantity(comp.id)">
+                                                +1
+                                            </button>
+                                            <t t-if="!comp.picked">
                                                 <t t-if="state.editingQtyMoveId === comp.id">
                                                     <input
                                                         type="number"
@@ -238,20 +304,73 @@
                             </tr>
                             <tr t-if="state.expandedComponentId === comp.id">
                                 <td colspan="2" class="ps-4 py-1 bg-white">
-                                    <t t-foreach="comp.lots" t-as="sn" t-key="sn.id">
+                                    <t t-foreach="comp.lots" t-as="sn" t-key="sn.key">
                                         <div class="d-flex align-items-center flex-wrap gap-2 small text-muted">
                                             <i class="fa fa-circle-o"/>
-                                            <span t-att-class="'text-break' + (state.recentComponentLotKey === comp.id + ':' + sn.id ? ' badge bg-info o_mrp_scan_recent' : '')"
-                                                  t-att-data-scan-lot="comp.id + ':' + sn.id"
+                                            <span t-att-class="'text-break' + (state.recentComponentLotKey === comp.id + ':' + sn.key ? ' badge bg-info o_mrp_scan_recent' : '')"
+                                                  t-att-data-scan-lot="comp.id + ':' + sn.key"
                                                   style="min-width: 0;">
                                                 <t t-out="sn.name" />
                                             </span>
-                                            <button type="button"
+                                            <strong t-if="sn.picked">× <t t-out="sn.picked_quantity" /></strong>
+                                            <t t-else="">
+                                                <span class="small opacity-75">待消耗</span>
+                                                <strong>× <t t-out="sn.reserved_quantity" /></strong>
+                                            </t>
+                                            <button t-if="sn.picked"
+                                                    type="button"
                                                     class="btn btn-sm btn-link text-danger p-0 flex-shrink-0"
                                                     t-att-title="'Remove ' + sn.name"
                                                     t-on-click.stop="() => this.onRemoveComponentLot(comp.id, sn.id)">
                                                 <i class="fa fa-trash"/>
                                             </button>
+                                            <t t-if="!sn.picked &amp;&amp; state.barcode_mrp_lot_scan_policy === 'optional'">
+                                                <button t-if="comp.tracking === 'serial'"
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-success p-0 px-1"
+                                                        title="Consume reserved lot"
+                                                        t-on-click.stop="() => this.onConsumeReservedLot(comp.id, sn.id)">
+                                                    <i class="fa fa-check"/>
+                                                </button>
+                                                <t t-else="">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-success p-0 px-1"
+                                                            title="Consume reserved lot"
+                                                            t-on-click.stop="() => this.onConsumeReservedLot(comp.id, sn.id)">
+                                                        +1
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary p-0 px-1"
+                                                            title="Edit quantity"
+                                                            t-on-click.stop="() => this.onEditReservedLotQty(comp.id, sn.key)">
+                                                        <i class="fa fa-pencil"/>
+                                                    </button>
+                                                </t>
+                                            </t>
+                                            <div t-if="!sn.picked &amp;&amp; comp.tracking !== 'serial' &amp;&amp; state.editingReservedLotKey === comp.id + ':' + sn.key"
+                                                 class="d-flex align-items-center gap-1 border rounded p-2 bg-white text-dark w-100"
+                                                 t-on-click.stop="">
+                                                <input type="number"
+                                                       min="0"
+                                                       step="any"
+                                                       class="form-control form-control-sm"
+                                                       style="width: 6rem;"
+                                                       t-att-value="state.draftReservedLotQty"
+                                                       t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
+                                                       t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, comp.id, sn.id)"/>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-success"
+                                                        title="Confirm quantity"
+                                                        t-on-click.stop="() => this.onConfirmReservedLotQty(comp.id, sn.id)">
+                                                    <i class="fa fa-check"/>
+                                                </button>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary"
+                                                        title="Cancel"
+                                                        t-on-click.stop="() => this.onCancelReservedLotQty()">
+                                                    <i class="fa fa-times"/>
+                                                </button>
+                                            </div>
                                         </div>
                                     </t>
                                 </td>

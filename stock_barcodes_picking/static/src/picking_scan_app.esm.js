@@ -92,6 +92,7 @@ export class PickingScanApp extends Component {
             picking_name: "",
             picking_state: "",
             picking_type_code: "",
+            barcode_lot_scan_policy: "mandatory",
             location_id: false,
             location_name: "",
             location_dest_id: false,
@@ -124,6 +125,8 @@ export class PickingScanApp extends Component {
             editingLotKey: "",
             editingLotLineId: false,
             draftLotQty: "",
+            editingReservedLotKey: "",
+            draftReservedLotQty: "",
             // Composite row_key:lot_id highlighted for two seconds after scanning.
             recentScanLotKey: "",
             // Changes on every lot scan so repeating the same lot restarts
@@ -504,7 +507,11 @@ export class PickingScanApp extends Component {
     }
 
     get isQuantityEditing() {
-        return Boolean(this.state.editingQtyMoveId || this.state.editingLotKey);
+        return Boolean(
+            this.state.editingQtyMoveId
+            || this.state.editingLotKey
+            || this.state.editingReservedLotKey
+        );
     }
 
     /** Enter inline quantity-edit mode for a move row (pencil button).
@@ -518,6 +525,7 @@ export class PickingScanApp extends Component {
             return;
         }
         this.onCancelLotQty();
+        this.onCancelReservedLotQty();
         this.state.editingQtyMoveId = rowKey;
         this.state.draftQty = String(mv.product_uom_qty || 0);
     }
@@ -598,6 +606,107 @@ export class PickingScanApp extends Component {
         this.state.draftQty = "";
     }
 
+    async onAddMoveQuantity(moveId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_add_move_quantity",
+                [[this.wizId], moveId]
+            );
+            await this._handleActionResult(res, "Add quantity");
+        } catch (err) {
+            this.notification.add(
+                _t("Add quantity failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    async _pickReservedLot(moveId, lotId, quantity) {
+        if (this.state.scanning || !this.wizId) {
+            return false;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_pick_reserved_lot",
+                [[this.wizId], moveId, lotId, quantity]
+            );
+            await this._handleActionResult(res, "Pick reserved lot");
+            return res !== false;
+        } catch (err) {
+            this.notification.add(
+                _t("Pick reserved lot failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
+            this._playAlert();
+            return false;
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    onPickReservedLot(moveId, lotId) {
+        return this._pickReservedLot(moveId, lotId, 1);
+    }
+
+    onEditReservedLotQty(rowKey, lotKey) {
+        const lot = this._findLot(rowKey, lotKey);
+        if (!lot || lot.picked) {
+            return;
+        }
+        this.onCancelMoveQty();
+        this.onCancelLotQty();
+        this.state.editingReservedLotKey = `${rowKey}:${lotKey}`;
+        this.state.draftReservedLotQty = String(lot.reserved_quantity || 0);
+    }
+
+    onDraftReservedLotQtyInput(ev) {
+        this.state.draftReservedLotQty = ev.currentTarget.value;
+    }
+
+    onCancelReservedLotQty() {
+        this.state.editingReservedLotKey = "";
+        this.state.draftReservedLotQty = "";
+    }
+
+    onDraftReservedLotQtyKeydown(ev, rowKey, lotId) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this.onConfirmReservedLotQty(rowKey, lotId);
+        } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            this.onCancelReservedLotQty();
+        }
+    }
+
+    async onConfirmReservedLotQty(rowKey, lotId) {
+        const qty = parseFloat(this.state.draftReservedLotQty);
+        if (!qty || qty <= 0) {
+            this.notification.add(_t("Please enter a positive quantity"), {
+                type: "danger",
+            });
+            this._playAlert();
+            return;
+        }
+        const mv = this.state.move_ids.find((move) => move.row_key === rowKey);
+        if (!mv) {
+            return;
+        }
+        const done = await this._pickReservedLot(mv.id, lotId, qty);
+        if (done) {
+            this.onCancelReservedLotQty();
+        }
+    }
+
     _findLot(rowKey, lotKey) {
         const mv = this.state.move_ids.find((m) => m.row_key === rowKey);
         return mv?.lots.find((lot) => lot.key === lotKey);
@@ -613,6 +722,7 @@ export class PickingScanApp extends Component {
             return;
         }
         this.onCancelMoveQty();
+        this.onCancelReservedLotQty();
         this.state.editingLotKey = `${rowKey}:${lotKey}`;
         this.state.editingLotLineId = false;
         this.state.draftLotQty = "";

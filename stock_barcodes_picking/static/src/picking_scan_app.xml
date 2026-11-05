@@ -185,12 +185,21 @@
                                                 </div>
                                             </t>
                                             <t t-else="">
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-primary"
-                                                        title="Edit quantity"
-                                                        t-on-click.stop="() => this.onEditMoveQty(group.rows[0].row_key)">
-                                                    <i class="fa fa-pencil"/>
-                                                </button>
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <button t-if="state.barcode_lot_scan_policy === 'optional'"
+                                                            type="button"
+                                                            class="btn btn-sm btn-outline-success"
+                                                            title="Add quantity"
+                                                            t-on-click.stop="() => this.onAddMoveQuantity(group.move.id)">
+                                                        +1
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary"
+                                                            title="Edit quantity"
+                                                            t-on-click.stop="() => this.onEditMoveQty(group.rows[0].row_key)">
+                                                        <i class="fa fa-pencil"/>
+                                                    </button>
+                                                </div>
                                             </t>
                                         </t>
                                     </div>
@@ -285,13 +294,63 @@
                                                         <i class="fa fa-trash"/>
                                                     </button>
                                                 </span>
-                                                <!-- Reserved (unpicked) lots: greyed "pending", no edit/delete -->
+                                                <!-- Reserved lots can be picked directly in optional mode. -->
                                                 <span t-else=""
                                                       class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
                                                     <i class="fa fa-clock-o"/>
                                                     <t t-out="lot.name" />
                                                     <span class="small opacity-75">待拣</span>
+                                                    <strong>× <t t-out="lot.reserved_quantity" /></strong>
+                                                    <t t-if="state.barcode_lot_scan_policy === 'optional'">
+                                                        <button t-if="mv.tracking === 'serial'"
+                                                                type="button"
+                                                                class="btn btn-sm btn-outline-success p-0 px-1"
+                                                                title="Pick reserved lot"
+                                                                t-on-click.stop="() => this.onPickReservedLot(mv.id, lot.id)">
+                                                            <i class="fa fa-check"/>
+                                                        </button>
+                                                        <t t-else="">
+                                                            <button type="button"
+                                                                    class="btn btn-sm btn-outline-success p-0 px-1"
+                                                                    title="Pick reserved lot"
+                                                                    t-on-click.stop="() => this.onPickReservedLot(mv.id, lot.id)">
+                                                                +1
+                                                            </button>
+                                                            <button type="button"
+                                                                    class="btn btn-sm btn-outline-primary p-0 px-1"
+                                                                    title="Edit quantity"
+                                                                    t-on-click.stop="() => this.onEditReservedLotQty(mv.row_key, lot.key)">
+                                                                <i class="fa fa-pencil"/>
+                                                            </button>
+                                                        </t>
+                                                    </t>
                                                 </span>
+                                                <div t-if="!lot.picked &amp;&amp; mv.tracking !== 'serial' &amp;&amp; state.editingReservedLotKey === mv.row_key + ':' + lot.key"
+                                                     class="d-flex align-items-center gap-1 border rounded p-2 bg-white text-dark w-100"
+                                                     t-on-click.stop="">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        class="form-control form-control-sm"
+                                                        style="width: 6rem;"
+                                                        t-att-value="state.draftReservedLotQty"
+                                                        t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
+                                                        t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, mv.row_key, lot.id)"
+                                                    />
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-success"
+                                                            title="Confirm quantity"
+                                                            t-on-click.stop="() => this.onConfirmReservedLotQty(mv.row_key, lot.id)">
+                                                        <i class="fa fa-check"/>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            title="Cancel"
+                                                            t-on-click.stop="() => this.onCancelReservedLotQty()">
+                                                        <i class="fa fa-times"/>
+                                                    </button>
+                                                </div>
                                                 <!-- Single-line lots open the input directly. Multiple lines
                                                      expose their real source/package identities first. -->
                                                 <div t-if="lot.picked and state.editingLotKey === mv.row_key + ':' + lot.key"

@@ -2,8 +2,8 @@
 
 > 模块：`stock_barcodes_picking`  
 > 版本基线：`19.0.1.1.1`  
-> 当前增量：`19.0.1.1.10`（允许超量时保留其他批号明细，见第 28 节）
-> 整理日期：2026-11-04  
+> 当前增量：`19.0.1.1.12`（独立批次/序列号扫描策略，见第 29 节）
+> 整理日期：2026-11-05
 > 用途：统一现行规则口径、核对实现颗粒度、登记重复或冲突点，供后续开发与回归测试使用。
 
 ## 1. 文档口径
@@ -64,7 +64,8 @@
 | CFG-009 | `barcode.max_time_between_keys_in_ms` | 安装时设为 `1500`；`noupdate=1`，后续升级不覆盖管理员修改。 | [ir_config_parameter.xml:14-19](data/ir_config_parameter.xml#L14-L19) | 安装配置 |
 | CFG-010 | 安装/升级回填 | 安装 hook 和 `19.0.1.1.0` migration 都把源库位扫描的 False/NULL 回填为 True，用于保持旧版强制扫源位行为。 | [hooks.py:4-21](hooks.py#L4-L21)、[migration:16-22](migrations/19.0.1.1.0/post-update_fields.py#L16-L22) | 有意分支；覆盖语义见 ISS-020 |
 | CFG-011 | 包装按钮权限 | 前端以 `stock.group_tracking_lot` 控制 Pack/Select Package 按钮；原生需要包装类型时还可能打开 `stock.put.in.pack` 向导。 | [Wizard:581-584](wizard/stock_barcodes_picking.py#L581-L584)、[OWL:996-1002](static/src/picking_scan_app.esm.js#L996-L1002) | 未见直接测试 |
-| CFG-012 | 配置界面 | 作业类型 Barcode 页签分组为 Location Scanning、Serial Numbers、Quantity Control、Packaging；包装组受同一权限组控制。制造作业类型（`code=mrp_operation`）隐藏 Quantity Control 和 Packaging，因为 MRP 扫码不读取 CFG-004～CFG-007；其他作业类型保留。 | [stock_picking_type_views.xml:13-32](views/stock_picking_type_views.xml#L13-L32) | 已覆盖制造隐藏规则 |
+| CFG-012 | 配置界面 | 普通作业类型 Barcode 页签分组为 Location Scanning、Lot/Serial Numbers、Quantity Control、Packaging；包装组受同一权限组控制。制造作业类型（`code=mrp_operation`）隐藏整个 picking Barcode 页签，由 `stock_barcodes_mrp` 独立提供制造专用页签。 | [stock_picking_type_views.xml:13-34](views/stock_picking_type_views.xml#L13-L34) | 已覆盖制造隐藏规则 |
+| CFG-013 | `barcode_lot_scan_policy` | 默认 `mandatory`，可选 `optional`；只由 picking 扫码向导读取。可选模式使用已预留批次/SN，强制模式保持原扫码流程。 | [Picking Type:33-45](models/stock_picking_type.py#L33-L45)、[Wizard:863-1023](wizard/stock_barcodes_picking.py#L863-L1023) | 已覆盖默认、按钮守卫及主要分配分支 |
 
 ## 4. 入口与单据状态（ENT）
 
@@ -579,3 +580,22 @@ RULES.md 是否同步：
 
 - 新增 `test_new_product_second_lot_preserves_first_when_excess_allowed`，覆盖单据外产品确认首批号后、在允许超量策略下扫描第二批号的场景。
 - 该测试在旧代码上稳定复现旧明细 `unlink` 和 `1 != 2` 断言失败；修复后定向测试通过，独立临时数据库完整回归共执行 **85 个测试**，结果为 **0 failed、0 error**。
+
+## 29. `19.0.1.1.12` 独立批次/序列号扫描策略
+
+### 29.1 配置边界
+
+- `stock_barcodes_picking` 在普通作业类型上提供 `barcode_lot_scan_policy`；`stock_barcodes_mrp` 在制造作业类型上提供独立的 `barcode_mrp_lot_scan_policy`。两者均默认 `mandatory`，不新增共享模块，也不增加跨模块依赖。
+- picking 的 Barcode 页签在 `code=mrp_operation` 时隐藏；MRP 的 Barcode 页签只在制造作业类型显示，避免双页签和无效配置。
+
+### 29.2 可选扫描分配规则
+
+- 候选仅限当前源库位、未拣、未装包、正数量且具有可解析同产品批次的预留明细，按明细 ID 顺序分配；`lot_name` 不能解析为现有 `stock.lot` 时不参与。
+- 扫描跟踪产品每次自动拣选 1 个预留数量。普通批号部分拣选时拆分明细，同批次已拣行存在时合并数量；序列号每次使用一个未拣预留 SN，不重复使用。
+- 预留不足或在非 `allow` 超量策略下会超需求时，不写业务明细并回到批次/SN 扫描步骤。非跟踪产品的 `+1` 复用既有 SET 入口，以当前已拣数量加 1。
+- 可选模式下，待拣普通批号提供 `+1` 和数量编辑，待拣 SN 提供固定数量 1 的勾选按钮；只有已拣批次/SN 显示删除按钮。强制模式下不显示这些自动分配按钮，原流程不变。
+
+### 29.3 回归覆盖
+
+- 新增 5 个 picking 测试：默认配置与制造页签隐藏、普通批号拆分与合并、序列号防重复、预留不足零写入回退、非跟踪连续 `+1` 及强制模式守卫。
+- MRP 同步增加 5 个独立测试，覆盖制造数量确认自动分配、序列号逐只消耗及相同拒绝/展示规则。

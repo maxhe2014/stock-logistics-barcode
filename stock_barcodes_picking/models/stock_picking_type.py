@@ -29,6 +29,18 @@ class PickingType(models.Model):
              "displayed in the barcode scanner so the picker knows which "
              "serial numbers to scan.",
     )
+    barcode_lot_scan_policy = fields.Selection(
+        string="Force Lot/Serial scan?",
+        selection=[
+            ("mandatory", "Mandatory Scan"),
+            ("optional", "Optional Scan"),
+        ],
+        default="mandatory",
+        required=True,
+        help="Mandatory Scan requires scanning every lot/serial number. "
+             "Optional Scan lets the operator pick reserved lots/serials "
+             "with the line buttons or by scanning the product.",
+    )
     barcode_require_pack = fields.Selection(
         string="Force put in package",
         selection=[

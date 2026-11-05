@@ -560,6 +560,21 @@ class WizStockBarcodesMrp(models.TransientModel):
         ):
             move_lines = mv.move_line_ids
             picked_all = bool(move_lines) and all(l.picked for l in move_lines)
+            lots_by_key = {}
+            for line in move_lines.filtered(lambda line: line.lot_id).sorted(key=lambda line: line.id):
+                lot_state = "picked" if line.picked else "reserved"
+                lot_key = (line.lot_id.id, lot_state)
+                if lot_key not in lots_by_key:
+                    lots_by_key[lot_key] = {
+                        "id": line.lot_id.id,
+                        "key": "%s_%s" % (line.lot_id.id, lot_state),
+                        "name": line.lot_id.name,
+                        "picked": line.picked,
+                        "picked_quantity": 0.0,
+                        "reserved_quantity": 0.0,
+                    }
+                quantity_key = "picked_quantity" if line.picked else "reserved_quantity"
+                lots_by_key[lot_key][quantity_key] += line.quantity
             components.append({
                 "id": mv.id,
                 "product_name": mv.product_id.display_name or "",
@@ -574,11 +589,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                 "picked": picked_all,
                 "state": mv.state,
                 "tracking": mv.product_id.tracking or "none",
-                "lots": [
-                    {"id": l.lot_id.id, "name": l.lot_id.name}
-                    for l in move_lines
-                    if l.lot_id
-                ],
+                "lots": list(lots_by_key.values()),
             })
         # Resolve the effective finished lot (wizard fields first, then
         # fall back to the MO's lot_producing_ids) so the UI keeps showing
@@ -602,6 +613,7 @@ class WizStockBarcodesMrp(models.TransientModel):
             "visible_switch_selector": bool(self.visible_switch_selector),
             # Button visibility fields (mirror the old form invisible attrs)
             "production_state": self.production_state or "",
+            "barcode_mrp_lot_scan_policy": self._get_lot_scan_policy(),
             "finished_product_tracking": self.finished_product_tracking or "none",
             "product_id": self.product_id.id or False,
             "product_tracking": self.product_tracking or "none",
@@ -908,6 +920,165 @@ class WizStockBarcodesMrp(models.TransientModel):
         self._set_message_step()
         return True
 
+    def _get_lot_scan_policy(self):
+        self.ensure_one()
+        return (
+            self.production_id.picking_type_id.barcode_mrp_lot_scan_policy
+            or "mandatory"
+        )
+
+    def _get_reserved_lot_candidates(self, moves, lot=None):
+        """Return (unpicked line, lot) pairs in reservation order."""
+        product = moves[:1].product_id
+        lines = moves.move_line_ids.filtered(
+            lambda line: (
+                not line.picked
+                and not line.result_package_id
+                and (line.lot_id or line.lot_name)
+                and line.quantity > 0
+                and (not self.location_id or line.location_id == self.location_id)
+            )
+        ).sorted(key=lambda line: line.id)
+        lot_by_name = {reserved_lot.name: reserved_lot for reserved_lot in lines.lot_id}
+        missing_names = {
+            line.lot_name for line in lines
+            if not line.lot_id and line.lot_name and line.lot_name not in lot_by_name
+        }
+        if missing_names:
+            found_lots = self.env["stock.lot"].search([
+                ("product_id", "=", product.id),
+                ("name", "in", list(missing_names)),
+            ])
+            lot_by_name.update({reserved_lot.name: reserved_lot for reserved_lot in found_lots})
+        all_lines = moves.move_line_ids
+        candidates = []
+        for line in lines:
+            reserved_lot = line.lot_id or lot_by_name.get(line.lot_name)
+            if not reserved_lot or (lot and reserved_lot != lot):
+                continue
+            if product.tracking == "serial" and all_lines.filtered(
+                lambda picked_line: picked_line.picked and picked_line.lot_id == reserved_lot
+            ):
+                continue
+            candidates.append((line, reserved_lot))
+        return candidates
+
+    def _consume_reserved_lots(self, moves, quantity, lot=None):
+        """Move quantity from reservations to consumed lines, retaining traceability."""
+        self.ensure_one()
+        product = moves[:1].product_id
+        if not product or product.tracking == "none" or quantity <= 0:
+            return {}
+        rounding = product.uom_id.rounding
+        if product.tracking == "serial" and (
+            float_compare(quantity, round(quantity), precision_rounding=rounding)
+            or float_compare(quantity, 1.0, precision_rounding=rounding) < 0
+        ):
+            return {}
+        all_lines = moves.move_line_ids
+        total_demand = sum(moves.mapped("product_uom_qty"))
+        consumed_qty = sum(line.quantity for line in all_lines if line.picked)
+        if float_compare(
+            consumed_qty + quantity, total_demand, precision_rounding=rounding
+        ) > 0:
+            return {}
+        candidates = self._get_reserved_lot_candidates(moves, lot=lot)
+        if product.tracking == "serial":
+            available = sum(
+                1.0 for line, _lot in candidates
+                if float_compare(line.quantity, 1.0, precision_rounding=rounding) >= 0
+            )
+        else:
+            available = sum(line.quantity for line, _lot in candidates)
+        if float_compare(available, quantity, precision_rounding=rounding) < 0:
+            return {}
+
+        remaining = quantity
+        move_lines_dic = {}
+        for line, reserved_lot in candidates:
+            if float_is_zero(remaining, precision_rounding=rounding):
+                break
+            if product.tracking == "serial":
+                if float_compare(line.quantity, 1.0, precision_rounding=rounding) < 0:
+                    continue
+                take = 1.0
+            else:
+                take = min(line.quantity, remaining)
+            if not line.lot_id:
+                line.lot_id = reserved_lot.id
+                line.lot_name = reserved_lot.name
+            consumed_line = self.env["stock.move.line"]
+            if product.tracking != "serial":
+                consumed_line = line.move_id.move_line_ids.filtered(
+                    lambda candidate: (
+                        candidate.picked
+                        and not candidate.result_package_id
+                        and candidate.lot_id == reserved_lot
+                        and candidate.location_id == line.location_id
+                        and candidate.location_dest_id == line.location_dest_id
+                    )
+                )[:1]
+            if consumed_line:
+                consumed_line.quantity += take
+                line.quantity -= take
+                if float_is_zero(line.quantity, precision_rounding=rounding):
+                    line.unlink()
+            elif not float_compare(
+                take, line.quantity, precision_rounding=rounding
+            ):
+                line.picked = True
+                consumed_line = line
+            else:
+                line.quantity -= take
+                consumed_line = line.copy({"quantity": take, "picked": True})
+            move_lines_dic[consumed_line.move_id.id] = consumed_line
+            remaining -= take
+        return move_lines_dic
+
+    def action_consume_reserved_lot(self, move_id, lot_id, quantity=1.0):
+        """Consume an exact reserved lot/SN from the OWL line buttons."""
+        self.ensure_one()
+        if self._get_lot_scan_policy() != "optional":
+            self._set_message(
+                "error",
+                self.env._("Lot/Serial scanning is mandatory for this operation type."),
+            )
+            return False
+        move = self.component_move_ids.filtered(
+            lambda candidate: candidate.id == move_id and candidate.state != "cancel"
+        )
+        lot = self.env["stock.lot"].browse(lot_id)
+        if not move or not lot.exists() or lot.product_id != move.product_id:
+            return False
+        try:
+            quantity = float(quantity)
+        except (TypeError, ValueError):
+            return False
+        if quantity <= 0:
+            return False
+        result = self._consume_reserved_lots(move, quantity, lot=lot)
+        if not result:
+            self._set_message(
+                "error",
+                self.env._(
+                    "Insufficient reserved quantity for %(lot)s, or the quantity "
+                    "would exceed demand. Scan the lot/serial instead.",
+                    lot=lot.name,
+                ),
+            )
+            return False
+        product_name = move.product_id.name
+        self._clean_values()
+        self._set_message(
+            "success",
+            self.env._(
+                "Consumed reserved lot/serial: %(prod)s x%(qty)s",
+                prod=product_name,
+                qty=quantity,
+            ),
+        )
+        return result
+
     def _scan_product(self, barcode):
         domain = [("barcode", "=", barcode), ("type", "=", "consu")]
         products = self.env["product.product"].search(domain)
@@ -984,8 +1155,15 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.product_qty = 1.0
         self._compute_qty_available()
         if product.tracking != "none":
-            self._set_message("info", self.env._("Product: %s. Scan lot.", product.name))
-            self.step = 3
+            if self._get_lot_scan_policy() == "optional":
+                self._set_message(
+                    "info",
+                    self.env._("Product: %s. Enter qty and confirm.", product.name),
+                )
+                self.step = 4
+            else:
+                self._set_message("info", self.env._("Product: %s. Scan lot.", product.name))
+                self.step = 3
         else:
             self._set_message("info", self.env._("Product: %s. Enter qty and confirm.", product.name))
             self.step = 4
@@ -1466,6 +1644,25 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.product_qty = qty
         return self.action_confirm()
 
+    def action_add_component_quantity(self, move_id):
+        """Add one to a non-tracked component while preserving SET semantics."""
+        self.ensure_one()
+        if self._get_lot_scan_policy() != "optional":
+            return False
+        move = self.component_move_ids.filtered(
+            lambda candidate: (
+                candidate.id == move_id
+                and candidate.state not in ("done", "cancel")
+                and candidate.product_id.tracking == "none"
+            )
+        )
+        if not move:
+            return False
+        consumed_qty = sum(
+            line.quantity for line in move.move_line_ids if line.picked
+        )
+        return self.action_consume_component_with_qty(move.id, consumed_qty + 1.0)
+
     def _resolve_lot_owner(self, lot, product):
         """Identify whether `product` is a component or the finished product
         of the current MO and handle accordingly.
@@ -1790,11 +1987,50 @@ class WizStockBarcodesMrp(models.TransientModel):
         if not self.location_id:
             self._set_message("error", self.env._("No source location scanned"))
             return False
-        if self.product_id.tracking != "none" and not self.lot_id and not self.lot_name:
+        if (
+            self.product_id.tracking != "none"
+            and not self.lot_id
+            and not self.lot_name
+            and self._get_lot_scan_policy() != "optional"
+        ):
             self._set_message("error", self.env._("Lot required for tracked product"))
             return False
         if not self.product_qty or self.product_qty <= 0:
             self._set_message("error", self.env._("Quantity must be positive"))
+            return False
+        if (
+            self.product_id.tracking != "none"
+            and not self.lot_id
+            and not self.lot_name
+        ):
+            moves = self.production_id.move_raw_ids.filtered(
+                lambda move: (
+                    move.product_id == self.product_id and move.state != "cancel"
+                )
+            )
+            move_dic = self._consume_reserved_lots(moves, self.product_qty)
+            if move_dic:
+                product_name = self.product_id.name
+                quantity = self.product_qty
+                self._clean_values()
+                self._set_message(
+                    "success",
+                    self.env._(
+                        "Consumed reserved lot/serial: %(prod)s x%(qty)s",
+                        prod=product_name,
+                        qty=quantity,
+                    ),
+                )
+                return move_dic
+            self.step = 3
+            self._set_message(
+                "info",
+                self.env._(
+                    "Insufficient reserved lot/serial quantity for %s. "
+                    "Scan the lot/serial instead.",
+                    self.product_id.name,
+                ),
+            )
             return False
 
         # A serial component must physically exist at the scanned source

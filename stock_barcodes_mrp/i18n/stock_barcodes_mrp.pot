@@ -1426,3 +1426,115 @@ msgstr ""
 #: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
 msgid "重置"
 msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_picking_type__barcode_mrp_lot_scan_policy
+msgid "Force Lot/Serial scan?"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__stock_picking_type__barcode_mrp_lot_scan_policy__mandatory
+msgid "Mandatory Scan"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields.selection,name:stock_barcodes_mrp.selection__stock_picking_type__barcode_mrp_lot_scan_policy__optional
+msgid "Optional Scan"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_stock_picking_type__barcode_mrp_lot_scan_policy
+msgid ""
+"Mandatory Scan requires scanning every component lot/serial number. Optional "
+"Scan lets the operator consume reserved lots/serials with the line buttons or "
+"by confirming a component quantity without scanning its lot/serial."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_picking_type_form_inherit_barcode_mrp
+msgid "Lot/Serial Numbers"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_picking_type_form_inherit_barcode_mrp
+msgid "Location Scanning"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_picking_type__barcode_scan_source_location
+msgid "Scan Source Location"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_stock_picking_type__barcode_scan_source_location
+msgid ""
+"If enabled, the barcode scan flow requires the operator to scan the source "
+"location barcode. If disabled, the picking's default source location is used"
+" automatically."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_picking_type__barcode_scan_dest_location
+msgid "Scan Destination Location"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_stock_picking_type__barcode_scan_dest_location
+msgid ""
+"If enabled, the barcode scan flow requires the operator to scan the "
+"destination location barcode. If disabled, the picking's default destination"
+" location is used automatically."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,field_description:stock_barcodes_mrp.field_stock_picking_type__barcode_show_reserved_sns
+msgid "Show Reserved Serial Numbers"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#: model:ir.model.fields,help:stock_barcodes_mrp.field_stock_picking_type__barcode_show_reserved_sns
+msgid ""
+"If enabled, reserved (but not yet picked) serial numbers are displayed in "
+"the barcode scanner so the picker knows which serial numbers to scan."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot/Serial scanning is mandatory for this operation type."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"Insufficient reserved quantity for %(lot)s, or the quantity would exceed "
+"demand. Scan the lot/serial instead."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Consumed reserved lot/serial: %(prod)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"Insufficient reserved lot/serial quantity for %s. Scan the lot/serial instead."
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Add quantity"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.esm.js:0
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Consume reserved lot"
+msgstr ""
