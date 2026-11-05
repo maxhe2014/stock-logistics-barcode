@@ -223,6 +223,12 @@ msgid "Back"
 msgstr "返回"
 
 #. module: stock_barcodes_mrp
+#. odoo-javascript
+#: code:addons/stock_barcodes_mrp/static/src/mrp_scan_app.xml:0
+msgid "Scan with camera"
+msgstr "使用摄像头扫码"
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__barcode
 msgid "Barcode"
 msgstr "条码"

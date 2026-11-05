@@ -43,6 +43,18 @@
                     <div class="col-auto">
                         <button
                             type="button"
+                            class="btn btn-secondary btn-lg o_mrp_scan_camera"
+                            t-att-disabled="state.scanning ? 'disabled' : ''"
+                            t-on-click="onCameraScan"
+                            aria-label="Scan with camera"
+                            title="Scan with camera"
+                        >
+                            <i class="fa fa-camera" aria-hidden="true"/>
+                        </button>
+                    </div>
+                    <div class="col-auto">
+                        <button
+                            type="button"
                             class="btn btn-secondary btn-lg o_mrp_scan_header_back"
                             t-on-click="onBack"
                         >Back</button>

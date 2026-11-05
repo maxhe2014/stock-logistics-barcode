@@ -6,6 +6,7 @@ import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
+import { scanBarcode } from "@web/core/barcode/barcode_dialog";
 
 /**
  * MrpScanApp — thin OWL client action for the MRP scan flow.
@@ -240,6 +241,24 @@ export class MrpScanApp extends Component {
         if (value) {
             this._onScan(value);
             ev.currentTarget.value = "";
+        }
+    }
+
+    /** Open the device camera and feed the detected code into the normal scan queue. */
+    async onCameraScan() {
+        if (this.state.scanning) {
+            return;
+        }
+        try {
+            const barcode = await scanBarcode(this.env, "environment");
+            if (barcode?.trim()) {
+                await this._onScan(barcode.trim());
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Scan failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
         }
     }
 
