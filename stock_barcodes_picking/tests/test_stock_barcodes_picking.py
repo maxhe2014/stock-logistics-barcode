@@ -2274,8 +2274,10 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertEqual(sum(picked.mapped("quantity")), 2.0)
 
         self.picking_type.barcode_lot_scan_policy = "mandatory"
-        self.assertFalse(wiz.action_add_move_quantity(picking.move_ids.id))
+        # Non-tracked +1 works regardless of policy — it's just a quantity
+        # shortcut, no lot/serial scan involved.
+        self.assertTrue(wiz.action_add_move_quantity(picking.move_ids.id))
         picking.invalidate_recordset()
         self.assertEqual(sum(
             line.quantity for line in picking.move_line_ids if line.picked
-        ), 2.0)
+        ), 3.0)

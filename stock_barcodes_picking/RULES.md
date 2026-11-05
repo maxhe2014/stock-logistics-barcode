@@ -587,6 +587,7 @@ RULES.md 是否同步：
 
 - `stock_barcodes_picking` 在普通作业类型上提供 `barcode_lot_scan_policy`；`stock_barcodes_mrp` 在制造作业类型上提供独立的 `barcode_mrp_lot_scan_policy`。两者均默认 `mandatory`，不新增共享模块，也不增加跨模块依赖。
 - picking 的 Barcode 页签在 `code=mrp_operation` 时隐藏；MRP 的 Barcode 页签只在制造作业类型显示，避免双页签和无效配置。
+- `19.0.1.7.4` 修复制造页签原配置缺失：恢复 Location Scanning 的源/目的库位扫描及 Lot/Serial Numbers 的显示预留序列号，新扫描策略追加到同一批次分组。三个原字段由 MRP 以相同定义提供，两个模块同时安装时由 Odoo 合并并复用原字段值，不新增跨模块依赖；Quantity Control 和 Packaging 继续按已确认边界隐藏。
 
 ### 29.2 可选扫描分配规则
 
@@ -599,3 +600,4 @@ RULES.md 是否同步：
 
 - 新增 5 个 picking 测试：默认配置与制造页签隐藏、普通批号拆分与合并、序列号防重复、预留不足零写入回退、非跟踪连续 `+1` 及强制模式守卫。
 - MRP 同步增加 5 个独立测试，覆盖制造数量确认自动分配、序列号逐只消耗及相同拒绝/展示规则。
+- 制造页签修复后，MRP 120 个后端测试方法对应命令退出码为 0，日志无 FAIL/ERROR；主库组合视图断言包含且仅包含上述 4 个制造配置，制造类型原值 `True/False/True/mandatory` 保持不变，模块版本为 `19.0.1.7.4`，8071 登录页 HTTP 200。

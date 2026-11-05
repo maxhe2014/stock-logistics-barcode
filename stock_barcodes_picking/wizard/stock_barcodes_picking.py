@@ -455,8 +455,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         # picking paid ~N extra SELECTs per scan (10 moves -> 10 separate
         # stock_lot queries). Warming the cache here keeps the loop below
         # query-free and also benefits _compute_totals.
+        # Exclude moves that are confirmed but never assigned — they have no
+        # move_line_ids and nothing for the scan app to operate on.
         active_moves = self.move_ids.filtered(
-            lambda m: m.state not in ("done", "cancel")
+            lambda m: (
+                m.state not in ("done", "cancel")
+                and bool(m.move_line_ids)
+            )
         )
         all_lines = picking.move_line_ids
         lot_name_by_id = {lot.id: lot.name for lot in all_lines.lot_id}
@@ -2103,10 +2108,17 @@ class WizStockBarcodesPicking(models.TransientModel):
         return result
 
     def action_add_move_quantity(self, move_id):
-        """Add one to a non-tracked move while preserving SET semantics."""
+        """Add one to a non-tracked move while preserving SET semantics.
+
+        Available in both mandatory and optional policies — non-tracked
+        products don't need a lot/serial scan, so the operator may
+        always add quantity directly through this shortcut.
+
+        Tracked products use the per-lot +1 button inside reserved
+        badges (optional policy only), handled by
+        :meth:`action_pick_reserved_lot`.
+        """
         self.ensure_one()
-        if self._get_lot_scan_policy() != "optional":
-            return False
         move = self.picking_id.move_ids.filtered(
             lambda candidate: (
                 candidate.id == move_id
