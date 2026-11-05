@@ -2,7 +2,7 @@
 
 > 模块：`stock_barcodes_picking`  
 > 版本基线：`19.0.1.1.1`  
-> 当前增量：`19.0.1.1.5`（批号按真实明细精确修改与删除，见第 23 节）
+> 当前增量：`19.0.1.1.6`（已包装封存，普通扫码默认写入未包装明细，见第 24 节）
 > 整理日期：2026-11-04  
 > 用途：统一现行规则口径、核对实现颗粒度、登记重复或冲突点，供后续开发与回归测试使用。
 
@@ -442,17 +442,17 @@ RULES.md 是否同步：
 
 ### 23.1 展示合计与操作身份分离
 
-- 已拣批号仍按“包装＋批号”汇总显示 `picked_quantity`，第 22 节的全部批号展开方式不变；同时每个已拣批号返回真实 `lines` 数组，逐项包含 `stock.move.line.id`、数量、源库位和包装元数据。预留待拣批号的 `lines` 为空，不能修改或删除。 | [Wizard:481-545](wizard/stock_barcodes_picking.py#L481-L545) |
-- 非跟踪产品继续使用产品标题的数量铅笔；普通批号在各自批号标签显示铅笔；SN 固定数量 1，不显示修改铅笔。 | [OWL XML:147-168](static/src/picking_scan_app.xml#L147-L168)、[OWL XML:251-282](static/src/picking_scan_app.xml#L251-L282) |
-- 批号只有一条真实明细时，点击铅笔直接显示该明细数量输入框；同批号有多条真实明细时，先展开明细列表，显示源库位、包装和各自数量，再由操作员逐行点击修改或删除。 | [OWL JS:563-609](static/src/picking_scan_app.esm.js#L563-L609)、[OWL XML:283-345](static/src/picking_scan_app.xml#L283-L345) |
-- 数量输入支持 Enter 保存、Esc 取消；普通产品或批号数量编辑期间，硬件扫码和手工扫码输入均被拦截，必须先保存或取消。 | [OWL JS:230-249](static/src/picking_scan_app.esm.js#L230-L249)、[OWL JS:591-603](static/src/picking_scan_app.esm.js#L591-L603) |
+- 已拣批号仍按“包装＋批号”汇总显示 `picked_quantity`，第 22 节的全部批号展开方式不变；同时每个已拣批号返回真实 `lines` 数组，逐项包含 `stock.move.line.id`、数量、源库位和包装元数据。预留待拣批号的 `lines` 为空，不能修改或删除。（[Wizard:481-545](wizard/stock_barcodes_picking.py#L481-L545)）
+- 非跟踪产品继续使用产品标题的数量铅笔；普通批号在各自批号标签显示铅笔；SN 固定数量 1，不显示修改铅笔。（[OWL XML:147-168](static/src/picking_scan_app.xml#L147-L168)、[OWL XML:251-282](static/src/picking_scan_app.xml#L251-L282)）
+- 批号只有一条真实明细时，点击铅笔直接显示该明细数量输入框；同批号有多条真实明细时，先展开明细列表，显示源库位、包装和各自数量，再由操作员逐行点击修改或删除。（[OWL JS:563-609](static/src/picking_scan_app.esm.js#L563-L609)、[OWL XML:283-345](static/src/picking_scan_app.xml#L283-L345)）
+- 数量输入支持 Enter 保存、Esc 取消；普通产品或批号数量编辑期间，硬件扫码和手工扫码输入均被拦截，必须先保存或取消。（[OWL JS:230-249](static/src/picking_scan_app.esm.js#L230-L249)、[OWL JS:591-603](static/src/picking_scan_app.esm.js#L591-L603)）
 
 ### 23.2 服务端精确修改与删除
 
-- `_get_picked_lot_line()` 是修改和删除的统一入口守卫：先解决候选调拨单，再检查当前 picking 和单据状态，按“真实明细 ID＋当前 picking”定位，排除完成/取消明细，并要求目标为带批号的可跟踪产品及 `picked=True`。外部 picking 的明细 ID、未拣预留明细均拒绝。 | [Wizard:2241-2277](wizard/stock_barcodes_picking.py#L2241-L2277) |
-- `action_edit_move_line_qty(line_id, qty, force=False)` 只对指定明细的 `quantity` 做 SET，不按 `move_id＋lot_id` 搜索，也不重分配或改动同批号、同产品的其他明细。数量必须大于 0，SN 不允许修改固定数量 1。 | [Wizard:2279-2344](wizard/stock_barcodes_picking.py#L2279-L2344) |
-- 修改的超量上限沿用扫码的产品级口径：`总需求－除目标行外的其他已拣数量`。`allow` 直接写入；`warn` 第一次返回 `more_match`，前端二次确认后以 `force=True` 重试；`forbid` 即使传 `force=True` 也拒绝。 | [Wizard:2301-2333](wizard/stock_barcodes_picking.py#L2301-L2333)、[OWL JS:611-665](static/src/picking_scan_app.esm.js#L611-L665) |
-- `action_remove_move_lot(line_id)` 只操作指定真实明细：普通批号数量大于 1 时减 1，数量为 1 时删除该行，SN 删除对应行；不会删除 `stock.lot` 主数据。多明细批号点击标签删除按钮时先展开明细，不默认操作第一条。 | [Wizard:2346-2367](wizard/stock_barcodes_picking.py#L2346-L2367)、[OWL JS:667-712](static/src/picking_scan_app.esm.js#L667-L712) |
+- `_get_picked_lot_line()` 是修改和删除的统一入口守卫：先解决候选调拨单，再检查当前 picking 和单据状态，按“真实明细 ID＋当前 picking”定位，排除完成/取消明细，并要求目标为带批号的可跟踪产品及 `picked=True`。外部 picking 的明细 ID、未拣预留明细均拒绝。（[Wizard:2241-2277](wizard/stock_barcodes_picking.py#L2241-L2277)）
+- `action_edit_move_line_qty(line_id, qty, force=False)` 只对指定明细的 `quantity` 做 SET，不按 `move_id＋lot_id` 搜索，也不重分配或改动同批号、同产品的其他明细。数量必须大于 0，SN 不允许修改固定数量 1。（[Wizard:2279-2344](wizard/stock_barcodes_picking.py#L2279-L2344)）
+- 修改的超量上限沿用扫码的产品级口径：`总需求－除目标行外的其他已拣数量`。`allow` 直接写入；`warn` 第一次返回 `more_match`，前端二次确认后以 `force=True` 重试；`forbid` 即使传 `force=True` 也拒绝。（[Wizard:2301-2333](wizard/stock_barcodes_picking.py#L2301-L2333)、[OWL JS:611-665](static/src/picking_scan_app.esm.js#L611-L665)）
+- `action_remove_move_lot(line_id)` 只操作指定真实明细：普通批号数量大于 1 时减 1，数量为 1 时删除该行，SN 删除对应行；不会删除 `stock.lot` 主数据。多明细批号点击标签删除按钮时先展开明细，不默认操作第一条。（[Wizard:2346-2367](wizard/stock_barcodes_picking.py#L2346-L2367)、[OWL JS:667-712](static/src/picking_scan_app.esm.js#L667-L712)）
 - 本增量只纠正显式修改/删除的目标身份；普通扫码实时累加、多批号独立累加、已包装明细的普通扫码匹配及 active move 写入颗粒度不在本次变更范围内。
 
 ### 23.3 回归测试
@@ -470,3 +470,42 @@ RULES.md 是否同步：
 | `test_remove_lot_uses_exact_line_and_keeps_decrement_semantics` | 普通批号精确减 1、数量为 1 时删行，其他同批号明细及 lot 主数据不变。 | [Tests:937-956](tests/test_stock_barcodes_picking.py#L937-L956) |
 
 独立临时数据库完整运行 `stock_barcodes_picking`，共执行 **71 个测试**，结果为 **0 failed、0 error**；测试数据库已清理。
+
+## 24. `19.0.1.1.6` 已包装封存，普通扫码默认未包装
+
+### 24.1 已确认的业务口径
+
+- 普通扫码只写 `result_package_id=False` 的未包装明细。已包装明细视为封存，不能被后续普通扫码自动累加、覆盖或扣减；需要调整包装内容时，必须使用第 23 节的显式真实明细修改/删除入口。
+- 同批号只有已包装明细时，再次扫码新建未包装行；同批号同时存在包装和未包装行时，只累加未包装行。新批号、新 SN 同样进入未包装组。
+- 已包装数量仍计入产品总已拣数量和需求上限，保证超量判断准确；但容量重分配只能从未包装行扣减，不能为了容纳新批号而减少包装内容。
+- 未包装数量不足以吸收超量时，继续执行作业类型的 `allow/warn/forbid` 策略。需要继续装入同一包裹时，先扫产品形成未包装明细，再扫描或选择目标包裹，不增加隐含的“当前包装”写入状态。
+- 本增量不改变第 22 节的展示方式；现有“包装＋批号”分组会自然分别显示包装内和未包装数量。active move 多需求行颗粒度仍由 TODO-02 独立跟踪。
+
+示例：批号 `L001` 已有 5 件装入 Package A。
+
+| 操作 | Package A：L001 | 未包装：L001 |
+|---|---:|---:|
+| 初始 | 5 | 0 |
+| 再扫一次 L001 | 5 | 1 |
+| 再扫第二次 L001 | 5 | 2 |
+| 再扫新批号 L002 | 5 | L001=2，L002=1 |
+
+### 24.2 后端写入规则
+
+- `_confirm_scanned_lot()` 的 SET 目标数量只累计同产品、同源库位、同批号且未包装的已拣数量，再加 1。包装数量不再进入普通扫码的累加基数，避免新建未包装行时把包装数量复制一遍。（[Wizard:1442-1464](wizard/stock_barcodes_picking.py#L1442-L1464)）
+- `_process_stock_move_line()` 的现有行匹配增加 `not result_package_id`；SN 复用收货占位行时也要求占位行未包装。只有包装行存在时进入新建分支，并显式写入 `result_package_id=False`。（[Wizard:1649-1687](wizard/stock_barcodes_picking.py#L1649-L1687)、[Wizard:1782-1799](wizard/stock_barcodes_picking.py#L1782-L1799)）
+- `other_lines_qty` 仍汇总其他已拣行，包括已包装行，用于计算需求上限；新建行的超量重分配则先过滤为未包装行，再按原顺序扣减。包装数量“参与校验、不参与自动改写”。（[Wizard:1682-1690](wizard/stock_barcodes_picking.py#L1682-L1690)、[Wizard:1763-1784](wizard/stock_barcodes_picking.py#L1763-L1784)）
+- 显式修改和删除仍按真实 `stock.move.line.id` 操作，因此可以纠正包装内指定行；普通扫码与显式纠正保持两条独立路径。
+
+### 24.3 回归测试
+
+| 测试方法 | 覆盖场景 | 源码依据 |
+|---|---|---|
+| `test_scan_same_lot_after_packing_accumulates_unpacked_only` | 同批号分布在两个包装后连续扫码两次，两个包装数量均不变，未包装从 1 累加到 2；状态快照分别显示三个包装分组。 | [Tests:972-1014](tests/test_stock_barcodes_picking.py#L972-L1014) |
+| `test_scan_same_lot_updates_only_existing_unpacked_line` | 同批号包装与未包装并存时，仅未包装行从 2 增至 3，包装行保持 4。 | [Tests:1016-1032](tests/test_stock_barcodes_picking.py#L1016-L1032) |
+| `test_scan_new_lot_allow_never_redistributes_packed_quantity` | `allow` 超量时新建未包装新批号行，不从包装重分配数量。 | [Tests:1034-1054](tests/test_stock_barcodes_picking.py#L1034-L1054) |
+| `test_scan_new_lot_warn_preserves_package_before_and_after_force` | `warn` 首次拦截及二次强制确认前后均不改变包装内容。 | [Tests:1056-1081](tests/test_stock_barcodes_picking.py#L1056-L1081) |
+| `test_scan_new_lot_forbid_preserves_package_even_with_force` | `forbid` 拒绝扫码及强制绕过，目标包装和新批号均不被错误写入。 | [Tests:1083-1101](tests/test_stock_barcodes_picking.py#L1083-L1101) |
+| `test_scan_new_serial_after_packing_creates_unpacked_line` | 新 SN 进入未包装行，原包装 SN 数量和包装归属不变。 | [Tests:1103-1125](tests/test_stock_barcodes_picking.py#L1103-L1125) |
+
+独立临时数据库完整运行 `stock_barcodes_picking`，共执行 **77 个测试**，结果为 **0 failed、0 error**；测试数据库已清理。

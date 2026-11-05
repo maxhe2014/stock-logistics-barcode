@@ -1443,8 +1443,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         """Immediately add one to the picked quantity of the scanned lot.
 
         ``_process_stock_move_line`` uses SET semantics, so the target
-        quantity must include what was already picked for this lot. Other
-        lots of the same product keep their own picked move lines.
+        quantity must include what was already picked for this lot in the
+        unpacked group. Packed lines are sealed from normal scans; only an
+        explicit move-line edit can change them. Other lots of the same
+        product keep their own picked move lines.
         """
         self.ensure_one()
         lot_name = self.lot_id.name or self.lot_name
@@ -1454,6 +1456,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 line.quantity
                 for line in self.picking_id.move_line_ids
                 if line.picked
+                and not line.result_package_id
                 and line.lot_id == self.lot_id
                 and line.product_id == self.product_id
                 and (not self.location_id or line.location_id == self.location_id)
@@ -1645,10 +1648,14 @@ class WizStockBarcodesPicking(models.TransientModel):
 
         # Read the moves' lines once; every filtered/compare below works on
         # this recordset (mapped() re-read the same lines three times).
+        # Normal scans only target unpacked lines. Packed quantities still
+        # count toward demand below, but can only be changed by the explicit
+        # move-line edit/delete actions.
         all_lines = moves.move_line_ids
         existing_lines = all_lines.filtered(
             lambda l: (
                 l.product_id == self.product_id
+                and not l.result_package_id
                 and (not self.location_id or l.location_id == self.location_id)
                 and (not self.lot_id or l.lot_id == self.lot_id)
             )
@@ -1656,7 +1663,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         # For serial-tracked products on receptions, Odoo pre-creates
         # placeholder lines (one per unit) with quantity set but no lot
         # and picked=False. When scanning a serial, no line matches by
-        # lot, so reuse the first unpicked placeholder instead of
+        # lot, so reuse the first unpicked, unpacked placeholder instead of
         # creating a new line (which would exceed demand).
         if (
             not existing_lines
@@ -1666,6 +1673,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             existing_lines = all_lines.filtered(
                 lambda l: (
                     l.product_id == self.product_id
+                    and not l.result_package_id
                     and (not self.location_id or l.location_id == self.location_id)
                     and not l.lot_id
                     and not l.picked
@@ -1753,7 +1761,13 @@ class WizStockBarcodesPicking(models.TransientModel):
                     self.visible_force_done = True
                     return False
             if excess > 0:
-                for line in other_lines.sorted(key=lambda l: l.id):
+                # Capacity redistribution may consume unpacked lines only.
+                # A packed line still counts in other_lines_qty, but taking
+                # quantity from it would silently change the package contents.
+                redistributable = other_lines.filtered(
+                    lambda l: not l.result_package_id
+                )
+                for line in redistributable.sorted(key=lambda l: l.id):
                     if is_serial and line.quantity > 0:
                         continue
                     take = min(line.quantity, excess)
@@ -1780,6 +1794,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 ),
                 "lot_id": self.lot_id.id if self.lot_id else False,
                 "lot_name": self.lot_id.name if self.lot_id else self.lot_name or False,
+                "result_package_id": False,
             }
             new_line = self.env["stock.move.line"].create(sml_vals)
             # move.picked auto-computes from new_line.picked (see note above).

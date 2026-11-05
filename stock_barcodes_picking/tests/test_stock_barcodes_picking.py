@@ -969,6 +969,161 @@ class TestStockBarcodesPicking(TransactionCase):
             self.assertTrue(line.picked)
             self.assertEqual(wiz.message_type, "success")
 
+    def test_scan_same_lot_after_packing_accumulates_unpacked_only(self):
+        """Repeated scans start a new unpacked group without changing packages."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        move = picking.move_ids[0]
+        lot = self._create_lot(self.product_lot, "TR-PACKED-SCAN-SAME")
+        package_a = self.env["stock.package"].create({"name": "PKG-SCAN-A"})
+        package_b = self.env["stock.package"].create({"name": "PKG-SCAN-B"})
+        packed_a = self._create_picked_lot_line(
+            picking, lot, 2.0, package=package_a
+        )
+        packed_b = self._create_picked_lot_line(
+            picking, lot, 3.0, package=package_b
+        )
+        wiz = self._create_wiz(picking)
+
+        for expected_qty in (1.0, 2.0):
+            wiz.on_barcode_scanned(lot.name)
+            unpacked = move.move_line_ids.filtered(
+                lambda l: l.lot_id == lot and l.picked and not l.result_package_id
+            )
+            self.assertEqual(len(unpacked), 1)
+            self.assertEqual(unpacked.quantity, expected_qty)
+            self.assertEqual(packed_a.quantity, 2.0)
+            self.assertEqual(packed_b.quantity, 3.0)
+            self.assertEqual(packed_a.result_package_id, package_a)
+            self.assertEqual(packed_b.result_package_id, package_b)
+            self.assertEqual(wiz.message_type, "success")
+
+        rows = [
+            row for row in wiz.get_scan_state()["move_ids"]
+            if row["id"] == move.id
+        ]
+        self.assertEqual(len(rows), 3)
+        rows_by_package = {row["package_name"]: row for row in rows}
+        for package_name, expected_qty in (
+            ("PKG-SCAN-A", 2.0),
+            ("PKG-SCAN-B", 3.0),
+            ("", 2.0),
+        ):
+            self.assertEqual(
+                rows_by_package[package_name]["lots"][0]["picked_quantity"],
+                expected_qty,
+            )
+
+    def test_scan_same_lot_updates_only_existing_unpacked_line(self):
+        """When packed and unpacked rows coexist, only the unpacked row grows."""
+        picking = self._create_in_picking(self.product_lot, qty=20.0)
+        lot = self._create_lot(self.product_lot, "TR-PACKED-AND-UNPACKED")
+        package = self.env["stock.package"].create({"name": "PKG-SEALED-4"})
+        packed = self._create_picked_lot_line(
+            picking, lot, 4.0, package=package
+        )
+        unpacked = self._create_picked_lot_line(picking, lot, 2.0)
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(lot.name)
+
+        self.assertEqual(packed.quantity, 4.0)
+        self.assertEqual(packed.result_package_id, package)
+        self.assertEqual(unpacked.quantity, 3.0)
+        self.assertFalse(unpacked.result_package_id)
+
+    def test_scan_new_lot_allow_never_redistributes_packed_quantity(self):
+        """Allowed over-picking cannot take quantity from a sealed package."""
+        picking = self._create_in_picking(self.product_lot, qty=5.0)
+        picking.picking_type_id.barcode_excess_qty_policy = "allow"
+        lot_a = self._create_lot(self.product_lot, "TR-PACKED-CAPACITY-A")
+        lot_b = self._create_lot(self.product_lot, "TR-PACKED-CAPACITY-B")
+        package = self.env["stock.package"].create({"name": "PKG-CAPACITY-ALLOW"})
+        packed = self._create_picked_lot_line(
+            picking, lot_a, 5.0, package=package
+        )
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(lot_b.name)
+
+        unpacked_b = picking.move_line_ids.filtered(
+            lambda l: l.lot_id == lot_b and l.picked and not l.result_package_id
+        )
+        self.assertEqual(len(unpacked_b), 1)
+        self.assertEqual(unpacked_b.quantity, 1.0)
+        self.assertEqual(packed.quantity, 5.0)
+        self.assertEqual(packed.result_package_id, package)
+
+    def test_scan_new_lot_warn_preserves_package_before_and_after_force(self):
+        """Warn confirmation preserves the package on both scan attempts."""
+        picking = self._create_in_picking(self.product_lot, qty=5.0)
+        picking.picking_type_id.barcode_excess_qty_policy = "warn"
+        lot_a = self._create_lot(self.product_lot, "TR-PACKED-WARN-A")
+        lot_b = self._create_lot(self.product_lot, "TR-PACKED-WARN-B")
+        package = self.env["stock.package"].create({"name": "PKG-CAPACITY-WARN"})
+        packed = self._create_picked_lot_line(
+            picking, lot_a, 5.0, package=package
+        )
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(lot_b.name)
+
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.visible_force_done)
+        self.assertFalse(picking.move_line_ids.filtered(lambda l: l.lot_id == lot_b))
+        self.assertEqual(packed.quantity, 5.0)
+        self.assertTrue(wiz.action_force_done())
+        unpacked_b = picking.move_line_ids.filtered(
+            lambda l: l.lot_id == lot_b and l.picked and not l.result_package_id
+        )
+        self.assertEqual(len(unpacked_b), 1)
+        self.assertEqual(unpacked_b.quantity, 1.0)
+        self.assertEqual(packed.quantity, 5.0)
+        self.assertEqual(packed.result_package_id, package)
+
+    def test_scan_new_lot_forbid_preserves_package_even_with_force(self):
+        """Forbidden over-picking rejects both scan and forced confirmation."""
+        picking = self._create_in_picking(self.product_lot, qty=5.0)
+        picking.picking_type_id.barcode_excess_qty_policy = "forbid"
+        lot_a = self._create_lot(self.product_lot, "TR-PACKED-FORBID-A")
+        lot_b = self._create_lot(self.product_lot, "TR-PACKED-FORBID-B")
+        package = self.env["stock.package"].create({"name": "PKG-CAPACITY-FORBID"})
+        packed = self._create_picked_lot_line(
+            picking, lot_a, 5.0, package=package
+        )
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(lot_b.name)
+
+        self.assertEqual(wiz.message_type, "error")
+        self.assertFalse(wiz.action_force_done())
+        self.assertFalse(picking.move_line_ids.filtered(lambda l: l.lot_id == lot_b))
+        self.assertEqual(packed.quantity, 5.0)
+        self.assertEqual(packed.result_package_id, package)
+
+    def test_scan_new_serial_after_packing_creates_unpacked_line(self):
+        """A new SN is picked as unpacked while the packed SN stays sealed."""
+        product = self._create_serial_product(
+            "Packed Serial Scan", "PROD-PACKED-SERIAL-SCAN"
+        )
+        picking = self._create_in_picking(product, qty=3.0)
+        packed_lot = self._create_lot(product, "SN-PACKED-SEALED")
+        new_lot = self._create_lot(product, "SN-PACKED-NEW")
+        package = self.env["stock.package"].create({"name": "PKG-SERIAL-SEALED"})
+        packed = self._create_picked_lot_line(
+            picking, packed_lot, 1.0, package=package
+        )
+        wiz = self._create_wiz(picking)
+
+        wiz.on_barcode_scanned(new_lot.name)
+
+        new_line = picking.move_line_ids.filtered(
+            lambda l: l.lot_id == new_lot and l.picked and not l.result_package_id
+        )
+        self.assertEqual(len(new_line), 1)
+        self.assertEqual(new_line.quantity, 1.0)
+        self.assertEqual(packed.quantity, 1.0)
+        self.assertEqual(packed.result_package_id, package)
+
     # --- New lot uniqueness ---
     def test_create_new_lot_search_then_create(self):
         """Scanning an unknown barcode creates a lot; scanning the same
