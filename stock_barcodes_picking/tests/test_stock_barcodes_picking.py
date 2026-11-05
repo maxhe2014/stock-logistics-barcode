@@ -1980,6 +1980,31 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertTrue(lines.picked)
         self.assertFalse(lines.result_package_id)
 
+    def test_new_product_second_lot_preserves_first_when_excess_allowed(self):
+        """Allowed over-picking adds a different lot without replacing others."""
+        self.picking_type.barcode_excess_qty_policy = "allow"
+        product, lot_1, picking, wiz = self._prepare_outside_lot_scan("warn")
+        lot_2 = self._create_lot(product, "LOT-OUTSIDE-002")
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 10.0, lot_id=lot_2
+        )
+        wiz.on_barcode_scanned(lot_1.name)
+        self.assertTrue(wiz.action_confirm_new_product())
+        move = picking.move_ids.filtered(lambda m: m.product_id == product)
+
+        wiz.on_barcode_scanned(lot_2.name)
+
+        self.assertEqual(wiz.message_type, "success")
+        self.assertEqual(move.product_uom_qty, 1.0)
+        lines = move.move_line_ids.filtered(lambda l: l.lot_id in (lot_1 | lot_2))
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(
+            {line.lot_id.name: line.quantity for line in lines},
+            {lot_1.name: 1.0, lot_2.name: 1.0},
+        )
+        self.assertTrue(all(lines.mapped("picked")))
+        self.assertFalse(any(lines.mapped("result_package_id")))
+
     # --- action_force_add ---
     def test_force_add_creates_move_and_picks(self):
         """action_force_add adds a product NOT on the picking, creates a

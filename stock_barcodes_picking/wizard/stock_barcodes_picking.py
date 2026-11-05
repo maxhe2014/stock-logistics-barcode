@@ -1647,8 +1647,8 @@ class WizStockBarcodesPicking(models.TransientModel):
         """Find matching picking move and update/create move line.
 
         SET semantics (not ADD): matching line quantity is replaced.
-        New lines redistribute demand from other lines so a lot
-        substitution does not silently double consumption.
+        Allowed over-picking preserves other lots; forced warned over-picking
+        redistributes demand from other unpacked lines for lot substitution.
 
         picked write: every created/updated line gets picked=True.
         move.picked is NOT set explicitly — it is computed from
@@ -1783,10 +1783,11 @@ class WizStockBarcodesPicking(models.TransientModel):
                     )
                     self.visible_force_done = True
                     return False
-            if excess > 0:
-                # Capacity redistribution may consume unpacked lines only.
-                # A packed line still counts in other_lines_qty, but taking
-                # quantity from it would silently change the package contents.
+            if excess > 0 and policy != "allow":
+                # Allowed over-picking preserves other lots. Forced warned
+                # over-picking may consume unpacked lines only. A packed line
+                # still counts in other_lines_qty, but taking quantity from it
+                # would silently change the package contents.
                 redistributable = other_lines.filtered(
                     lambda l: not l.result_package_id
                 )
