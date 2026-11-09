@@ -398,6 +398,77 @@ export class PickingScanApp extends Component {
         this.env.config.historyBack();
     }
 
+    /** Open the source/origin document (sale.order / purchase.order / ...).
+     *  Falls back to the picking form when no origin is resolvable. */
+    onOpenSourcePicking() {
+        const { origin_model, origin_id } = this.state;
+        if (origin_model && origin_id) {
+            this.actionService.doAction({
+                res_model: origin_model,
+                res_id: origin_id,
+                views: [[false, "form"]],
+                type: "ir.actions.act_window",
+                target: "current",
+            });
+            return;
+        }
+        // No origin available — fall back to the picking itself so the
+        // button at least always does something useful.
+        if (this.state.picking_id) {
+            this.actionService.doAction({
+                res_model: "stock.picking",
+                res_id: this.state.picking_id,
+                views: [[false, "form"]],
+                type: "ir.actions.act_window",
+                target: "current",
+            });
+        }
+    }
+
+    /** Jump to the source transfer form so the operator can use the
+     *  native Odoo action menu (gear icon) — print, ZPL labels, scrap,
+     *  cancel, etc. — all of which live on the form/header controller
+     *  and can't be triggered cleanly from this client action. */
+    onOpenPickingActions() {
+        if (!this.state.picking_id) {
+            return;
+        }
+        this.actionService.doAction({
+            res_model: "stock.picking",
+            res_id: this.state.picking_id,
+            views: [[false, "form"]],
+            type: "ir.actions.act_window",
+            target: "current",
+        });
+    }
+
+    /** Open product picker → add the selected product to the current
+     *  picking (backend creates a new stock.move) → refresh state so the
+     *  new card appears on the scan view. */
+    onAddProduct() {
+        this.dialogService.add(
+            SelectCreateDialog,
+            {
+                resModel: "product.product",
+                title: _t("选择或创建产品"),
+                onSelected: async (records) => {
+                    const productId = records?.[0]?.id;
+                    if (!productId) {
+                        return;
+                    }
+                    await this.orm.call(
+                        "wiz.stock.barcodes.picking",
+                        "action_add_product_to_picking",
+                        [this.wizId],
+                        { product_id: productId }
+                    );
+                    await this._refreshState();
+                },
+            },
+            { onClose: () => {} }
+        );
+    }
+
     /**
      * Unified three-state handler for action RPCs.
      *

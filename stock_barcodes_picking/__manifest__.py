@@ -21,7 +21,7 @@
     ],
     "assets": {
         "web.assets_web": [
-            "stock_barcodes_picking/static/src/picking_scan_app.esm.js",
+            "stock_barcodes_picking/static/src/picking_scan_app.js",
             "stock_barcodes_picking/static/src/picking_scan_app.xml",
             "stock_barcodes_picking/static/src/picking_scan_app.css",
             "stock_barcodes_picking/static/src/picking_scan_app.scss",

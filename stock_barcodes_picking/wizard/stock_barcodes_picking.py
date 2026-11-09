@@ -489,18 +489,25 @@ class WizStockBarcodesPicking(models.TransientModel):
                 lambda l: l.picked
             ).sorted(key=lambda l: l.id)
             picked_total = sum(l.quantity for l in picked_lines)
-            # Group picked lines by result_package_id so each package becomes
-            # its own product row (with the SNs belonging to that package).
-            package_groups = {}  # (package_id, package_name) -> [lines]
+            # Group picked lines by (result_package_id, location_id) so each
+            # package×location combination becomes its own product row.
+            # This lets the card header show the source location per row and
+            # keeps serial/lot grouping precise when the same product comes
+            # from multiple locations into one package.
+            package_groups = {}  # (pkg_id, pkg_name, loc_id, loc_name) -> [lines]
             for l in picked_lines:
                 pkg_id = l.result_package_id.id or False
                 pkg_name = package_name_by_id.get(pkg_id, "")
-                key = (pkg_id, pkg_name)
+                loc_id = l.location_id.id or False
+                loc_name = location_name_by_id.get(loc_id, "")
+                key = (pkg_id, pkg_name, loc_id, loc_name)
                 if key not in package_groups:
                     package_groups[key] = []
                 package_groups[key].append(l)
             if not package_groups:
-                package_groups[(False, "")] = []
+                default_loc_id = mv.location_id.id or False
+                default_loc_name = mv.location_id.display_name or location_name_by_id.get(default_loc_id, "")
+                package_groups[(False, "", default_loc_id, default_loc_name)] = []
             # Whether the move has any packaged group (to decide showing
             # the "未装包" label on the unpacked group).
             has_packaged = any(k[0] for k in package_groups)
@@ -510,14 +517,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             # losing it behind the package rows.
             if (
                 has_packaged
-                and (False, "") not in package_groups
+                and not any(not k[0] for k in package_groups)
                 and picked_total < mv.product_uom_qty
             ):
-                package_groups[(False, "")] = []
+                package_groups[(False, "", default_loc_id, default_loc_name)] = []
             packed_picked = sum(
                 l.quantity for l in picked_lines if l.result_package_id
             )
-            for (pkg_id, pkg_name), lines in package_groups.items():
+            for (pkg_id, pkg_name, loc_id, loc_name), lines in package_groups.items():
                 # Show one entry per lot and picked state within this package
                 # group. Multiple lines of the same lot contribute to one
                 # picked quantity; other packages keep their own quantity.
@@ -581,10 +588,11 @@ class WizStockBarcodesPicking(models.TransientModel):
                 )
                 moves.append({
                     "id": mv.id,
-                    "row_key": "%s_%s" % (mv.id, pkg_id or "nopkg"),
+                    "row_key": "%s_%s_%s" % (mv.id, pkg_id or "nopkg", loc_id or 0),
                     "product_name": product_info_by_id.get(
                         mv.product_id.id, ("", "none")
                     )[0],
+                    "location_name": loc_name,
                     "product_uom_qty": mv.product_uom_qty,
                     "demand_qty": demand_qty,
                     "quantity": group_qty,
@@ -598,6 +606,10 @@ class WizStockBarcodesPicking(models.TransientModel):
                     "package_name": pkg_name,
                     "show_package_label": show_package_label,
                 })
+
+        # ---- Resolve origin document for the "source doc" button ----
+        origin_info = self._resolve_picking_origin(picking)
+
         return {
             "wiz_id": self.id,
             "step": self.step,
@@ -608,6 +620,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             "picking_name": picking.name or "",
             "picking_state": self.picking_state or "",
             "picking_type_code": self.picking_type_code or "",
+            # Origin document (sale.order / purchase.order / ...).
+            # Resolve from direct m2o links first, then fall back to the
+            # plain `origin` char field (common in MRP/manual flows).
+            "origin_model": origin_info["model"],
+            "origin_id": origin_info["id"],
+            "origin_name": origin_info["name"],
             "barcode_lot_scan_policy": lot_scan_policy,
             "location_id": self.location_id.id or False,
             "location_name": self.location_id.display_name or "",
@@ -649,6 +667,55 @@ class WizStockBarcodesPicking(models.TransientModel):
             "pack_required": picking.picking_type_id.barcode_require_pack == "mandatory",
             "lines_need_pack": self._lines_need_pack(picking),
         }
+
+    @api.model
+    def _resolve_picking_origin(self, picking):
+        """Best-effort resolution of the picking's origin document.
+
+        Priority: direct Many2one links (sale_id, purchase_id, ...) on the
+        picking itself, then the plain ``origin`` char field which stores
+        the source document's ``_name`` (e.g. MRP, manual).
+
+        Returns a dict with model / id / name, all False if no origin
+        can be identified — the frontend then disables/hides the button.
+        """
+        if not picking:
+            return {"model": False, "id": False, "name": ""}
+
+        # 1) Known direct m2o links on stock.picking
+        for fname in ("sale_id", "purchase_id"):
+            if fname in picking._fields:
+                rel = picking[fname]
+                if rel:
+                    return {
+                        "model": rel._name,
+                        "id": rel.id,
+                        "name": rel.display_name or "",
+                    }
+
+        # 2) origin char field — try to match by name in common origin models
+        origin_name = (picking.origin or "").strip()
+        if origin_name:
+            # sale.order
+            so = self.env["sale.order"].search(
+                [("name", "=", origin_name)], limit=1
+            )
+            if so:
+                return {"model": "sale.order", "id": so.id, "name": so.name}
+            # purchase.order
+            po = self.env["purchase.order"].search(
+                [("name", "=", origin_name)], limit=1
+            )
+            if po:
+                return {"model": "purchase.order", "id": po.id, "name": po.name}
+            # mrp.production
+            mp = self.env["mrp.production"].search(
+                [("name", "=", origin_name)], limit=1
+            )
+            if mp:
+                return {"model": "mrp.production", "id": mp.id, "name": mp.name}
+
+        return {"model": False, "id": False, "name": ""}
 
     def _lines_need_pack(self, picking):
         """Whether validation requires all picked lines to be packed."""
@@ -2747,13 +2814,20 @@ class WizStockBarcodesPicking(models.TransientModel):
         in the scan view instead of disappearing from the move list.
         """
         self.ensure_one()
-        move_key, _, pkg_key = (row_key or "").rpartition("_")
-        if not move_key.isdigit():
+        # row_key format: "{move_id}_{pkg_id|nopkg}_{location_id|0}"
+        parts = (row_key or "").split("_")
+        if len(parts) < 3 or not parts[0].isdigit():
             return False
+        move_key = parts[0]
+        pkg_key = parts[1]
+        loc_key = parts[2]
         pkg_id = False if pkg_key in ("", "nopkg") else int(pkg_key)
+        loc_id = False if loc_key in ("", "0") else int(loc_key)
         mv = self.picking_id.move_ids.filtered(lambda m: m.id == int(move_key))
         lines = mv.move_line_ids.filtered(
-            lambda l: l.picked and (l.result_package_id.id or False) == pkg_id
+            lambda l: l.picked
+            and (l.result_package_id.id or False) == pkg_id
+            and (l.location_id.id or False) == loc_id
         )
         if not lines:
             return False
@@ -2761,6 +2835,47 @@ class WizStockBarcodesPicking(models.TransientModel):
         self._set_message(
             "success",
             self.env._("Removed the picked quantity of the row.")
+        )
+        return True
+
+    def action_add_product_to_picking(self, product_id, qty=1.0):
+        """Add a product to the current picking and create a stock.move.
+
+        Called from the scan UI's "Add Product" button when the operator
+        wants to pick a product that isn't on the transfer yet (force-add).
+        """
+        self.ensure_one()
+        if not self.picking_id:
+            return False
+        product = self.env["product.product"].browse(product_id)
+        if not product.exists():
+            return False
+        # Avoid duplicates — if the product is already on the picking, tell
+        # the operator instead of silently creating another move.
+        existing = self.picking_id.move_ids.filtered(
+            lambda m: m.product_id.id == product_id and m.state != "done"
+        )
+        if existing:
+            self._set_message(
+                "info",
+                self.env._("Product already on the transfer — scan it to pick.")
+            )
+            return True
+        src_loc = self.location_id or self.picking_location_id
+        dst_loc = self.location_dest_id or self.picking_location_dest_id
+        self.picking_id.move_ids.create({
+            "name": product.display_name,
+            "product_id": product_id,
+            "product_uom": product.uom_id.id,
+            "product_uom_qty": qty,
+            "location_id": src_loc.id,
+            "location_dest_id": dst_loc.id,
+            "picking_id": self.picking_id.id,
+            "state": "confirmed",
+        })
+        self._set_message(
+            "success",
+            self.env._("Product added to the transfer — scan to pick.")
         )
         return True
 

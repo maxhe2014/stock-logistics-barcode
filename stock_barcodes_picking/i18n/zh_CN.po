@@ -1493,3 +1493,21 @@ msgstr "| 已拣"
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "| Serial"
 msgstr "| 序列号"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Product already on the transfer — scan it to pick."
+msgstr "产品已在调拔单中 — 扫码即可拣货。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Product added to the transfer — scan to pick."
+msgstr "产品已添加到调拔单 — 扫码即可拣货。"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "选择或创建产品"
+msgstr "选择或创建产品"

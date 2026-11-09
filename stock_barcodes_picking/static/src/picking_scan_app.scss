@@ -31,22 +31,49 @@
         --scan-text-2: #FFFFFF;
     }
 
-    // ---------- top: doc name + progress ----------
+    // ---------- top: source btn + doc name + progress + actions ----------
     .o_scan_topbar {
         display: flex;
         align-items: center;
-        justify-content: center;
-        gap: 26px;
+        justify-content: space-between;
+        gap: 8px;
         padding: 6px 12px 2px;
+    }
+    .o_scan_src_btn,
+    .o_scan_actions_btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid var(--scan-frame);
+        background: transparent;
+        color: var(--scan-text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-size: 15px;
+        &:hover {
+            background: var(--scan-row-bg);
+        }
+    }
+    .o_scan_doc_wrap {
+        flex: 1;
+        min-width: 0;
+        text-align: center;
     }
     .o_scan_doc {
         font-size: 20px;
         font-weight: 700;
         line-height: 25px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     .o_scan_doc_progress {
         font-size: 12px;
-        line-height: 25px;
+        line-height: 18px;
+        color: var(--scan-text-2);
     }
 
     // ---------- scan row ----------
@@ -133,17 +160,6 @@
         }
     }
 
-    // ---------- from / to ----------
-    .o_scan_fromto {
-        display: flex;
-        justify-content: center;
-        gap: 90px;
-        padding: 6px 12px 0;
-        min-height: 30px;
-        font-size: 12px;
-        align-items: center;
-    }
-
     // ---------- section title ----------
     .o_scan_section_title {
         height: 30px;
@@ -151,7 +167,6 @@
         text-align: center;
         font-size: 12px;
         font-weight: 700;
-        border-top: 1px solid var(--scan-frame);
         margin-top: 4px;
     }
 
@@ -225,29 +240,50 @@
     }
 
     .o_scan_card_head {
-        height: 32px;
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 5px;
-        gap: 5px;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        position: relative;
+        padding: 4px 5px;
+        gap: 0;
+        min-height: 44px;
 
         &.is-selectable {
             cursor: pointer;
         }
     }
+    .o_scan_pmeta_loc {
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 13px;
+        color: var(--scan-text-2);
+        flex-shrink: 0;
+    }
     .o_scan_pname {
         font-size: 12px;
         font-weight: 700;
         line-height: 17px;
+        min-width: 0;
+        word-break: break-word;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        width: 100%;
     }
     .o_scan_pmeta {
         font-size: 9px;
         font-weight: 700;
-        line-height: 15px;
+        line-height: 13px;
         color: var(--scan-text-2);
+        flex-shrink: 0;
     }
     .o_scan_head_actions {
+        position: absolute;
+        right: 5px;
+        top: 4px;
         display: flex;
         gap: 5px;
         align-items: center;
@@ -490,10 +526,31 @@
     }
     .o_scan_footer_actions {
         display: flex;
-        justify-content: flex-end;
-        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
         gap: 10px;
+        flex-wrap: wrap;
         padding-bottom: 6px;
+    }
+    .o_scan_footer_actions_right {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+        flex: 1;
+    }
+    .o_scan_key_add_product {
+        background-color: #27A844;
+        color: #FFFFFF;
+        font-weight: 600;
+        min-width: 130px;
+        box-shadow: 0px 1.5px 0px 0px rgba(116, 120, 123, 1);
+        &:hover {
+            background-color: darken(#27A844, 5%);
+        }
+        &:active {
+            background-color: darken(#27A844, 8%);
+        }
     }
 
     // ---------- misc ----------

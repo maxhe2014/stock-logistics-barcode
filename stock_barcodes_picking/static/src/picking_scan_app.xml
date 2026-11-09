@@ -22,12 +22,20 @@
     <t t-name="stock_barcodes_picking.PickingScanApp">
         <div class="o_picking_scan_app d-flex flex-column h-100">
 
-            <!-- Top bar: transfer name + progress -->
+            <!-- Top bar: source button + transfer name + progress + actions -->
             <div class="o_scan_topbar" t-if="state.picking_id">
-                <div class="o_scan_doc"><t t-out="state.picking_name" /></div>
-                <div class="o_scan_doc_progress">
-                    Progress: <t t-out="state.total_done" />/<t t-out="state.total_demand" />
+                <button type="button" class="o_scan_src_btn" t-on-click="onOpenSourcePicking" title="查看源单据">
+                    <i class="fa fa-file-text-o"/>
+                </button>
+                <div class="o_scan_doc_wrap">
+                    <div class="o_scan_doc"><t t-out="state.picking_name" /></div>
+                    <div class="o_scan_doc_progress">
+                        <t t-out="state.total_done" />/<t t-out="state.total_demand" />
+                    </div>
                 </div>
+                <button type="button" class="o_scan_actions_btn" t-on-click="onOpenPickingActions" title="操作">
+                    <i class="fa fa-cog"/>
+                </button>
             </div>
 
             <!-- Scan row: manual input + camera + back -->
@@ -35,7 +43,7 @@
                 <input
                     type="text"
                     class="o_picking_scan_input"
-                    t-att-placeholder="barcodePlaceholder"
+                    placeholder="扫码或输入条码..."
                     t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
                     t-on-keydown="onManualScanEnter"
                 />
@@ -44,8 +52,8 @@
                     class="o_scan_key o_picking_scan_camera"
                     t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
                     t-on-click="onCameraScan"
-                    aria-label="Scan with camera"
-                    title="Scan with camera"
+                    aria-label="扫码"
+                    title="扫码"
                 >
                     <i class="fa fa-camera" aria-hidden="true"/>
                 </button>
@@ -53,7 +61,9 @@
                     type="button"
                     class="o_scan_key o_picking_scan_back"
                     t-on-click="onBack"
-                >Back</button>
+                    title="返回">
+                    <i class="fa fa-arrow-left"/> 返回
+                </button>
             </div>
 
             <!-- Hint bar: status + active target + force-add offer -->
@@ -73,16 +83,6 @@
                         <i class="fa fa-plus me-1"/>Force add "<t t-out="state.last_unmatched_barcode" />"
                     </button>
                 </t>
-            </div>
-
-            <!-- From / To -->
-            <div class="o_scan_fromto" t-if="state.picking_id">
-                <span t-if="state.location_name">
-                    From: <strong><t t-out="state.location_name" /></strong>
-                </span>
-                <span t-if="state.location_dest_name">
-                    To: <strong><t t-out="state.location_dest_name" /></strong>
-                </span>
             </div>
 
             <!-- Section title -->
@@ -121,19 +121,20 @@
                             <t t-set="mv" t-value="group.rows[0]" />
                             <div t-att-class="'o_scan_card' + (!pkg.package_id &amp;&amp; state.active_move_id === group.move.id ? ' is-selected' : '')">
 
-                                <!-- Card head -->
+                                <!-- Card head (tracked: lot/serial) -->
                                 <div t-if="group.move.tracking !== 'none'"
                                      t-att-class="'o_scan_card_head' + (pkg.package_id ? '' : ' is-selectable')"
                                      t-att-title="pkg.package_id ? '' : 'Select this product, then scan'"
                                      t-on-click="() => !pkg.package_id &amp;&amp; this.onSelectMove(group.move.id)">
-                                    <div>
-                                        <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
-                                        <div class="o_scan_pmeta">
-                                            Demand <t t-out="mv.demand_qty" />
-                                            | Picked <t t-out="group.totalPicked" />
-                                            <t t-if="group.move.tracking === 'lot'"> | Lot</t>
-                                            <t t-if="group.move.tracking === 'serial'"> | Serial</t>
-                                        </div>
+                                    <div class="o_scan_pmeta_loc" t-if="mv.location_name">
+                                        从：<t t-out="mv.location_name" />
+                                    </div>
+                                    <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
+                                    <div class="o_scan_pmeta">
+                                        需求 <t t-out="mv.demand_qty" />
+                                        | 已拣 <t t-out="group.totalPicked" />
+                                        <t t-if="group.move.tracking === 'lot'"> | 批号</t>
+                                        <t t-if="group.move.tracking === 'serial'"> | 序列号</t>
                                     </div>
                                     <div class="o_scan_head_actions">
                                         <span t-if="!pkg.package_id" class="o_scan_sq o_scan_sq_hand">
@@ -144,12 +145,13 @@
 
                                 <!-- Untracked product head: +1 / pencil / inline qty edit -->
                                 <div t-else="" class="o_scan_card_head">
-                                    <div>
-                                        <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
-                                        <div class="o_scan_pmeta">
-                                            Demand <t t-out="mv.demand_qty" />
-                                            | Picked <t t-out="group.totalPicked" />
-                                        </div>
+                                    <div class="o_scan_pmeta_loc" t-if="mv.location_name">
+                                        从：<t t-out="mv.location_name" />
+                                    </div>
+                                    <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
+                                    <div class="o_scan_pmeta">
+                                        需求 <t t-out="mv.demand_qty" />
+                                        | 已拣 <t t-out="group.totalPicked" />
                                     </div>
                                     <div class="o_scan_head_actions">
                                         <button t-if="!pkg.package_id"
@@ -426,61 +428,73 @@
                     Progress: <t t-out="state.total_done" />/<t t-out="state.total_demand" />
                 </div>
                 <div class="o_scan_footer_actions">
+                    <!-- 左：绿色添加产品按钮 -->
                     <button
-                        t-if="canPutInPack"
+                        t-if="state.picking_id"
                         type="button"
-                        class="o_scan_key"
-                        t-on-click="onPutInPack"
-                    >Put in Pack</button>
+                        class="o_scan_key o_scan_key_add_product"
+                        t-on-click="onAddProduct"
+                        title="添加未在调拔单上的产品"
+                    ><i class="fa fa-plus"/> 添加产品</button>
 
-                    <button
-                        t-if="canPutInPack"
-                        type="button"
-                        class="o_scan_key"
-                        t-on-click="onSelectPackage"
-                    >Select Package</button>
+                    <!-- 右：原有按钮组 -->
+                    <div class="o_scan_footer_actions_right">
+                        <button
+                            t-if="canPutInPack"
+                            type="button"
+                            class="o_scan_key"
+                            t-on-click="onPutInPack"
+                        >Put in Pack</button>
 
-                    <button
-                        t-if="canConsumeByDemand"
-                        type="button"
-                        class="o_scan_key"
-                        t-on-click="onConsumeByDemand"
-                    >Consume by demand</button>
+                        <button
+                            t-if="canPutInPack"
+                            type="button"
+                            class="o_scan_key"
+                            t-on-click="onSelectPackage"
+                        >Select Package</button>
 
-                    <button
-                        t-if="canConfirm"
-                        type="button"
-                        class="o_scan_key"
-                        t-on-click="onConfirm"
-                    >Confirm</button>
+                        <button
+                            t-if="canConsumeByDemand"
+                            type="button"
+                            class="o_scan_key"
+                            t-on-click="onConsumeByDemand"
+                        >Consume by demand</button>
 
-                    <button
-                        t-if="state.visible_force_add"
-                        type="button"
-                        class="o_scan_key o_scan_key_warn"
-                        t-on-click="onConfirmNewProduct"
-                    >Add Product and Pick</button>
+                        <button
+                            t-if="canConfirm"
+                            type="button"
+                            class="o_scan_key"
+                            t-on-click="onConfirm"
+                        >Confirm</button>
 
-                    <button
-                        t-if="state.visible_force_add"
-                        type="button"
-                        class="o_scan_key"
-                        t-on-click="onCancelNewProduct"
-                    >Cancel</button>
+                        <button
+                            t-if="state.visible_force_add"
+                            type="button"
+                            class="o_scan_key o_scan_key_warn"
+                            t-on-click="onConfirmNewProduct"
+                        >Add Product and Pick</button>
 
-                    <button
-                        t-if="state.visible_force_done"
-                        type="button"
-                        class="o_scan_key o_scan_key_warn"
-                        t-on-click="onForceDone"
-                    >Force Consume</button>
+                        <button
+                            t-if="state.visible_force_add"
+                            type="button"
+                            class="o_scan_key"
+                            t-on-click="onCancelNewProduct"
+                        >Cancel</button>
 
-                    <button
-                        t-if="canValidate"
-                        type="button"
-                        class="o_scan_key o_scan_key_primary"
-                        t-on-click="onValidatePicking"
-                    >Validate</button>
+                        <button
+                            t-if="state.visible_force_done"
+                            type="button"
+                            class="o_scan_key o_scan_key_warn"
+                            t-on-click="onForceDone"
+                        >Force Consume</button>
+
+                        <button
+                            t-if="canValidate"
+                            type="button"
+                            class="o_scan_key o_scan_key_primary"
+                            t-on-click="onValidatePicking"
+                        >Validate</button>
+                    </div>
                 </div>
             </div>
         </div>
