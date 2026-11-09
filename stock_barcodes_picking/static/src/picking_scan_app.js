@@ -10,6 +10,23 @@ import { AutoComplete } from "@web/core/autocomplete/autocomplete";
 import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog";
 import { browser } from "@web/core/browser/browser";
 import { scanBarcode } from "@web/core/barcode/barcode_dialog";
+import { CogMenu } from "@web/search/cog_menu/cog_menu";
+
+/**
+ * ScanCogMenu — thin wrapper around Odoo's native CogMenu that skips the
+ * cogMenuRegistry entries (archive / restore / sync calendar / ...).
+ * Those registry items run ``isDisplayed(env)`` callbacks that touch
+ * ``env.searchModel``, which our client action does not have because we
+ * are a client action, not a search-based view. Without the registry
+ * items the component behaves identically to what the picking form view
+ * shows — a single gear button holding the picking form's toolbar actions
+ * (Unreserve / Scrap / Lock / Split / Create Repair) and print reports.
+ */
+export class ScanCogMenu extends CogMenu {
+    async _registryItems() {
+        return [];
+    }
+}
 
 /**
  * PickingScanApp — thin OWL client action for the outgoing-picking
@@ -29,7 +46,7 @@ import { scanBarcode } from "@web/core/barcode/barcode_dialog";
 export class PickingScanApp extends Component {
     static template = "stock_barcodes_picking.PickingScanApp";
     static props = { ...standardActionServiceProps };
-    static components = { AutoComplete };
+    static components = { AutoComplete, CogMenu: ScanCogMenu };
 
     setup() {
         this.orm = useService("orm");
@@ -1486,6 +1503,25 @@ export class PickingScanApp extends Component {
                 ...p,
                 groups: Array.from(p.groups.values()),
             }));
+    }
+
+    /** Props for the native Odoo CogMenu component rendered in the
+     *  top-right corner. Items come from the picking form's toolbar
+     *  (scrap / print reports / lock / split / etc.) — exactly what the
+     *  user would see on the stock.picking form view, so the UI and
+     *  behaviour are 100% native Odoo. */
+    get cogMenuProps() {
+        const items = this.state.action_menu_items || {};
+        return {
+            resModel: "stock.picking",
+            getActiveIds: () => (this.state.picking_id ? [this.state.picking_id] : []),
+            context: this.props.context || {},
+            items: {
+                action: items.action || [],
+                print: items.print || [],
+            },
+            isDomainSelected: false,
+        };
     }
 
     // ---------- serial card collapse (local UI only) ----------

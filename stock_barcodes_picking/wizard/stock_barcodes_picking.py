@@ -626,6 +626,9 @@ class WizStockBarcodesPicking(models.TransientModel):
             "origin_model": origin_info["model"],
             "origin_id": origin_info["id"],
             "origin_name": origin_info["name"],
+            # Picking form toolbar items — consumed by the native
+            # ``web.CogMenu`` OWL component rendered in the top-right corner.
+            "action_menu_items": self._get_picking_action_menu_items(),
             "barcode_lot_scan_policy": lot_scan_policy,
             "location_id": self.location_id.id or False,
             "location_name": self.location_id.display_name or "",
@@ -2837,6 +2840,33 @@ class WizStockBarcodesPicking(models.TransientModel):
             self.env._("Removed the picked quantity of the row.")
         )
         return True
+
+    def _get_picking_action_menu_items(self):
+        """Return the picking form's toolbar items (actions + print).
+
+        These are the exact same items shown in the native Odoo cog menu
+        on the stock.picking form view — Unreserve / Lock / Scrap / ...
+        plus the print reports. The frontend renders them via the standard
+        ``web.CogMenu`` OWL component, so the UI looks 100% native.
+        """
+        self.ensure_one()
+        if not self.picking_id:
+            return {"action": [], "print": []}
+        picking_model = self.env["stock.picking"]
+        # Pick the canonical form view (user may have custom views; the
+        # stock module ships the primary one which carries the toolbar).
+        view_id = self.env.ref("stock.view_picking_form").id
+        try:
+            result = picking_model.get_views(
+                [(view_id, "form")], {"toolbar": True}
+            )
+            toolbar = result["views"]["form"].get("toolbar", {})
+        except Exception:
+            toolbar = {}
+        return {
+            "action": toolbar.get("action", []),
+            "print": toolbar.get("print", []),
+        }
 
     def action_add_product_to_picking(self, product_id, qty=1.0):
         """Add a product to the current picking and create a stock.move.

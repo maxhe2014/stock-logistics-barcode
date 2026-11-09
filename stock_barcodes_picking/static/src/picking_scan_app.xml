@@ -33,9 +33,7 @@
                         <t t-out="state.total_done" />/<t t-out="state.total_demand" />
                     </div>
                 </div>
-                <button type="button" class="o_scan_actions_btn" t-on-click="onOpenPickingActions" title="操作">
-                    <i class="fa fa-cog"/>
-                </button>
+                <CogMenu t-if="state.picking_id" t-props="cogMenuProps"/>
             </div>
 
             <!-- Scan row: manual input + camera + back -->
