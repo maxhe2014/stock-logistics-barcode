@@ -1412,6 +1412,18 @@ msgid "Updated lot/SN quantity: %(lot)s x%(qty)s"
 msgstr "已更新批号/序列号数量：%(lot)s × %(qty)s"
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Updated package quantity: %(pkg)s x%(qty)s"
+msgstr "已更新包裹数量：%(pkg)s × %(qty)s"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Package line not found"
+msgstr "未找到该包裹内的拣货明细"
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
 msgid "Force Lot/Serial scan?"
 msgstr "批次/序列号扫描策略"

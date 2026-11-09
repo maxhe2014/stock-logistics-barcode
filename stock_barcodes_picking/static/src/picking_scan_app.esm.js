@@ -572,24 +572,53 @@ export class PickingScanApp extends Component {
         }
         this.state.scanning = true;
         try {
-            // 1. Bind the target move
-            const ok = await this.orm.call(
-                "wiz.stock.barcodes.picking",
-                "set_active_move",
-                [[this.wizId], mv.id]
-            );
-            if (!ok) {
-                await this._refreshState();
-                this._playAlert();
-                return;
+            if (mv.package_id) {
+                // Packaged row: the consume flow below only SETs unpacked
+                // lines, so edit the lines that actually sit in this package.
+                let res = await this.orm.call(
+                    "wiz.stock.barcodes.picking",
+                    "action_edit_package_qty",
+                    [[this.wizId], mv.id, mv.package_id, qty]
+                );
+                if (res === false) {
+                    await this._refreshState();
+                    if (this.state.message_type !== "more_match") {
+                        this._playAlert();
+                        return;
+                    }
+                    const force = window.confirm(
+                        `${this.state.message}\n${_t("Continue?")}`
+                    );
+                    if (!force) {
+                        return;
+                    }
+                    res = await this.orm.call(
+                        "wiz.stock.barcodes.picking",
+                        "action_edit_package_qty",
+                        [[this.wizId], mv.id, mv.package_id, qty, true]
+                    );
+                }
+                await this._handleActionResult(res, "Edit quantity");
+            } else {
+                // 1. Bind the target move
+                const ok = await this.orm.call(
+                    "wiz.stock.barcodes.picking",
+                    "set_active_move",
+                    [[this.wizId], mv.id]
+                );
+                if (!ok) {
+                    await this._refreshState();
+                    this._playAlert();
+                    return;
+                }
+                // 2. Consume with the entered quantity
+                const res = await this.orm.call(
+                    "wiz.stock.barcodes.picking",
+                    "action_consume_with_qty",
+                    [[this.wizId], qty]
+                );
+                await this._handleActionResult(res, "Consume");
             }
-            // 2. Consume with the entered quantity
-            const res = await this.orm.call(
-                "wiz.stock.barcodes.picking",
-                "action_consume_with_qty",
-                [[this.wizId], qty]
-            );
-            await this._handleActionResult(res, "Consume");
             this.state.editingQtyMoveId = false;
             this.state.draftQty = "";
         } catch (err) {
@@ -1337,10 +1366,15 @@ export class PickingScanApp extends Component {
             g.totalPicked += qty;
             p.qty += qty;
         }
-        return Array.from(pkgs.values()).map((p) => ({
-            ...p,
-            groups: Array.from(p.groups.values()),
-        }));
+        // Unpacked stays on top (design: what is not packed yet — including
+        // the unpicked remainder — is always the first stack), packaged
+        // stacks keep their scan order below it.
+        return Array.from(pkgs.values())
+            .sort((a, b) => (a.package_id ? 1 : 0) - (b.package_id ? 1 : 0))
+            .map((p) => ({
+                ...p,
+                groups: Array.from(p.groups.values()),
+            }));
     }
 
     // ---------- serial card collapse (local UI only) ----------

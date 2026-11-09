@@ -2619,6 +2619,98 @@ class WizStockBarcodesPicking(models.TransientModel):
         )
         return True
 
+    def action_edit_package_qty(self, move_id, package_id, qty, force=False):
+        """SET the picked quantity of one move's lines inside one package.
+
+        The card-head quantity editor of a packaged row must change the
+        packed lines themselves. The regular consume flow
+        (``action_consume_with_qty``) only targets *unpacked* lines, so
+        editing a packaged row used to leave it untouched.
+
+        Demand is checked with the same product-wide scope and over-picking
+        policy as scanning; ``force`` only bypasses a warn, never a forbid.
+        """
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        if not self.picking_id:
+            self._set_message("error", self.env._("No transfer selected"))
+            return False
+        if self.picking_state in ("draft", "done", "cancel"):
+            self._set_message(
+                "error",
+                self.env._("Transfer is %(state)s, cannot scan", **{
+                    "state": self.picking_state,
+                }),
+            )
+            return False
+        move = self.picking_id.move_ids.filtered(
+            lambda m: m.id == move_id and m.state not in ("done", "cancel")
+        )
+        lines = move.move_line_ids.filtered(
+            lambda l: l.picked and l.result_package_id.id == package_id
+        ).sorted(key=lambda l: l.id)
+        if not lines:
+            self._set_message("error", self.env._("Package line not found"))
+            return False
+        if lines[0].product_id.tracking == "serial":
+            self._set_message(
+                "error", self.env._("Serial number quantity is fixed at 1")
+            )
+            return False
+        qty = float(qty) if qty else 0.0
+        if qty <= 0:
+            self._set_message("error", self.env._("Quantity must be positive"))
+            return False
+        product = lines[0].product_id
+        moves = self.picking_id.move_ids.filtered(
+            lambda m: m.product_id == product and m.state != "cancel"
+        )
+        total_demand = sum(m.product_uom_qty for m in moves)
+        other_picked_qty = sum(
+            other.quantity
+            for other in moves.move_line_ids
+            if other.picked and other.id not in lines.ids
+        )
+        max_quantity = total_demand - other_picked_qty
+        exceeds = float_compare(
+            qty,
+            max_quantity,
+            precision_rounding=product.uom_id.rounding,
+        ) > 0
+        policy = self._get_excess_qty_policy()
+        if exceeds and policy == "forbid":
+            self._set_message(
+                "error",
+                self.env._(
+                    "Quantity exceeds demand (max: %(max)s). "
+                    "Over-picking is forbidden for this operation type.",
+                    max=max_quantity,
+                ),
+            )
+            return False
+        if exceeds and policy == "warn" and not force:
+            self._set_message(
+                "more_match",
+                self.env._("Quantity exceeds demand (max: %s)", max_quantity),
+            )
+            return False
+        # One package row aggregates its lines: put the new total on the
+        # first line and drop the now redundant ones.
+        first = lines[0]
+        first.quantity = qty
+        for extra in lines[1:]:
+            extra.unlink()
+        self._set_message(
+            "success",
+            self.env._(
+                "Updated package quantity: %(pkg)s x%(qty)s",
+                pkg=first.result_package_id.name,
+                qty=qty,
+            ),
+        )
+        return True
+
     def action_remove_move_lot(self, line_id):
         """Remove one unit from an exact picked lot/SN move line.
 
