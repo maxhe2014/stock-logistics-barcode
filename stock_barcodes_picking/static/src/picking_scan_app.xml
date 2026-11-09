@@ -116,7 +116,7 @@
                 </div>
 
                 <t t-foreach="groupedByPackage" t-as="pkg" t-key="pkg.key">
-                    <div class="o_scan_stack">
+                    <div t-att-class="'o_scan_stack' + (pkg.package_id ? ' is-packed' : '')">
                         <t t-foreach="pkg.groups" t-as="group" t-key="group.move.id">
                             <t t-set="mv" t-value="group.rows[0]" />
                             <div t-att-class="'o_scan_card' + (!pkg.package_id &amp;&amp; state.active_move_id === group.move.id ? ' is-selected' : '')">

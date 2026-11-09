@@ -176,6 +176,12 @@
         gap: 5px;
         margin-bottom: 8px;
         overflow: hidden;
+
+        // Packed stacks are done: fade them so the operator's eye stays on
+        // the unpacked work on top.
+        &.is-packed {
+            opacity: 0.6;
+        }
     }
 
     // ---------- product card ----------
@@ -468,7 +474,7 @@
     }
     .o_scan_footer_actions {
         display: flex;
-        justify-content: center;
+        justify-content: flex-end;
         flex-wrap: wrap;
         gap: 10px;
         padding-bottom: 6px;
