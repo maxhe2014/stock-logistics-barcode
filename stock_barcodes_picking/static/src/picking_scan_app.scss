@@ -203,6 +203,22 @@
             box-shadow: 2px 4px 4px 0 rgba(64, 65, 68, 0.9) inset;
         }
     }
+
+    // Global "Packages" setting off: drop the package layer (frame +
+    // footer bar). Cards sit directly on the page background, each one
+    // rounded and clipped on its own, 5px apart as in the design.
+    .o_scan_stack.is-flat {
+        background: transparent;
+        padding: 0;
+        border-radius: 0;
+        overflow: visible;
+        margin-bottom: 5px;
+
+        .o_scan_card {
+            border-radius: 4px;
+            overflow: hidden;
+        }
+    }
     &[data-theme="dark"] .o_scan_card.is-selected > .o_scan_card_head {
         background: #404144;
         box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.9) inset;

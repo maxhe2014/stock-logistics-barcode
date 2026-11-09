@@ -116,7 +116,7 @@
                 </div>
 
                 <t t-foreach="groupedByPackage" t-as="pkg" t-key="pkg.key">
-                    <div t-att-class="'o_scan_stack' + (pkg.package_id ? ' is-packed' : '')">
+                    <div t-att-class="'o_scan_stack' + (pkg.package_id ? ' is-packed' : '') + (state.packages_enabled ? '' : ' is-flat')">
                         <t t-foreach="pkg.groups" t-as="group" t-key="group.move.id">
                             <t t-set="mv" t-value="group.rows[0]" />
                             <div t-att-class="'o_scan_card' + (!pkg.package_id &amp;&amp; state.active_move_id === group.move.id ? ' is-selected' : '')">
@@ -189,6 +189,13 @@
                                                     title="Edit quantity"
                                                     t-on-click.stop="() => this.onEditMoveQty(mv.row_key)">
                                                 <i class="fa fa-pencil"/>
+                                            </button>
+                                            <button t-if="group.totalPicked > 0"
+                                                    type="button"
+                                                    class="o_scan_sq o_scan_sq_del"
+                                                    title="Delete picked quantity"
+                                                    t-on-click.stop="() => this.onRemoveMoveQty(mv.row_key)">
+                                                <i class="fa fa-trash"/>
                                             </button>
                                         </t>
                                     </div>
@@ -357,8 +364,8 @@
                             </div>
                         </t>
 
-                        <!-- Package bar -->
-                        <div class="o_scan_pkgbar">
+                        <!-- Package bar (only when the Packages feature is on) -->
+                        <div class="o_scan_pkgbar" t-if="state.packages_enabled or pkg.package_id">
                             <t t-if="state.editingPackageId &amp;&amp; state.editingPackageId === pkg.package_id">
                                 <span class="o_scan_pkg_rename_input"
                                       t-on-keydown="(ev) => this.onPackageNameKeydown(ev)">

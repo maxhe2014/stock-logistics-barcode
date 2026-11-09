@@ -287,6 +287,12 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Delete picked quantity"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__total_demand
 msgid "Demand"
 msgstr ""
@@ -1023,6 +1029,12 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove quantity failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 msgid "Remove this package? Products will be unpacked."
 msgstr ""
 
@@ -1030,6 +1042,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Removed lot/SN from the transfer."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Removed the picked quantity of the row."
 msgstr ""
 
 #. module: stock_barcodes_picking

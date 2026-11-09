@@ -642,6 +642,10 @@ class WizStockBarcodesPicking(models.TransientModel):
             "move_ids": moves,
             # Packaging config
             "show_put_in_pack": self.env.user.has_group("stock.group_tracking_lot"),
+            # Global "Packages" setting: when off, the scan view drops the
+            # whole package layer (stack frame + package bar) and shows the
+            # product cards directly on the page background.
+            "packages_enabled": self.env.user.has_group("stock.group_tracking_lot"),
             "pack_required": picking.picking_type_id.barcode_require_pack == "mandatory",
             "lines_need_pack": self._lines_need_pack(picking),
         }
@@ -2731,6 +2735,32 @@ class WizStockBarcodesPicking(models.TransientModel):
         self._set_message(
             "success",
             self.env._("Removed lot/SN from the transfer.")
+        )
+        return True
+
+    def action_remove_move_qty(self, row_key):
+        """Clear the picked quantity of one product/package row.
+
+        Quantity-tracked counterpart of ``action_remove_move_lot``: the
+        trash button of a row only resets the picked quantity to 0. The
+        move lines are kept on purpose, so the product row stays visible
+        in the scan view instead of disappearing from the move list.
+        """
+        self.ensure_one()
+        move_key, _, pkg_key = (row_key or "").rpartition("_")
+        if not move_key.isdigit():
+            return False
+        pkg_id = False if pkg_key in ("", "nopkg") else int(pkg_key)
+        mv = self.picking_id.move_ids.filtered(lambda m: m.id == int(move_key))
+        lines = mv.move_line_ids.filtered(
+            lambda l: l.picked and (l.result_package_id.id or False) == pkg_id
+        )
+        if not lines:
+            return False
+        lines.write({"quantity": 0.0, "picked": False})
+        self._set_message(
+            "success",
+            self.env._("Removed the picked quantity of the row.")
         )
         return True
 

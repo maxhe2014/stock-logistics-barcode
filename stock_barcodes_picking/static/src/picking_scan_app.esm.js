@@ -893,6 +893,38 @@ export class PickingScanApp extends Component {
     }
 
     /**
+     * Delete the whole picked quantity of one row (quantity-tracked
+     * products), mirroring the per-lot trash button of tracked products.
+     */
+    async onRemoveMoveQty(rowKey) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_remove_move_qty",
+                [[this.wizId], rowKey]
+            );
+            await this._handleActionResult(res, "Remove quantity");
+            if (res) {
+                this.onCancelMoveQty();
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Remove quantity failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /**
      * One-click consume the full demand of the active/non-tracked
      * product. Tracked products are rejected server-side.
      */

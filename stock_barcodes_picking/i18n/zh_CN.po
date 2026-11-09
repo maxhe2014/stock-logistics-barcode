@@ -222,6 +222,12 @@ msgstr "创建时间"
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Delete picked quantity"
+msgstr "删除已拣数量"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__total_demand
 msgid "Demand"
 msgstr "需求"
@@ -780,6 +786,12 @@ msgstr "移除包裹（拆包）"
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove quantity failed: %(err)s"
+msgstr "移除数量失败：%(err)s"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 msgid "Remove this package? Products will be unpacked."
 msgstr "确定移除此包裹？产品将被拆包。"
 
@@ -788,6 +800,12 @@ msgstr "确定移除此包裹？产品将被拆包。"
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Removed lot/SN from the transfer."
 msgstr "已从调拨单中移除批次/序列号。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Removed the picked quantity of the row."
+msgstr "已清除该行的已拣数量。"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
