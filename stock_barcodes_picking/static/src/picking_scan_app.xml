@@ -1,101 +1,96 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Copyright 2026 OpenViking
   License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
   Template for the PickingScanApp client action (OWL).
-  Outgoing-picking barcode scan flow:
-    - scan input (hardware via barcode bus + manual Enter)
-    - message bar (status + active-scan target)
-    - picking info strip (name, source/dest locations, progress)
-    - step indicator (location → product → lot → qty)
-    - move checklist (per move: product, demand, picked, lots)
+  Responsive card-stack layout (design: /home/max/下载/扫码设计).
+
+  Structure:
+    - top bar (doc name + progress)
+    - scan row (input + camera + back)
+    - hint bar (status + active target + force-add offer)
+    - from/to strip
     - candidate-picking selector overlay (multi-match)
-    - action buttons (confirm, consume by demand, force done, validate)
+    - package stacks: one stack per result_package, each holding
+      product cards (qty / lot / serial) and a package footer bar
+    - footer (progress + action buttons)
+
+  JS hooks kept: .o_picking_scan_moves, [data-scan-row], [data-scan-lot].
 -->
 <templates id="template" xml:space="preserve">
     <t t-name="stock_barcodes_picking.PickingScanApp">
         <div class="o_picking_scan_app d-flex flex-column h-100">
-            <!-- Header: manual scan input + back -->
-            <div class="o_picking_scan_header p-3 border-bottom">
-                <div class="row g-2 align-items-center">
-                    <div class="col">
-                        <input
-                            type="text"
-                            class="form-control form-control-lg o_picking_scan_input"
-                            t-att-placeholder="barcodePlaceholder"
-                            t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
-                            t-on-keydown="onManualScanEnter"
-                        />
-                    </div>
-                    <div class="col-auto">
-                        <button
-                            type="button"
-                            class="btn btn-secondary btn-lg o_picking_scan_camera"
-                            t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
-                            t-on-click="onCameraScan"
-                            aria-label="Scan with camera"
-                            title="Scan with camera"
-                        >
-                            <i class="fa fa-camera" aria-hidden="true"/>
-                        </button>
-                    </div>
-                    <div class="col-auto">
-                        <button
-                            type="button"
-                            class="btn btn-secondary btn-lg o_picking_scan_back"
-                            t-on-click="onBack"
-                        >Back</button>
-                    </div>
+
+            <!-- Top bar: transfer name + progress -->
+            <div class="o_scan_topbar" t-if="state.picking_id">
+                <div class="o_scan_doc"><t t-out="state.picking_name" /></div>
+                <div class="o_scan_doc_progress">
+                    Progress: <t t-out="state.total_done" />/<t t-out="state.total_demand" />
                 </div>
             </div>
 
-            <!-- Consolidated message bar: status + active target -->
+            <!-- Scan row: manual input + camera + back -->
+            <div class="o_scan_scanrow">
+                <input
+                    type="text"
+                    class="o_picking_scan_input"
+                    t-att-placeholder="barcodePlaceholder"
+                    t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
+                    t-on-keydown="onManualScanEnter"
+                />
+                <button
+                    type="button"
+                    class="o_scan_key o_picking_scan_camera"
+                    t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
+                    t-on-click="onCameraScan"
+                    aria-label="Scan with camera"
+                    title="Scan with camera"
+                >
+                    <i class="fa fa-camera" aria-hidden="true"/>
+                </button>
+                <button
+                    type="button"
+                    class="o_scan_key o_picking_scan_back"
+                    t-on-click="onBack"
+                >Back</button>
+            </div>
+
+            <!-- Hint bar: status + active target + force-add offer -->
             <div t-if="state.message || state.active_move_product_name || state.last_unmatched_barcode"
-                 class="o_picking_scan_message m-3">
-                <div t-att-class="'alert ' + (state.message ? alertClass : 'alert-info') + ' mb-0'">
-                    <t t-if="state.message"><t t-out="state.message" /></t>
-                    <t t-if="state.message &amp;&amp; state.active_move_product_name"><br/></t>
-                    <t t-if="state.active_move_product_name">
-                        <span class="text-primary">
-                            <i class="fa fa-hand-o-right me-1"/>Active:
-                            <t t-out="state.active_move_product_name" />
-                        </span>
-                    </t>
-                    <!-- Force-add offer for an unmatched barcode -->
-                    <t t-if="state.last_unmatched_barcode">
-                        <br/>
-                        <button
-                            type="button"
-                            class="btn btn-sm btn-outline-primary mt-1"
-                            t-on-click="onForceAddFromBarcode"
-                        >
-                            <i class="fa fa-plus me-1"/>Force add "<t t-out="state.last_unmatched_barcode" />"
-                        </button>
-                    </t>
-                </div>
+                 t-att-class="'o_scan_hintbar ' + (state.message ? alertClass : '')">
+                <t t-if="state.message"><t t-out="state.message" /></t>
+                <t t-if="state.message &amp;&amp; state.active_move_product_name"> · </t>
+                <t t-if="state.active_move_product_name">
+                    Active: <t t-out="state.active_move_product_name" />
+                </t>
+                <t t-if="state.last_unmatched_barcode">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        t-on-click="onForceAddFromBarcode"
+                    >
+                        <i class="fa fa-plus me-1"/>Force add "<t t-out="state.last_unmatched_barcode" />"
+                    </button>
+                </t>
             </div>
 
-            <!-- Picking info strip -->
-            <div t-if="state.picking_id" class="o_picking_scan_info m-3 p-2 border rounded">
-                <div class="d-flex flex-wrap gap-3">
-                    <span><strong>Transfer:</strong> <t t-out="state.picking_name" /></span>
-                    <span t-if="state.location_name">
-                        <strong>From:</strong> <t t-out="state.location_name" />
-                    </span>
-                    <span t-if="state.location_dest_name">
-                        <strong>To:</strong> <t t-out="state.location_dest_name" />
-                    </span>
-                    <span>
-                        <strong>Progress:</strong>
-                        <t t-out="state.total_done" /> / <t t-out="state.total_demand" />
-                    </span>
-                </div>
+            <!-- From / To -->
+            <div class="o_scan_fromto" t-if="state.picking_id">
+                <span t-if="state.location_name">
+                    From: <strong><t t-out="state.location_name" /></strong>
+                </span>
+                <span t-if="state.location_dest_name">
+                    To: <strong><t t-out="state.location_dest_name" /></strong>
+                </span>
             </div>
+
+            <!-- Section title -->
+            <div class="o_scan_section_title" t-if="state.move_ids.length">Products</div>
 
             <!-- Candidate-picking selector overlay (multi-match) -->
             <div t-if="state.visible_switch_selector"
-                 class="o_picking_scan_selector m-3 p-3 border rounded bg-warning bg-opacity-10">
+                 class="o_picking_scan_selector p-3 border rounded bg-warning bg-opacity-10">
                 <div class="fw-bold mb-2">
                     <i class="fa fa-exclamation-triangle me-1"/>
                     Multiple transfers match — select one:
@@ -114,274 +109,215 @@
                 </div>
             </div>
 
-            <!-- Move checklist -->
-            <div class="o_picking_scan_moves flex-grow-1 overflow-auto p-3">
-                <div t-if="!state.move_ids.length" class="text-muted">
+            <!-- Package stacks -->
+            <div class="o_picking_scan_moves">
+                <div t-if="!state.move_ids.length" class="o_scan_empty">
                     No transfer selected. Scan a transfer name to begin.
                 </div>
-                <table t-else="" class="table table-sm align-middle">
-                    <thead>
-                        <tr>
-                            <th class="text-center" style="width:2rem"></th>
-                            <th>Product</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <t t-foreach="groupedMoves" t-as="group" t-key="group.move.id">
-                            <!-- Product header row: rendered once per product -->
-                            <tr
-                                t-att-data-move-row="group.move.id"
-                                t-att-style="state.active_move_id === group.move.id ? 'border-left:4px solid #0d6efd;' : ''"
-                                t-on-click="() => this.onSelectMove(group.move.id)"
-                                role="button"
-                            >
-                                <td class="text-center align-middle">
-                                    <i
-                                        t-att-class="state.active_move_id === group.move.id ? 'fa fa-hand-o-right text-primary' : 'fa fa-hand-o-right text-muted opacity-25'"
-                                    />
-                                </td>
-                                <td class="align-middle">
-                                    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                                        <div>
-                                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                <strong><t t-out="group.move.product_name" /></strong>
-                                            </div>
-                                            <div class="small text-muted lh-sm">
-                                                Demand <t t-out="group.move.product_uom_qty" />
-                                                <span class="mx-1">·</span>
-                                                Picked <t t-out="group.totalPicked" />
-                                                <t t-if="group.move.tracking !== 'none'">
-                                                    <span class="mx-1">·</span>
-                                                    <t t-out="group.move.tracking" />
-                                                </t>
-                                            </div>
-                                        </div>
-                                        <!-- Product-level +1 only for non-tracked products. -->
-                                        <!-- Tracked products use the per-lot +1 inside reserved badges. -->
-                                        <div class="d-flex align-items-center gap-1"
-                                             t-if="group.move.tracking === 'none'">
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-success fw-bold"
-                                                    title="Add one"
-                                                    t-on-click.stop="() => this.onAddMoveQuantity(group.move.id)">
-                                                +1
-                                            </button>
-                                            <t t-if="state.editingQtyMoveId === group.rows[0].row_key">
-                                                <div class="d-flex align-items-center gap-1" t-on-click.stop="">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="any"
-                                                        class="form-control form-control-sm"
-                                                        style="width: 6rem;"
-                                                        t-att-value="state.draftQty"
-                                                        t-on-input="(ev) => this.onDraftQtyInput(ev)"
-                                                        t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, group.rows[0].row_key)"
-                                                    />
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-success"
-                                                            title="Confirm quantity"
-                                                            t-on-click.stop="() => this.onConfirmMoveQty(group.rows[0].row_key)">
-                                                        <i class="fa fa-check"/>
-                                                    </button>
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-secondary"
-                                                            title="Cancel"
-                                                            t-on-click.stop="() => this.onCancelMoveQty()">
-                                                        <i class="fa fa-times"/>
-                                                    </button>
-                                                </div>
-                                            </t>
-                                            <t t-else="">
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-primary"
-                                                        title="Edit quantity"
-                                                        t-on-click.stop="() => this.onEditMoveQty(group.rows[0].row_key)">
-                                                    <i class="fa fa-pencil"/>
-                                                </button>
-                                            </t>
+
+                <t t-foreach="groupedByPackage" t-as="pkg" t-key="pkg.key">
+                    <div class="o_scan_stack">
+                        <t t-foreach="pkg.groups" t-as="group" t-key="group.move.id">
+                            <t t-set="mv" t-value="group.rows[0]" />
+                            <div t-att-class="'o_scan_card' + (!pkg.package_id &amp;&amp; state.active_move_id === group.move.id ? ' is-selected' : '')">
+
+                                <!-- Card head -->
+                                <div t-if="group.move.tracking !== 'none'"
+                                     t-att-class="'o_scan_card_head' + (pkg.package_id ? '' : ' is-selectable')"
+                                     t-att-title="pkg.package_id ? '' : 'Select this product, then scan'"
+                                     t-on-click="() => !pkg.package_id &amp;&amp; this.onSelectMove(group.move.id)">
+                                    <div>
+                                        <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
+                                        <div class="o_scan_pmeta">
+                                            Demand <t t-out="mv.demand_qty" />
+                                            | Picked <t t-out="group.totalPicked" />
+                                            <t t-if="group.move.tracking === 'lot'"> | Lot</t>
+                                            <t t-if="group.move.tracking === 'serial'"> | Serial</t>
                                         </div>
                                     </div>
-                                </td>
-                            </tr>
-                            <!-- Package rows under this product -->
-                            <t t-foreach="group.rows" t-as="mv" t-key="mv.row_key">
-                                <tr
-                                    t-att-class="mv.quantity > 0 ? 'table-success' : 'table-danger'"
-                                    t-att-data-scan-row="mv.row_key"
-                                >
-                                    <td></td>
-                                    <td class="align-middle ps-4">
-                                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                                            <!-- Package label (only when this move row is split by package) -->
-                                            <t t-if="mv.show_package_label">
-                                                <t t-if="state.editingPackageMoveId === mv.row_key">
-                                                    <span class="d-inline-flex align-items-center gap-1"
-                                                          t-on-keydown="(ev) => this.onPackageNameKeydown(ev)">
-                                                        <i class="fa fa-archive text-info"/>
-                                                        <AutoComplete
-                                                            value="state.packageDraftName"
-                                                            sources="packageNameSources"
-                                                            placeholder="'Package name...'"
-                                                            autofocus="true"
-                                                            onChange="(val) => this.onPackageNameChange(val)"
-                                                            onInput="(val) => this.onPackageNameInput(val)"
-                                                            class="'o_package_rename_ac'"
-                                                        />
-                                                        <button type="button"
-                                                                class="btn btn-sm btn-success p-0 px-1"
-                                                                title="Confirm"
-                                                                t-on-click.stop="() => this._confirmPackageRename(state.packageDraftName)">
-                                                            <i class="fa fa-check"/>
-                                                        </button>
-                                                        <button type="button"
-                                                                class="btn btn-sm btn-outline-secondary p-0 px-1"
-                                                                title="Cancel"
-                                                                t-on-click.stop="() => this._cancelPackageRename()">
-                                                            <i class="fa fa-times"/>
-                                                        </button>
-                                                    </span>
-                                                </t>
-                                                <t t-else="">
-                                                    <span t-if="mv.package_name"
-                                                          class="badge bg-info d-inline-flex align-items-center gap-1">
-                                                        <i class="fa fa-archive"/>
-                                                        <t t-out="mv.package_name" />
-                                                        <button type="button"
-                                                                class="btn btn-link btn-sm p-0 ms-1"
-                                                                title="Rename package"
-                                                                t-on-click.stop="() => this.onEditPackageName(mv.package_id, mv.row_key, mv.package_name)">
-                                                            <i class="fa fa-pencil"/>
-                                                        </button>
-                                                        <button type="button"
-                                                                class="btn btn-link btn-sm p-0 text-danger"
-                                                                title="Remove package (unpack)"
-                                                                t-on-click.stop="() => this.onUnpackPackage(mv.package_id, mv.id)">
-                                                            <i class="fa fa-trash"/>
-                                                        </button>
-                                                    </span>
-                                                    <span t-else=""
-                                                          class="badge bg-light text-muted border d-inline-flex align-items-center gap-1">
-                                                        <i class="fa fa-inbox"/>
-                                                        未装包
-                                                    </span>
-                                                </t>
-                                            </t>
+                                    <div class="o_scan_head_actions">
+                                        <span t-if="!pkg.package_id" class="o_scan_sq o_scan_sq_hand">
+                                            <i t-att-class="state.active_move_id === group.move.id ? 'fa fa-hand-o-right' : 'fa fa-hand-o-right opacity-50'"/>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Untracked product head: +1 / pencil / inline qty edit -->
+                                <div t-else="" class="o_scan_card_head">
+                                    <div>
+                                        <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
+                                        <div class="o_scan_pmeta">
+                                            Demand <t t-out="mv.demand_qty" />
+                                            | Picked <t t-out="group.totalPicked" />
                                         </div>
-                                        <!-- All lots are always visible with their picked quantities. -->
-                                        <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                                            <t t-foreach="mv.lots" t-as="lot" t-key="lot.key + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ':scan-' + state.recentScanLotNonce : '')">
-                                                <!-- Picked lots: latest highlighted, others grey -->
-                                                <span t-if="lot.picked"
-                                                    t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (lot.id === mv.latest_lot_id ? 'bg-info' : 'bg-secondary') + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ' o_picking_scan_recent' : '')"
-                                                    t-att-data-scan-lot="mv.row_key + ':' + lot.id"
-                                                >
-                                                    <i class="fa fa-barcode"/>
-                                                    <t t-out="lot.name" />
-                                                    <strong class="ms-1">× <t t-out="lot.picked_quantity" /></strong>
-                                                    <button t-if="mv.tracking !== 'serial'"
+                                    </div>
+                                    <div class="o_scan_head_actions">
+                                        <button t-if="!pkg.package_id"
+                                                type="button"
+                                                class="o_scan_sq o_scan_sq_add"
+                                                title="Add one"
+                                                t-on-click.stop="() => this.onAddMoveQuantity(group.move.id)">
+                                            +1
+                                        </button>
+                                        <t t-if="state.editingQtyMoveId === mv.row_key">
+                                            <span class="o_scan_qty_edit" t-on-click.stop="">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="any"
+                                                    t-att-value="state.draftQty"
+                                                    t-on-input="(ev) => this.onDraftQtyInput(ev)"
+                                                    t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, mv.row_key)"
+                                                />
+                                                <button type="button"
+                                                        class="o_scan_sq o_scan_sq_add"
+                                                        title="Confirm quantity"
+                                                        t-on-click.stop="() => this.onConfirmMoveQty(mv.row_key)">
+                                                    <i class="fa fa-check"/>
+                                                </button>
+                                                <button type="button"
+                                                        class="o_scan_sq"
+                                                        title="Cancel"
+                                                        t-on-click.stop="() => this.onCancelMoveQty()">
+                                                    <i class="fa fa-times"/>
+                                                </button>
+                                            </span>
+                                        </t>
+                                        <t t-else="">
+                                            <button type="button"
+                                                    class="o_scan_sq o_scan_sq_edit"
+                                                    title="Edit quantity"
+                                                    t-on-click.stop="() => this.onEditMoveQty(mv.row_key)">
+                                                <i class="fa fa-pencil"/>
+                                            </button>
+                                        </t>
+                                    </div>
+                                </div>
+
+                                <!-- Fold bar (serial only) -->
+                                <button t-if="group.move.tracking === 'serial'"
+                                        type="button"
+                                        class="o_scan_foldbar"
+                                        title="Collapse / expand"
+                                        t-on-click="() => this.onToggleSerialFold(mv.row_key)">
+                                    <span class="o_scan_grip"/>
+                                </button>
+
+                                <!-- Lot / serial body -->
+                                <div t-if="group.move.tracking !== 'none'" class="o_scan_card_body">
+                                    <!-- Collapsed serial: last scanned (or first) lot + total -->
+                                    <t t-if="group.move.tracking === 'serial' &amp;&amp; this.isSerialCollapsed(mv.row_key)">
+                                        <t t-set="summary" t-value="this.getSerialCollapseSummary(mv)" />
+                                        <div t-if="summary"
+                                             class="o_scan_row is-collapsed-single"
+                                             t-att-data-scan-row="mv.row_key">
+                                            <span class="o_scan_row_name"><t t-out="summary.name" /></span>
+                                            <span class="o_scan_row_qty">Picked: <t t-out="summary.total" /></span>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-foreach="mv.lots" t-as="lot" t-key="lot.key + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ':scan-' + state.recentScanLotNonce : '')">
+                                            <div t-att-class="'o_scan_row' + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ' is-scanned' : '')"
+                                                 t-att-data-scan-row="mv.row_key"
+                                                 t-att-data-scan-lot="mv.row_key + ':' + lot.id">
+
+                                                <!-- Picked lot: name / qty / [pencil lot only] / trash -->
+                                                <t t-if="lot.picked">
+                                                    <span class="o_scan_row_name"><t t-out="lot.name" /></span>
+                                                    <span class="o_scan_row_qty">Picked: <t t-out="lot.picked_quantity" /></span>
+                                                    <button t-if="mv.tracking === 'lot'"
                                                             type="button"
-                                                            class="btn btn-link btn-sm p-0 ms-1 text-white"
+                                                            class="o_scan_sq o_scan_sq_edit"
                                                             title="Edit quantity"
                                                             t-on-click.stop="() => this.onEditLotQty(mv.row_key, lot.key)">
                                                         <i class="fa fa-pencil"/>
                                                     </button>
                                                     <button type="button"
-                                                            class="btn btn-link btn-sm p-0 ms-1 text-danger"
+                                                            class="o_scan_sq o_scan_sq_del"
                                                             t-att-title="'Remove ' + lot.name"
                                                             t-on-click.stop="() => this.onRemoveMoveLot(mv.row_key, lot.key)">
                                                         <i class="fa fa-trash"/>
                                                     </button>
-                                                </span>
-                                                <!-- Reserved lots can be picked directly in optional mode. -->
-                                                <span t-else=""
-                                                      class="badge bg-light text-muted border d-inline-flex align-items-center gap-2 py-2 px-3">
-                                                    <i class="fa fa-clock-o"/>
-                                                    <t t-out="lot.name" />
-                                                    <span class="small opacity-75">待拣</span>
-                                                    <strong>× <t t-out="lot.reserved_quantity" /></strong>
+                                                </t>
+
+                                                <!-- Reserved lot: name / qty / +1 / [pencil lot only] -->
+                                                <t t-else="">
+                                                    <span class="o_scan_row_name"><t t-out="lot.name" /></span>
+                                                    <span class="o_scan_row_qty">Picked: <t t-out="lot.picked_quantity || 0" /></span>
                                                     <t t-if="state.barcode_lot_scan_policy === 'optional'">
-                                                        <button t-if="mv.tracking === 'serial'"
-                                                                type="button"
-                                                                class="btn btn-sm btn-success px-2 py-1"
+                                                        <button type="button"
+                                                                class="o_scan_sq o_scan_sq_add"
                                                                 title="Pick reserved lot"
                                                                 t-on-click.stop="() => this.onPickReservedLot(mv.id, lot.id)">
+                                                            +1
+                                                        </button>
+                                                        <button t-if="mv.tracking === 'lot'"
+                                                                type="button"
+                                                                class="o_scan_sq o_scan_sq_edit"
+                                                                title="Edit quantity"
+                                                                t-on-click.stop="() => this.onEditReservedLotQty(mv.row_key, lot.key)">
+                                                            <i class="fa fa-pencil"/>
+                                                        </button>
+                                                    </t>
+                                                </t>
+
+                                                <!-- Reserved lot qty edit (lot only) -->
+                                                <div t-if="!lot.picked &amp;&amp; mv.tracking !== 'serial' &amp;&amp; state.editingReservedLotKey === mv.row_key + ':' + lot.key"
+                                                     class="o_scan_lot_edit"
+                                                     t-on-click.stop="">
+                                                    <div class="o_scan_lot_edit_line">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="any"
+                                                            t-att-value="state.draftReservedLotQty"
+                                                            t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
+                                                            t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, mv.row_key, lot.id)"
+                                                        />
+                                                        <button type="button"
+                                                                class="o_scan_sq o_scan_sq_add"
+                                                                title="Confirm quantity"
+                                                                t-on-click.stop="() => this.onConfirmReservedLotQty(mv.row_key, lot.id)">
                                                             <i class="fa fa-check"/>
                                                         </button>
-                                                        <t t-else="">
-                                                            <button type="button"
-                                                                    class="btn btn-sm btn-outline-success px-3 py-1 fw-bold"
-                                                                    title="Pick reserved lot"
-                                                                    t-on-click.stop="() => this.onPickReservedLot(mv.id, lot.id)">
-                                                                +1
-                                                            </button>
-                                                            <button type="button"
-                                                                    class="btn btn-sm btn-outline-primary px-2 py-1"
-                                                                    title="Edit quantity"
-                                                                    t-on-click.stop="() => this.onEditReservedLotQty(mv.row_key, lot.key)">
-                                                                <i class="fa fa-pencil"/>
-                                                            </button>
-                                                        </t>
-                                                    </t>
-                                                </span>
-                                                <div t-if="!lot.picked &amp;&amp; mv.tracking !== 'serial' &amp;&amp; state.editingReservedLotKey === mv.row_key + ':' + lot.key"
-                                                     class="d-flex align-items-center gap-1 border rounded p-2 bg-white text-dark w-100"
-                                                     t-on-click.stop="">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="any"
-                                                        class="form-control form-control-sm"
-                                                        style="width: 6rem;"
-                                                        t-att-value="state.draftReservedLotQty"
-                                                        t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
-                                                        t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, mv.row_key, lot.id)"
-                                                    />
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-success"
-                                                            title="Confirm quantity"
-                                                            t-on-click.stop="() => this.onConfirmReservedLotQty(mv.row_key, lot.id)">
-                                                        <i class="fa fa-check"/>
-                                                    </button>
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-secondary"
-                                                            title="Cancel"
-                                                            t-on-click.stop="() => this.onCancelReservedLotQty()">
-                                                        <i class="fa fa-times"/>
-                                                    </button>
+                                                        <button type="button"
+                                                                class="o_scan_sq"
+                                                                title="Cancel"
+                                                                t-on-click.stop="() => this.onCancelReservedLotQty()">
+                                                            <i class="fa fa-times"/>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <!-- Single-line lots open the input directly. Multiple lines
-                                                     expose their real source/package identities first. -->
+
+                                                <!-- Picked lot qty edit: one editor per source/package line -->
                                                 <div t-if="lot.picked and state.editingLotKey === mv.row_key + ':' + lot.key"
-                                                     class="d-flex flex-column gap-1 border rounded p-2 bg-white text-dark w-100">
+                                                     class="o_scan_lot_edit">
                                                     <t t-foreach="lot.lines" t-as="line" t-key="line.id">
-                                                        <div class="d-flex align-items-center gap-2 flex-wrap small">
-                                                            <span t-if="lot.lines.length > 1" class="text-muted">
+                                                        <div class="o_scan_lot_edit_line">
+                                                            <span t-if="lot.lines.length > 1">
                                                                 <i class="fa fa-map-marker"/>
                                                                 <t t-out="line.location_name" />
-                                                                <span class="mx-1">·</span>
+                                                                ·
                                                                 <i class="fa fa-archive"/>
-                                                                <t t-out="line.package_name || '未装包'" />
+                                                                <t t-out="line.package_name || 'Unpacked'" />
                                                             </span>
                                                             <t t-if="state.editingLotLineId === line.id">
                                                                 <input
                                                                     type="number"
                                                                     min="0"
                                                                     step="any"
-                                                                    class="form-control form-control-sm"
-                                                                    style="width: 6rem;"
                                                                     t-att-value="state.draftLotQty"
                                                                     t-on-input="(ev) => this.onDraftLotQtyInput(ev)"
                                                                     t-on-keydown="(ev) => this.onDraftLotQtyKeydown(ev)"
                                                                 />
                                                                 <button type="button"
-                                                                        class="btn btn-sm btn-success"
+                                                                        class="o_scan_sq o_scan_sq_add"
                                                                         title="Confirm quantity"
                                                                         t-on-click.stop="() => this.onConfirmLotQty()">
                                                                     <i class="fa fa-check"/>
                                                                 </button>
                                                                 <button type="button"
-                                                                        class="btn btn-sm btn-outline-secondary"
+                                                                        class="o_scan_sq"
                                                                         title="Cancel"
                                                                         t-on-click.stop="() => this.onCancelLotQty()">
                                                                     <i class="fa fa-times"/>
@@ -391,13 +327,13 @@
                                                                 <strong>× <t t-out="line.quantity" /></strong>
                                                                 <button t-if="mv.tracking !== 'serial'"
                                                                         type="button"
-                                                                        class="btn btn-sm btn-outline-primary p-0 px-1"
+                                                                        class="o_scan_sq o_scan_sq_edit"
                                                                         title="Edit quantity"
                                                                         t-on-click.stop="() => this.onSelectLotLine(line)">
                                                                     <i class="fa fa-pencil"/>
                                                                 </button>
                                                                 <button type="button"
-                                                                        class="btn btn-sm btn-outline-danger p-0 px-1"
+                                                                        class="o_scan_sq o_scan_sq_del"
                                                                         t-att-title="'Remove ' + lot.name"
                                                                         t-on-click.stop="() => this._removeMoveLine(line.id)">
                                                                     <i class="fa fa-trash"/>
@@ -405,86 +341,137 @@
                                                             </t>
                                                         </div>
                                                     </t>
-                                                    <button t-if="!state.editingLotLineId"
-                                                            type="button"
-                                                            class="btn btn-sm btn-outline-secondary align-self-end"
-                                                            title="Cancel"
-                                                            t-on-click.stop="() => this.onCancelLotQty()">
-                                                        <i class="fa fa-times"/>
-                                                    </button>
+                                                    <div class="o_scan_lot_edit_line" t-if="!state.editingLotLineId">
+                                                        <button type="button"
+                                                                class="o_scan_sq"
+                                                                title="Cancel"
+                                                                t-on-click.stop="() => this.onCancelLotQty()">
+                                                            <i class="fa fa-times"/>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </t>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </t>
+                                            </div>
+                                        </t>
+                                    </t>
+                                </div>
+                            </div>
                         </t>
-                    </tbody>
-                </table>
+
+                        <!-- Package bar -->
+                        <div class="o_scan_pkgbar">
+                            <t t-if="state.editingPackageId &amp;&amp; state.editingPackageId === pkg.package_id">
+                                <span class="o_scan_pkg_rename_input"
+                                      t-on-keydown="(ev) => this.onPackageNameKeydown(ev)">
+                                    <AutoComplete
+                                        value="state.packageDraftName"
+                                        sources="packageNameSources"
+                                        placeholder="'Package name...'"
+                                        autofocus="true"
+                                        onChange="(val) => this.onPackageNameChange(val)"
+                                        onInput="(val) => this.onPackageNameInput(val)"
+                                        class="'o_package_rename_ac'"
+                                    />
+                                </span>
+                                <button type="button"
+                                        class="o_scan_pkg_rename"
+                                        title="Confirm"
+                                        t-on-click.stop="() => this._confirmPackageRename(state.packageDraftName)">
+                                    <i class="fa fa-check"/>
+                                </button>
+                                <button type="button"
+                                        class="o_scan_pkg_rename"
+                                        title="Cancel"
+                                        t-on-click.stop="() => this._cancelPackageRename()">
+                                    <i class="fa fa-times"/>
+                                </button>
+                            </t>
+                            <t t-else="">
+                                <span class="o_scan_pkg_left">
+                                    <span class="o_scan_pkg_name">
+                                        <i t-att-class="pkg.package_id ? 'fa fa-archive' : 'fa fa-inbox'"/>
+                                        <t t-out="pkg.package_name || 'Unpacked'" />
+                                    </span>
+                                    <button t-if="pkg.package_id"
+                                            type="button"
+                                            class="o_scan_pkg_rename"
+                                            title="Rename package"
+                                            t-on-click.stop="() => this.onEditPackageName(pkg.package_id, pkg.first_row_key, pkg.package_name)">
+                                        <i class="fa fa-pencil"/>
+                                    </button>
+                                </span>
+                                <span class="o_scan_pkg_qty">Qty: <t t-out="pkg.qty" /></span>
+                                <button t-if="pkg.package_id"
+                                        type="button"
+                                        class="o_scan_pkg_del"
+                                        title="Remove package (unpack)"
+                                        t-on-click.stop="() => this.onUnpackPackage(pkg.package_id)">
+                                    <i class="fa fa-trash"/>
+                                </button>
+                            </t>
+                        </div>
+                    </div>
+                </t>
             </div>
 
-            <!-- Action buttons -->
-            <div class="o_picking_scan_actions p-3 border-top d-flex gap-2 flex-wrap justify-content-between">
-                <button
-                    type="button"
-                    class="btn btn-secondary btn-lg"
-                    t-on-click="onBack"
-                >Back</button>
-
-                <div class="d-flex gap-2 flex-wrap">
+            <!-- Footer -->
+            <div class="o_scan_footer">
+                <div class="o_scan_footer_progress" t-if="state.picking_id">
+                    Progress: <t t-out="state.total_done" />/<t t-out="state.total_demand" />
+                </div>
+                <div class="o_scan_footer_actions">
                     <button
                         t-if="canPutInPack"
                         type="button"
-                        class="btn btn-outline-info btn-lg"
+                        class="o_scan_key"
                         t-on-click="onPutInPack"
                     >Put in Pack</button>
 
                     <button
                         t-if="canPutInPack"
                         type="button"
-                        class="btn btn-outline-primary btn-lg"
+                        class="o_scan_key"
                         t-on-click="onSelectPackage"
                     >Select Package</button>
 
                     <button
                         t-if="canConsumeByDemand"
                         type="button"
-                        class="btn btn-outline-success btn-lg"
+                        class="o_scan_key"
                         t-on-click="onConsumeByDemand"
                     >Consume by demand</button>
 
                     <button
                         t-if="canConfirm"
                         type="button"
-                        class="btn btn-primary btn-lg"
+                        class="o_scan_key"
                         t-on-click="onConfirm"
                     >Confirm</button>
 
                     <button
                         t-if="state.visible_force_add"
                         type="button"
-                        class="btn btn-warning btn-lg"
+                        class="o_scan_key o_scan_key_warn"
                         t-on-click="onConfirmNewProduct"
                     >Add Product and Pick</button>
 
                     <button
                         t-if="state.visible_force_add"
                         type="button"
-                        class="btn btn-outline-secondary btn-lg"
+                        class="o_scan_key"
                         t-on-click="onCancelNewProduct"
                     >Cancel</button>
 
                     <button
                         t-if="state.visible_force_done"
                         type="button"
-                        class="btn btn-warning btn-lg"
+                        class="o_scan_key o_scan_key_warn"
                         t-on-click="onForceDone"
                     >Force Consume</button>
 
                     <button
                         t-if="canValidate"
                         type="button"
-                        class="btn btn-success btn-lg"
+                        class="o_scan_key o_scan_key_primary"
                         t-on-click="onValidatePicking"
                     >Validate</button>
                 </div>

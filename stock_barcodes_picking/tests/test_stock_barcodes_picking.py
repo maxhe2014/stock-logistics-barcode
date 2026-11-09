@@ -2281,3 +2281,42 @@ class TestStockBarcodesPicking(TransactionCase):
         self.assertEqual(sum(
             line.quantity for line in picking.move_line_ids if line.picked
         ), 3.0)
+
+    def test_non_tracked_add_one_ignores_packed_lines(self):
+        """+1 must add exactly one even when part of the move is packed.
+
+        Regression: the base used to include PACKED picked lines, but
+        _process_stock_move_line only SETs the target on the unpacked
+        line, so the packed qty was added on top (click +1, get +N).
+        """
+        self.picking_type.barcode_lot_scan_policy = "optional"
+        picking = self._create_picking(self.product_simple, qty=10.0)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        # Pick 4 unpacked, then move 3 of them into a package.
+        for _ in range(4):
+            self.assertTrue(wiz.action_add_move_quantity(picking.move_ids.id))
+        picking.invalidate_recordset()
+        unpacked = picking.move_line_ids.filtered(
+            lambda line: line.picked and not line.result_package_id
+        )
+        self.assertEqual(len(unpacked), 1)
+        package = self.env["stock.package"].create({"name": "PACK-ADD1"})
+        unpacked.quantity = 1.0
+        packed = unpacked.copy({"quantity": 3.0, "result_package_id": package.id})
+        before = sum(
+            line.quantity for line in picking.move_line_ids if line.picked
+        )
+        self.assertEqual(before, 4.0)
+
+        self.assertTrue(wiz.action_add_move_quantity(picking.move_ids.id))
+        picking.invalidate_recordset()
+        after = sum(
+            line.quantity for line in picking.move_line_ids if line.picked
+        )
+        self.assertEqual(after - before, 1.0)
+        packed_line = picking.move_line_ids.filtered(
+            lambda line: line.result_package_id == package
+        )
+        self.assertEqual(packed_line.quantity, 3.0)
+

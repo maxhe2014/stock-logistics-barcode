@@ -136,6 +136,8 @@ export class PickingScanApp extends Component {
             editingPackageMoveId: false,
             editingPackageId: false,
             packageDraftName: "",
+            // Serial cards collapsed state, keyed by row_key. Local UI only.
+            collapsedSerialRows: {},
         });
 
         // Sound alert for scan errors. Only an error tone is used
@@ -527,7 +529,9 @@ export class PickingScanApp extends Component {
         this.onCancelLotQty();
         this.onCancelReservedLotQty();
         this.state.editingQtyMoveId = rowKey;
-        this.state.draftQty = String(mv.product_uom_qty || 0);
+        // Pre-fill with the demand shown on this row (a package row shows
+        // what it holds, the unpacked row shows what is not packaged yet).
+        this.state.draftQty = String(mv.demand_qty ?? mv.product_uom_qty ?? 0);
     }
 
     onDraftQtyInput(ev) {
@@ -1301,6 +1305,81 @@ export class PickingScanApp extends Component {
             g.totalPicked += Number(mv.quantity) || 0;
         }
         return Array.from(groups.values());
+    }
+
+    /**
+     * Group move rows by result_package (design: one stack per package,
+     * product cards inside, package bar at the bottom of the stack).
+     * Each group: { key, package_id, package_name, qty, first_row_key,
+     *               groups: [{ move, rows, totalPicked }] }
+     */
+    get groupedByPackage() {
+        const pkgs = new Map();
+        for (const mv of this.state.move_ids || []) {
+            const key = mv.package_id || "nopkg";
+            if (!pkgs.has(key)) {
+                pkgs.set(key, {
+                    key,
+                    package_id: mv.package_id || false,
+                    package_name: mv.package_name || "",
+                    qty: 0,
+                    first_row_key: mv.row_key,
+                    groups: new Map(),
+                });
+            }
+            const p = pkgs.get(key);
+            if (!p.groups.has(mv.id)) {
+                p.groups.set(mv.id, { move: mv, rows: [], totalPicked: 0 });
+            }
+            const g = p.groups.get(mv.id);
+            g.rows.push(mv);
+            const qty = Number(mv.quantity) || 0;
+            g.totalPicked += qty;
+            p.qty += qty;
+        }
+        return Array.from(pkgs.values()).map((p) => ({
+            ...p,
+            groups: Array.from(p.groups.values()),
+        }));
+    }
+
+    // ---------- serial card collapse (local UI only) ----------
+
+    onToggleSerialFold(rowKey) {
+        const map = { ...this.state.collapsedSerialRows };
+        map[rowKey] = !map[rowKey];
+        this.state.collapsedSerialRows = map;
+    }
+
+    isSerialCollapsed(rowKey) {
+        return Boolean(this.state.collapsedSerialRows[rowKey]);
+    }
+
+    /**
+     * Collapsed serial card shows the last scanned lot (falling back to
+     * the latest picked lot, then the first lot) plus the picked total.
+     */
+    getSerialCollapseSummary(mv) {
+        if (!mv.lots || !mv.lots.length) {
+            return false;
+        }
+        let lot = false;
+        const recentKey = this.state.recentScanLotKey;
+        if (recentKey && recentKey.startsWith(mv.row_key + ":")) {
+            const lotId = Number(recentKey.slice(mv.row_key.length + 1));
+            lot = mv.lots.find((l) => l.id === lotId) || false;
+        }
+        if (!lot && mv.latest_lot_id) {
+            lot = mv.lots.find((l) => l.id === mv.latest_lot_id) || false;
+        }
+        if (!lot) {
+            lot = mv.lots[0];
+        }
+        const total = mv.lots.reduce(
+            (sum, l) => sum + (Number(l.picked_quantity) || 0),
+            0
+        );
+        return { name: lot.name, total };
     }
 }
 

@@ -1,0 +1,484 @@
+// Picking scan app — responsive card-stack layout.
+// Design source: /home/max/下载/扫码设计 (Pixso export, values pixel-verified
+// against PNG). Dark theme lives in picking_scan_app.dark.scss and follows
+// Odoo's color_scheme (web_dark_mode module cookie), not the OS setting.
+
+.o_picking_scan_app {
+    --scan-page: #F1F3F5;
+    --scan-card: #FFFFFF;
+    --scan-frame: #BBBFC6;
+    --scan-text: #000000;
+    --scan-text-2: #74787B;
+    --scan-row-bg: rgba(22, 163, 181, 0.2);
+    --scan-fold-bg: rgba(22, 163, 181, 0.36);
+    --scan-hint-bg: #D0ECF0;
+    --scan-hint-fg: #0F3A4A;
+    --scan-key-bg: #BBBFC6;
+    --scan-key-fg: #000000;
+    --scan-key-shadow: #74787B;
+    --scan-green: #27A844;
+    --scan-purple: #8174AA;
+    --scan-hl: rgba(133, 250, 158, 0.7);
+
+    background: var(--scan-page);
+    color: var(--scan-text);
+    overflow-y: auto;
+
+    &[data-theme="dark"] {
+        --scan-page: #0B0B0B;
+        --scan-card: #424346;
+        --scan-text: #FFFFFF;
+        --scan-text-2: #FFFFFF;
+    }
+
+    // ---------- top: doc name + progress ----------
+    .o_scan_topbar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 26px;
+        padding: 6px 12px 2px;
+    }
+    .o_scan_doc {
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 25px;
+    }
+    .o_scan_doc_progress {
+        font-size: 12px;
+        line-height: 25px;
+    }
+
+    // ---------- scan row ----------
+    .o_scan_scanrow {
+        display: flex;
+        gap: 8px;
+        padding: 6px 12px 8px;
+
+        .o_picking_scan_input {
+            flex: 1;
+            min-width: 0;
+            height: 35px;
+            border: 1px solid var(--scan-frame);
+            border-radius: 4px;
+            background: #FFFFFF;
+            color: #000000;
+            padding: 0 10px;
+            font-size: 15px;
+            &::placeholder {
+                color: #A8ACB3;
+            }
+        }
+    }
+
+    // key-style button (camera / back / footer actions)
+    .o_scan_key {
+        height: 34.5px;
+        min-width: 40px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 4px;
+        background: var(--scan-key-bg);
+        color: var(--scan-key-fg);
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        box-shadow: 0 1.5px 0 0 var(--scan-key-shadow);
+        white-space: nowrap;
+
+        &:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: none;
+        }
+        &:disabled {
+            opacity: 0.6;
+        }
+    }
+    .o_scan_key_primary {
+        background: var(--scan-green);
+        color: #FFFFFF;
+    }
+    .o_scan_key_warn {
+        background: #C97E1B;
+        color: #FFFFFF;
+    }
+
+    // ---------- hint bar ----------
+    .o_scan_hintbar {
+        margin: 0 12px;
+        min-height: 25px;
+        border-radius: 4px;
+        padding: 0 10px;
+        background: var(--scan-hint-bg);
+        color: var(--scan-hint-fg);
+        font-size: 12px;
+        line-height: 25px;
+        box-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+
+        &.alert-success {
+            background: #CFE9D6;
+            color: #14532D;
+        }
+        &.alert-danger,
+        &.alert-warning {
+            background: #F6D5D3;
+            color: #8C2018;
+        }
+        .btn {
+            line-height: 1.2;
+            padding: 2px 8px;
+            margin-left: 6px;
+        }
+    }
+
+    // ---------- from / to ----------
+    .o_scan_fromto {
+        display: flex;
+        justify-content: center;
+        gap: 90px;
+        padding: 6px 12px 0;
+        min-height: 30px;
+        font-size: 12px;
+        align-items: center;
+    }
+
+    // ---------- section title ----------
+    .o_scan_section_title {
+        height: 30px;
+        line-height: 30px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 700;
+        border-top: 1px solid var(--scan-frame);
+        margin-top: 4px;
+    }
+
+    // ---------- candidate picking overlay ----------
+    .o_picking_scan_selector {
+        margin: 0 12px 8px;
+    }
+
+    // ---------- package stacks ----------
+    .o_picking_scan_moves {
+        flex: 1;
+        padding: 0 12px 8px;
+        overflow-y: auto;
+    }
+
+    .o_scan_stack {
+        background: var(--scan-frame);
+        padding: 5px 5px 0;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 8px;
+        overflow: hidden;
+    }
+
+    // ---------- product card ----------
+    .o_scan_card {
+        background: var(--scan-card);
+        display: flex;
+        flex-direction: column;
+
+        &:first-child {
+            border-radius: 4px 4px 0 0;
+
+            // 首张卡片顶部圆角：让选中态内阴影/背景跟随圆角裁切
+            > .o_scan_card_head {
+                border-radius: 4px 4px 0 0;
+            }
+        }
+
+        &.is-selected > .o_scan_card_head {
+            box-shadow: 2px 4px 4px 0 rgba(64, 65, 68, 0.9) inset;
+        }
+    }
+    &[data-theme="dark"] .o_scan_card.is-selected > .o_scan_card_head {
+        background: #404144;
+        box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.9) inset;
+    }
+
+    .o_scan_card_head {
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 5px;
+        gap: 5px;
+
+        &.is-selectable {
+            cursor: pointer;
+        }
+    }
+    .o_scan_pname {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 17px;
+    }
+    .o_scan_pmeta {
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 15px;
+        color: var(--scan-text-2);
+    }
+    .o_scan_head_actions {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    // 26x26 square buttons
+    .o_scan_sq {
+        width: 26px;
+        height: 26px;
+        border-radius: 4px;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .o_scan_sq_add {
+        background: var(--scan-green);
+        color: #FFFFFF;
+    }
+    .o_scan_sq_edit {
+        background: var(--scan-purple);
+        color: #FFFFFF;
+    }
+    .o_scan_sq_del {
+        background: var(--scan-purple);
+        color: #FFFFFF;
+    }
+    .o_scan_sq_hand {
+        background: transparent;
+        color: #BCC0C7;
+        width: 26px;
+        font-size: 17px;
+    }
+
+    // inline qty edit inside header
+    .o_scan_qty_edit {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+
+        input {
+            width: 5.5rem;
+            height: 26px;
+            border: 1px solid var(--scan-frame);
+            border-radius: 4px;
+            background: #FFFFFF;
+            color: #000000;
+            padding: 0 6px;
+            font-size: 12px;
+        }
+    }
+
+    // ---------- fold bar (serial cards only) ----------
+    .o_scan_foldbar {
+        height: 11.5px;
+        background: var(--scan-fold-bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+
+        // 三横线整体高度 7.5px（1.4 + 1.65 + 1.4 + 1.65 + 1.4），在折叠条内垂直居中
+        .o_scan_grip {
+            display: block;
+            width: 20px;
+            height: 7.5px;
+            background-image: linear-gradient(#FFFFFF, #FFFFFF), linear-gradient(#FFFFFF, #FFFFFF), linear-gradient(#FFFFFF, #FFFFFF);
+            background-size: 100% 1.4px;
+            background-position: 0 0, 0 3.05px, 0 6.1px;
+            background-repeat: no-repeat;
+        }
+    }
+
+    // ---------- card body / lot rows ----------
+    .o_scan_card_body {
+        display: flex;
+        flex-direction: column;
+        background: var(--scan-row-bg);
+    }
+
+    .o_scan_row {
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px;
+        position: relative;
+
+        &.is-collapsed-single {
+            min-height: 36px;
+        }
+
+        // scan-hit highlight (design: rgba(133,250,158,.7), 36px, centered)
+        &.is-scanned::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 36px;
+            background: var(--scan-hl);
+            pointer-events: none;
+        }
+        > * {
+            position: relative;
+            z-index: 1;
+        }
+    }
+    .o_scan_row_name {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--scan-text-2);
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .o_scan_row_qty {
+        font-size: 12px;
+        color: var(--scan-text-2);
+        white-space: nowrap;
+        opacity: 0.9;
+    }
+
+    // inline lot / reserved-lot editing panel
+    .o_scan_lot_edit {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        background: var(--scan-card);
+        border: 1px solid var(--scan-frame);
+        border-radius: 4px;
+        padding: 6px;
+
+        .o_scan_lot_edit_line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: var(--scan-text-2);
+        }
+        input {
+            width: 5.5rem;
+            height: 26px;
+            border: 1px solid var(--scan-frame);
+            border-radius: 4px;
+            background: #FFFFFF;
+            color: #000000;
+            padding: 0 6px;
+            font-size: 12px;
+        }
+    }
+
+    // ---------- package bar ----------
+    .o_scan_pkgbar {
+        min-height: 19px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 5px;
+        background: var(--scan-frame);
+        border-radius: 0 0 8px 8px;
+        padding: 0 5px;
+        color: #404144;
+        font-size: 14px;
+
+        // left group: icon + name + rename pencil (design gap: 10px)
+        .o_scan_pkg_left {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .o_scan_pkg_name {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+
+            > i {
+                font-size: 19px;
+                line-height: 19px;
+            }
+        }
+        .o_scan_pkg_qty {
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .o_scan_pkg_del,
+        .o_scan_pkg_rename {
+            width: 22px;
+            height: 19px;
+            border: 0;
+            border-radius: 4px;
+            padding: 0;
+            cursor: pointer;
+            background: transparent;
+            color: #404144;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 13px;
+
+            &:hover {
+                background: rgba(64, 65, 68, 0.18);
+            }
+        }
+        .o_scan_pkg_del {
+            font-size: 15px;
+        }
+        .o_scan_pkg_rename_input {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+
+    // ---------- footer ----------
+    .o_scan_footer {
+        padding: 2px 12px 10px;
+        background: var(--scan-page);
+    }
+    .o_scan_footer_progress {
+        text-align: center;
+        font-size: 12px;
+        line-height: 25px;
+    }
+    .o_scan_footer_actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding-bottom: 6px;
+    }
+
+    // ---------- misc ----------
+    .o_scan_empty {
+        text-align: center;
+        color: var(--scan-text-2);
+        font-size: 12px;
+        padding: 24px 0;
+    }
+}

@@ -1,0 +1,15 @@
+// Picking scan app — dark theme overrides.
+// Loaded only in web.assets_web_dark, i.e. when Odoo's color_scheme is "dark"
+// (driven by the web_dark_mode module / user preference, not the OS).
+
+.o_picking_scan_app {
+    --scan-page: #0B0B0B;
+    --scan-card: #424346;
+    --scan-text: #FFFFFF;
+    --scan-text-2: #FFFFFF;
+
+    .o_scan_card.is-selected > .o_scan_card_head {
+        background: #404144;
+        box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.9) inset;
+    }
+}

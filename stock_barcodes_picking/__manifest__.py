@@ -24,6 +24,10 @@
             "stock_barcodes_picking/static/src/picking_scan_app.esm.js",
             "stock_barcodes_picking/static/src/picking_scan_app.xml",
             "stock_barcodes_picking/static/src/picking_scan_app.css",
+            "stock_barcodes_picking/static/src/picking_scan_app.scss",
+        ],
+        "web.assets_web_dark": [
+            "stock_barcodes_picking/static/src/picking_scan_app.dark.scss",
         ],
     },
     "installable": True,

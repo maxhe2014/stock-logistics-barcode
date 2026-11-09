@@ -488,6 +488,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             picked_lines = move_lines.filtered(
                 lambda l: l.picked
             ).sorted(key=lambda l: l.id)
+            picked_total = sum(l.quantity for l in picked_lines)
             # Group picked lines by result_package_id so each package becomes
             # its own product row (with the SNs belonging to that package).
             package_groups = {}  # (package_id, package_name) -> [lines]
@@ -503,6 +504,19 @@ class WizStockBarcodesPicking(models.TransientModel):
             # Whether the move has any packaged group (to decide showing
             # the "未装包" label on the unpacked group).
             has_packaged = any(k[0] for k in package_groups)
+            # When part of the demand is already packaged, keep an unpacked
+            # row for what is still outside any package (nothing picked yet),
+            # so the operator sees the remainder as its own row instead of
+            # losing it behind the package rows.
+            if (
+                has_packaged
+                and (False, "") not in package_groups
+                and picked_total < mv.product_uom_qty
+            ):
+                package_groups[(False, "")] = []
+            packed_picked = sum(
+                l.quantity for l in picked_lines if l.result_package_id
+            )
             for (pkg_id, pkg_name), lines in package_groups.items():
                 # Show one entry per lot and picked state within this package
                 # group. Multiple lines of the same lot contribute to one
@@ -558,6 +572,13 @@ class WizStockBarcodesPicking(models.TransientModel):
                     l.lot_id.id for l in lines if l.lot_id
                 ]
                 show_package_label = bool(pkg_name) or (not pkg_id and has_packaged)
+                group_qty = sum(l.quantity for l in lines)
+                # Row-level demand: a package row shows the quantity it
+                # holds, the unpacked row shows the demand not packaged yet.
+                demand_qty = (
+                    group_qty if pkg_id
+                    else max(mv.product_uom_qty - packed_picked, 0.0)
+                )
                 moves.append({
                     "id": mv.id,
                     "row_key": "%s_%s" % (mv.id, pkg_id or "nopkg"),
@@ -565,7 +586,8 @@ class WizStockBarcodesPicking(models.TransientModel):
                         mv.product_id.id, ("", "none")
                     )[0],
                     "product_uom_qty": mv.product_uom_qty,
-                    "quantity": sum(l.quantity for l in lines),
+                    "demand_qty": demand_qty,
+                    "quantity": group_qty,
                     "picked": picked_all,
                     "tracking": product_info_by_id.get(
                         mv.product_id.id, ("", "none")
@@ -2128,8 +2150,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         )
         if not move or not self.set_active_move(move.id):
             return False
+        # Base must only cover UNPACKED picked lines: _process_stock_move_line
+        # SETs the target onto the unpacked line while packed lines stay
+        # untouched — including them here would add the packed qty on top.
         picked_qty = sum(
-            line.quantity for line in move.move_line_ids if line.picked
+            line.quantity
+            for line in move.move_line_ids
+            if line.picked and not line.result_package_id
         )
         return self.action_consume_with_qty(picked_qty + 1.0)
 

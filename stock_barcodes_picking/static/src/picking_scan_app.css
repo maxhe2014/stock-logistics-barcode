@@ -1,44 +1,12 @@
 /* Copyright 2026 OpenViking
    License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). */
 
-.o_picking_scan_input {
-    font-family: monospace;
-    font-size: 1.25rem;
-}
-
-/* Info strip and badges use theme classes only (same palette as
-   stock_barcodes_mrp) so light and dark color schemes both apply. */
-
-/* Step indicator pills */
-.o_picking_scan_steps .nav-link {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
+/* Card-stack layout lives in picking_scan_app.scss. Only rules shared
+   with components outside the redesign remain here. */
 
 /* Keep the move list as the scroll container in the full-height flex layout. */
 .o_picking_scan_moves {
     min-height: 0;
-}
-
-/* Move row: pointer cursor for row-click selection */
-.o_picking_scan_moves tbody tr {
-    cursor: pointer;
-}
-
-/* Briefly flash the exact serial number that was just scanned. */
-@keyframes o_picking_scan_recent_flash {
-    0%, 100% {
-        filter: brightness(1);
-        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
-    }
-    50% {
-        filter: brightness(1.75);
-        box-shadow: 0 0 0 0.3rem rgba(255, 193, 7, 0.65);
-    }
-}
-
-.o_picking_scan_recent {
-    animation: o_picking_scan_recent_flash 0.4s ease-in-out 5;
 }
 
 /* Candidate selector: distinct warning style */
@@ -54,4 +22,3 @@
 .o_package_rename_ac .o-autocomplete--input {
     width: 100%;
 }
-
