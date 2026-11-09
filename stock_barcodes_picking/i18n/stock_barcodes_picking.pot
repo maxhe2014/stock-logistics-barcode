@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-09 02:13+0000\n"
-"PO-Revision-Date: 2026-10-09 02:13+0000\n"
+"POT-Creation-Date: 2026-11-09 02:41+0000\n"
+"PO-Revision-Date: 2026-11-09 02:41+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -66,9 +66,35 @@ msgid "Active:"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Add Product and Pick"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Add one"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Add quantity failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Added & picked: %(prod)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Added product %(product)s with demand 1 and picked lot/serial number %(sn)s."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -88,6 +114,12 @@ msgid "All picked products must be put into a package before validation."
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__allow
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__allow
+msgid "Allow"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Already on transfer %s"
@@ -102,12 +134,6 @@ msgstr ""
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Back"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Scan with camera"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -145,6 +171,7 @@ msgstr ""
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Cancel"
 msgstr ""
@@ -161,6 +188,12 @@ msgid "Cannot consume tracked product by demand; scan the lot"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Collapse / expand"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__company_id
 msgid "Company"
 msgstr ""
@@ -170,6 +203,20 @@ msgstr ""
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Confirm"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Confirm or cancel adding the current product before scanning another "
+"barcode."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Confirm or cancel the new product…"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -201,6 +248,30 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Consumed: %(prod)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Continue?"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
+msgid ""
+"Controls scanning an existing lot/serial number whose product is not part of the transfer:\n"
+"- Allow: add a move for one unit and pick the lot/serial directly.\n"
+"- Warn and Require Confirmation: show the product and lot/serial, then add them only after confirmation.\n"
+"- Forbid: reject the scan. Unknown barcodes never create a product automatically."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
+msgid ""
+"Controls what the barcode scan app does when the scanned quantity exceeds the remaining demand of the transfer:\n"
+"- Allow: the excess is added without asking.\n"
+"- Warn and Require Confirmation: scanning is blocked until the operator confirms with the 'Force done' button (legacy behaviour).\n"
+"- Forbid: the scan is rejected and no confirmation is offered."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -260,6 +331,12 @@ msgstr ""
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Edit lot quantity failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Edit quantity"
 msgstr ""
@@ -287,6 +364,18 @@ msgid "Failed to put in package: %(msg)s"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Finish or cancel quantity editing before scanning."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__forbid
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__forbid
+msgid "Forbid"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_force_add
 msgid "Force Add"
 msgstr ""
@@ -296,6 +385,11 @@ msgstr ""
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Force Consume"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
+msgid "Force Lot/Serial scan?"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -379,6 +473,22 @@ msgid "Info"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Insufficient reserved quantity for %(lot)s, or the quantity would exceed "
+"demand. Scan the lot/serial instead."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Insufficient unreserved stock for lot %(sn)s in location %(location)s "
+"(available: %(available)s, required: %(required)s)."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__write_uid
 msgid "Last Updated by"
 msgstr ""
@@ -428,9 +538,57 @@ msgid "Lot/Serial"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Lot/Serial Numbers"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Lot/Serial scanning is mandatory for this operation type."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Lot/serial number %(sn)s belongs to product %(product)s, which is not in "
+"transfer %(picking)s. Confirm adding 1 unit and picking it."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Lot/serial number %(sn)s has no stock in location %(location)s. It was not "
+"added to this transfer."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Lot/serial number %(sn)s is not in location %(location)s (currently in: "
+"%(locations)s). It was not added to this transfer."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Lot: %(lot)s. Picked quantity: %(qty)s. Scan again to add 1."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_lot_scan_policy__mandatory
+msgid "Mandatory Scan"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
+msgid ""
+"Mandatory Scan requires scanning every lot/serial number. Optional Scan lets"
+" the operator pick reserved lots/serials with the line buttons or by "
+"scanning the product."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -444,6 +602,13 @@ msgid "Manual entry mode"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Matched product %(product)s for serial number %(sn)s. It has been added."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__message
 msgid "Message"
 msgstr ""
@@ -451,12 +616,6 @@ msgstr ""
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__message_type
 msgid "Message Type"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Move not found in this transfer"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -509,6 +668,11 @@ msgid "Multiple transfers match — select one:"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
+msgid "New Product Scan Policy"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_require_pack__no
 msgid "No Requirement"
 msgstr ""
@@ -529,6 +693,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "No picked lines in this package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "No product addition is awaiting confirmation."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -597,12 +767,40 @@ msgid "Not found"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Only picked lot/SN lines can be corrected"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__active_move_id
 msgid ""
 "Operator-selected target move. When set, scanning a serial/lot narrows the "
 "lot lookup to this move's product first, so cross-product SN collisions "
 "resolve automatically. Cleared on picking switch or scanning a different "
 "product."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_lot_scan_policy__optional
+msgid "Optional Scan"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
+msgid "Over-picking Policy"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Over-picking is forbidden for this operation type."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Package line not found"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -637,14 +835,33 @@ msgid "Packaging"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
-msgid "Quantity Control"
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Pick reserved lot"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pick reserved lot failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Picked reserved lot/serial: %(prod)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Picked reserved lot/serial: %(prod)s x1"
 msgstr ""
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Picked"
+msgid "Picked:"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -670,10 +887,14 @@ msgid "Please enter a positive quantity"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_id
 msgid "Product"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Product %(name)s is already part of this transfer"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -699,14 +920,7 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Product scanned: %(prod)s x%(qty)s"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Product scanned: %(prod)s x%(qty)s (over demand by %(excess)s)"
+msgid "Product scanned: %(prod)s x%(qty)s (over demand by %(excess)s)"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -719,6 +933,12 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Product: %s. Scan lot."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Products"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -753,16 +973,27 @@ msgid "Put in Pack"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Qty:"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_qty
 msgid "Quantity"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
+msgid "Quantity Control"
 msgstr ""
 
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Quantity exceeds demand (max: %(max)s). Over-picking is forbidden for "
-"this operation type."
+"Quantity exceeds demand (max: %(max)s). Over-picking is forbidden for this "
+"operation type."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -896,6 +1127,12 @@ msgid "Scan the source location of transfer %s"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Scan with camera"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__location_dest_id
 msgid "Scanned Destination Location"
 msgstr ""
@@ -957,63 +1194,18 @@ msgid "Selected transfer is not in the candidate list"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
-msgid "Serial Numbers"
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number %(sn)s has already been added to this transfer. Do not scan it"
+" again."
 msgstr ""
 
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Serial number/lot %(name)s does not exist. This operation type does not "
-"allow creating new ones."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Matched product %(product)s for serial number %(sn)s. It has been added."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Serial number %(sn)s has already been added to this transfer. Do not scan "
-"it again."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Serial number %(sn)s has already been delivered and cannot be picked "
-"again."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Insufficient unreserved stock for lot %(sn)s in location %(location)s "
-"(available: %(available)s, required: %(required)s)."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Lot/serial number %(sn)s has no stock in location %(location)s. It was not "
-"added to this transfer."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Lot/serial number %(sn)s is not in location %(location)s (currently in: "
-"%(locations)s). It was not added to this transfer."
+"Serial number %(sn)s has already been delivered and cannot be picked again."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -1025,6 +1217,20 @@ msgid ""
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Serial number quantity is fixed at 1"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid ""
+"Serial number/lot %(name)s does not exist. This operation type does not "
+"allow creating new ones."
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__visible_switch_selector
 msgid "Show Picking Selector"
 msgstr ""
@@ -1032,111 +1238,6 @@ msgstr ""
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
 msgid "Show Reserved Serial Numbers"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
-msgid "New Product Scan Policy"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
-msgid ""
-"Controls scanning an existing lot/serial number whose product is not part "
-"of the transfer:\n"
-"- Allow: add a move for one unit and pick the lot/serial directly.\n"
-"- Warn and Require Confirmation: show the product and lot/serial, then add "
-"them only after confirmation.\n"
-"- Forbid: reject the scan. Unknown barcodes never create a product "
-"automatically."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Added product %(product)s with demand 1 and picked lot/serial number %(sn)s."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Add Product and Pick"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Confirm or cancel adding the current product before scanning another "
-"barcode."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-msgid "Confirm or cancel the new product…"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "No product addition is awaiting confirmation."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Product %(name)s is already part of this transfer"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Lot/serial number %(sn)s belongs to product %(product)s, which is not in "
-"transfer %(picking)s. Confirm adding 1 unit and picking it."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
-msgid "Over-picking Policy"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
-msgid ""
-"Controls what the barcode scan app does when the scanned quantity exceeds "
-"the remaining demand of the transfer:\n"
-"- Allow: the excess is added without asking.\n"
-"- Warn and Require Confirmation: scanning is blocked until the operator "
-"confirms with the 'Force done' button (legacy behaviour).\n"
-"- Forbid: the scan is rejected and no confirmation is offered."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__allow
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__allow
-msgid "Allow"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__forbid
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__forbid
-msgid "Forbid"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__warn
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__warn
-msgid "Warn and Require Confirmation"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Over-picking is forbidden for this operation type."
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -1223,12 +1324,6 @@ msgid "Transfer is draft, confirm it before scanning"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Transfer:"
-msgstr ""
-
-#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__picking_type_code
 msgid "Type of Operation"
 msgstr ""
@@ -1240,8 +1335,26 @@ msgid "Unpack failed: %(err)s"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Unpacked"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_uom_id
 msgid "UoM"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Updated lot/SN quantity: %(lot)s x%(qty)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Updated package quantity: %(pkg)s x%(qty)s"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -1267,6 +1380,12 @@ msgid "Visible Force Done"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_excess_qty_policy__warn
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_new_product_policy__warn
+msgid "Warn and Require Confirmation"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__barcode_scan_dest_location
 msgid ""
 "Whether the operator must scan the destination location barcode. When False,"
@@ -1286,6 +1405,24 @@ msgid "Wizard to read barcode on pickings"
 msgstr ""
 
 #. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "| Lot"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "| Picked"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "| Serial"
+msgstr ""
+
+#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "产品"
@@ -1295,12 +1432,6 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "库位"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "待拣"
 msgstr ""
 
 #. module: stock_barcodes_picking
@@ -1316,128 +1447,7 @@ msgid "数量"
 msgstr ""
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "未装包"
-msgstr ""
-
-#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "目的库位"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-msgid "Continue?"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-msgid "Edit lot quantity failed: %(err)s"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-msgid "Finish or cancel quantity editing before scanning."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Only picked lot/SN lines can be corrected"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Serial number quantity is fixed at 1"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Updated lot/SN quantity: %(lot)s x%(qty)s"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
-msgid "Force Lot/Serial scan?"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_lot_scan_policy__mandatory
-msgid "Mandatory Scan"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__stock_picking_type__barcode_lot_scan_policy__optional
-msgid "Optional Scan"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
-msgid ""
-"Mandatory Scan requires scanning every lot/serial number. Optional Scan lets "
-"the operator pick reserved lots/serials with the line buttons or by scanning "
-"the product."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
-msgid "Lot/Serial Numbers"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Lot/Serial scanning is mandatory for this operation type."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Insufficient reserved quantity for %(lot)s, or the quantity would exceed "
-"demand. Scan the lot/serial instead."
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Picked reserved lot/serial: %(prod)s x%(qty)s"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Picked reserved lot/serial: %(prod)s x1"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Add quantity"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-msgid "Add quantity failed: %(err)s"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Pick reserved lot"
-msgstr ""
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-msgid "Pick reserved lot failed: %(err)s"
 msgstr ""

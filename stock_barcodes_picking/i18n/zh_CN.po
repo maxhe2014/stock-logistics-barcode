@@ -13,8 +13,8 @@ msgstr ""
 "Language: zh_CN\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
-"Content-Transfer-Encoding: \n"
-"Plural-Forms: \n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__picking_state
@@ -69,12 +69,6 @@ msgstr "（无已有包裹）"
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__active_move_id
 msgid "Active Move"
 msgstr "当前移动"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Active:"
-msgstr "当前："
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -156,6 +150,7 @@ msgstr "未找到条码：%s"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Cancel"
 msgstr "取消"
@@ -259,9 +254,7 @@ msgid ""
 "Dynamic: the destination location scanned by the operator. Only used when "
 "the picking type requires destination location scanning. Otherwise "
 "picking_location_dest_id is used."
-msgstr ""
-"动态：操作员扫描的目的库位。仅在拣货类型要求扫描目的库位时使用。"
-"否则使用 picking_location_dest_id。"
+msgstr "动态：操作员扫描的目的库位。仅在拣货类型要求扫描目的库位时使用。否则使用 picking_location_dest_id。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__location_id
@@ -270,8 +263,8 @@ msgid ""
 "picking_location_id for the current scan context. Defaulted to "
 "picking_location_id on picking switch."
 msgstr ""
-"动态：操作员扫描的源库位。在当前扫描上下文中覆盖 picking_location_id。"
-"切换调拨单时默认重置为 picking_location_id。"
+"动态：操作员扫描的源库位。在当前扫描上下文中覆盖 picking_location_id。切换调拨单时默认重置为 "
+"picking_location_id。"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
@@ -355,9 +348,7 @@ msgid ""
 "If 'After Each Product', a package is mandatory after each product is "
 "scanned. If 'After a Group of Products', packages are optional but all "
 "products must be packed before validation."
-msgstr ""
-"若选择\"每个产品之后\"，扫描每个产品后必须装包。"
-"若选择\"一组产品之后\"，装包可选但所有产品必须在验证前装包。"
+msgstr "若选择\"每个产品之后\"，扫描每个产品后必须装包。若选择\"一组产品之后\"，装包可选但所有产品必须在验证前装包。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_validation_all_packed
@@ -365,18 +356,14 @@ msgid ""
 "If enabled, all picked products must be put into a package before the "
 "transfer can be validated. (Requires 'After a Group of Products' or 'After "
 "Each Product'.)"
-msgstr ""
-"若启用，所有已拣产品必须在验证调拨单前装入包裹。"
-"（需要已选择\"一组产品之后\"或\"每个产品之后\"。）"
+msgstr "若启用，所有已拣产品必须在验证调拨单前装入包裹。（需要已选择\"一组产品之后\"或\"每个产品之后\"。）"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_show_reserved_sns
 msgid ""
 "If enabled, reserved (but not yet picked) serial numbers are displayed in "
 "the barcode scanner so the picker knows which serial numbers to scan."
-msgstr ""
-"若启用，已预留（尚未拣选）的序列号将显示在条码扫描器中，"
-"便于拣货员知道需要扫描哪些序列号。"
+msgstr "若启用，已预留（尚未拣选）的序列号将显示在条码扫描器中，便于拣货员知道需要扫描哪些序列号。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_scan_dest_location
@@ -384,9 +371,7 @@ msgid ""
 "If enabled, the barcode scan flow requires the operator to scan the "
 "destination location barcode. If disabled, the picking's default destination"
 " location is used automatically."
-msgstr ""
-"若启用，条码扫描流程要求操作员扫描目的库位条码。"
-"若禁用，则自动使用调拨单的默认目的库位。"
+msgstr "若启用，条码扫描流程要求操作员扫描目的库位条码。若禁用，则自动使用调拨单的默认目的库位。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_scan_source_location
@@ -394,9 +379,7 @@ msgid ""
 "If enabled, the barcode scan flow requires the operator to scan the source "
 "location barcode. If disabled, the picking's default source location is used"
 " automatically."
-msgstr ""
-"若启用，条码扫描流程要求操作员扫描源库位条码。"
-"若禁用，则自动使用调拨单的默认源库位。"
+msgstr "若启用，条码扫描流程要求操作员扫描源库位条码。若禁用，则自动使用调拨单的默认源库位。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__message_type__info
@@ -481,12 +464,6 @@ msgstr "消息类型"
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Move not found in this transfer"
-msgstr "在此调拨单中未找到移动"
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Multiple lots found"
 msgstr "找到多个批次"
 
@@ -496,8 +473,7 @@ msgstr "找到多个批次"
 msgid ""
 "Multiple lots named %(sn)s found. Click the target product row first, then "
 "scan again."
-msgstr ""
-"找到多个名为 %(sn)s 的批次。请先点击目标产品行，然后重新扫描。"
+msgstr "找到多个名为 %(sn)s 的批次。请先点击目标产品行，然后重新扫描。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__message_type__more_match
@@ -630,8 +606,7 @@ msgid ""
 "resolve automatically. Cleared on picking switch or scanning a different "
 "product."
 msgstr ""
-"操作员选择的目标移动。设置后，扫描序列号/批次时会优先在此移动的产品范围内查找，"
-"从而自动解决跨产品序列号冲突。切换调拨单或扫描其他产品时清除。"
+"操作员选择的目标移动。设置后，扫描序列号/批次时会优先在此移动的产品范围内查找，从而自动解决跨产品序列号冲突。切换调拨单或扫描其他产品时清除。"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
@@ -670,12 +645,6 @@ msgid "Quantity Control"
 msgstr "数量控制"
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Picked"
-msgstr "已拣"
-
-#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__picking_location_id
 msgid "Picking Source Location"
 msgstr "拣货源库位"
@@ -689,8 +658,7 @@ msgstr "拣货类型"
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__pending_switch_picking_ids
 msgid ""
 "Pickings matching an ambiguous scan; the operator picks one to switch to."
-msgstr ""
-"匹配多义扫描的调拨单；操作员选择其一以切换。"
+msgstr "匹配多义扫描的调拨单；操作员选择其一以切换。"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
@@ -699,8 +667,6 @@ msgid "Please enter a positive quantity"
 msgstr "请输入正数数量"
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_id
 msgid "Product"
 msgstr "产品"
@@ -711,8 +677,7 @@ msgstr "产品"
 msgid ""
 "Product %(name)s is fully picked. Scan the next product barcode, then scan "
 "its lot."
-msgstr ""
-"产品 %(name)s 已全部拣完。请扫描下一产品条码，再扫描其批次。"
+msgstr "产品 %(name)s 已全部拣完。请扫描下一产品条码，再扫描其批次。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -729,14 +694,7 @@ msgstr "产品 %s 不在此调拨单中"
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Product scanned: %(prod)s x%(qty)s"
-msgstr "已扫描产品：%(prod)s x%(qty)s"
-
-#. module: stock_barcodes_picking
-#. odoo-python
-#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid ""
-"Product scanned: %(prod)s x%(qty)s (over demand by %(excess)s)"
+msgid "Product scanned: %(prod)s x%(qty)s (over demand by %(excess)s)"
 msgstr "已扫描产品：%(prod)s x%(qty)s（超出需求 %(excess)s）"
 
 #. module: stock_barcodes_picking
@@ -791,8 +749,8 @@ msgstr "数量"
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Quantity exceeds demand (max: %(max)s). Over-picking is forbidden for "
-"this operation type."
+"Quantity exceeds demand (max: %(max)s). Over-picking is forbidden for this "
+"operation type."
 msgstr "数量超出需求量（最多 %(max)s），此作业类型禁止超量扫码。"
 
 #. module: stock_barcodes_picking
@@ -987,18 +945,12 @@ msgid "Selected transfer is not in the candidate list"
 msgstr "所选调拨单不在候选列表中"
 
 #. module: stock_barcodes_picking
-#: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
-msgid "Serial Numbers"
-msgstr "序列号"
-
-#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
 "Serial number/lot %(name)s does not exist. This operation type does not "
 "allow creating new ones."
-msgstr ""
-"序列号/批次 %(name)s 不存在。此操作类型不允许创建新的序列号/批次。"
+msgstr "序列号/批次 %(name)s 不存在。此操作类型不允许创建新的序列号/批次。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -1011,16 +963,15 @@ msgstr "已按序列号 %(sn)s 匹配产品：%(product)s，并已加入。"
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Serial number %(sn)s has already been added to this transfer. Do not scan "
-"it again."
+"Serial number %(sn)s has already been added to this transfer. Do not scan it"
+" again."
 msgstr "序列号 %(sn)s 已添加，请勿重复扫码。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid ""
-"Serial number %(sn)s has already been delivered and cannot be picked "
-"again."
+"Serial number %(sn)s has already been delivered and cannot be picked again."
 msgstr "序列号 %(sn)s 已出库，不能重复使用。"
 
 #. module: stock_barcodes_picking
@@ -1030,8 +981,7 @@ msgid ""
 "Insufficient unreserved stock for lot %(sn)s in location %(location)s "
 "(available: %(available)s, required: %(required)s)."
 msgstr ""
-"库位 %(location)s 中批次 %(sn)s 的未预留库存不足（可用：%(available)s，"
-"需要：%(required)s）。"
+"库位 %(location)s 中批次 %(sn)s 的未预留库存不足（可用：%(available)s，需要：%(required)s）。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -1048,8 +998,7 @@ msgid ""
 "Lot/serial number %(sn)s is not in location %(location)s (currently in: "
 "%(locations)s). It was not added to this transfer."
 msgstr ""
-"批次/序列号 %(sn)s 不在库位 %(location)s（当前在：%(locations)s），未加入本单。"
-"请确认实物库位或更换批次/序列号。"
+"批次/序列号 %(sn)s 不在库位 %(location)s（当前在：%(locations)s），未加入本单。请确认实物库位或更换批次/序列号。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -1077,13 +1026,10 @@ msgstr "单据外产品扫码策略"
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_new_product_policy
 msgid ""
-"Controls scanning an existing lot/serial number whose product is not part "
-"of the transfer:\n"
+"Controls scanning an existing lot/serial number whose product is not part of the transfer:\n"
 "- Allow: add a move for one unit and pick the lot/serial directly.\n"
-"- Warn and Require Confirmation: show the product and lot/serial, then add "
-"them only after confirmation.\n"
-"- Forbid: reject the scan. Unknown barcodes never create a product "
-"automatically."
+"- Warn and Require Confirmation: show the product and lot/serial, then add them only after confirmation.\n"
+"- Forbid: reject the scan. Unknown barcodes never create a product automatically."
 msgstr ""
 "控制扫描已存在、但其产品不在调拨单中的批次/序列号时的处理方式：\n"
 "- 允许：直接创建需求为 1 的产品行并拣货该批次/序列号。\n"
@@ -1136,9 +1082,7 @@ msgstr "产品 %(name)s 已在此调拨单中"
 msgid ""
 "Lot/serial number %(sn)s belongs to product %(product)s, which is not in "
 "transfer %(picking)s. Confirm adding 1 unit and picking it."
-msgstr ""
-"批次/序列号 %(sn)s 属于产品 %(product)s，该产品不在调拨单 %(picking)s 中。"
-"请确认是否添加 1 件并拣货。"
+msgstr "批次/序列号 %(sn)s 属于产品 %(product)s，该产品不在调拨单 %(picking)s 中。请确认是否添加 1 件并拣货。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
@@ -1148,11 +1092,9 @@ msgstr "超量扫码策略"
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_excess_qty_policy
 msgid ""
-"Controls what the barcode scan app does when the scanned quantity exceeds "
-"the remaining demand of the transfer:\n"
+"Controls what the barcode scan app does when the scanned quantity exceeds the remaining demand of the transfer:\n"
 "- Allow: the excess is added without asking.\n"
-"- Warn and Require Confirmation: scanning is blocked until the operator "
-"confirms with the 'Force done' button (legacy behaviour).\n"
+"- Warn and Require Confirmation: scanning is blocked until the operator confirms with the 'Force done' button (legacy behaviour).\n"
 "- Forbid: the scan is rejected and no confirmation is offered."
 msgstr ""
 "控制扫码应用在扫描数量超过调拨单剩余需求量时的处理方式：\n"
@@ -1204,8 +1146,7 @@ msgstr "静态：调拨单的目的库位。"
 msgid ""
 "Static: the picking's own source location, bound when picking_id is set. "
 "Never overwritten by scanning."
-msgstr ""
-"静态：调拨单自身的源库位，在设置 picking_id 时绑定。不会被扫描覆盖。"
+msgstr "静态：调拨单自身的源库位，在设置 picking_id 时绑定。不会被扫描覆盖。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__picking_state
@@ -1269,12 +1210,6 @@ msgid "Transfer is draft, confirm it before scanning"
 msgstr "调拨单为草稿状态，请先确认再扫描"
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Transfer:"
-msgstr "调拨单："
-
-#. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__picking_type_code
 msgid "Type of Operation"
 msgstr "操作类型"
@@ -1284,6 +1219,12 @@ msgstr "操作类型"
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 msgid "Unpack failed: %(err)s"
 msgstr "拆包失败：%(err)s"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Unpacked"
+msgstr "未装包"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__product_uom_id
@@ -1317,16 +1258,14 @@ msgstr "显示强制完成"
 msgid ""
 "Whether the operator must scan the destination location barcode. When False,"
 " the picking's default destination location is used."
-msgstr ""
-"操作员是否必须扫描目的库位条码。为 False 时，使用调拨单的默认目的库位。"
+msgstr "操作员是否必须扫描目的库位条码。为 False 时，使用调拨单的默认目的库位。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_wiz_stock_barcodes_picking__barcode_scan_source_location
 msgid ""
 "Whether the operator must scan the source location barcode. When False, the "
 "picking's default source location is used."
-msgstr ""
-"操作员是否必须扫描源库位条码。为 False 时，使用调拨单的默认源库位。"
+msgstr "操作员是否必须扫描源库位条码。为 False 时，使用调拨单的默认源库位。"
 
 #. module: stock_barcodes_picking
 #: model:ir.model,name:stock_barcodes_picking.model_wiz_stock_barcodes_picking
@@ -1346,12 +1285,6 @@ msgid "库位"
 msgstr "库位"
 
 #. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "待拣"
-msgstr "待拣"
-
-#. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "批次"
@@ -1362,12 +1295,6 @@ msgstr "批次"
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "数量"
 msgstr "数量"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "未装包"
-msgstr "未装包"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -1441,12 +1368,10 @@ msgstr "可选扫描"
 #. module: stock_barcodes_picking
 #: model:ir.model.fields,help:stock_barcodes_picking.field_stock_picking_type__barcode_lot_scan_policy
 msgid ""
-"Mandatory Scan requires scanning every lot/serial number. Optional Scan lets "
-"the operator pick reserved lots/serials with the line buttons or by scanning "
-"the product."
-msgstr ""
-"强制扫描要求逐个扫描批次/序列号。可选扫描允许操作员通过明细行按钮或扫描产品，"
-"直接拣选已预留的批次/序列号。"
+"Mandatory Scan requires scanning every lot/serial number. Optional Scan lets"
+" the operator pick reserved lots/serials with the line buttons or by "
+"scanning the product."
+msgstr "强制扫描要求逐个扫描批次/序列号。可选扫描允许操作员通过明细行按钮或扫描产品，直接拣选已预留的批次/序列号。"
 
 #. module: stock_barcodes_picking
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_picking.view_picking_type_form_inherit_barcode
@@ -1465,8 +1390,7 @@ msgstr "此作业类型要求强制扫描批次/序列号。"
 msgid ""
 "Insufficient reserved quantity for %(lot)s, or the quantity would exceed "
 "demand. Scan the lot/serial instead."
-msgstr ""
-"%(lot)s 的预留数量不足，或该数量会超过需求。请改为扫描批次/序列号。"
+msgstr "%(lot)s 的预留数量不足，或该数量会超过需求。请改为扫描批次/序列号。"
 
 #. module: stock_barcodes_picking
 #. odoo-python
@@ -1479,13 +1403,6 @@ msgstr "已拣选预留批次/序列号：%(prod)s × %(qty)s"
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Picked reserved lot/serial: %(prod)s x1"
 msgstr "已拣选预留批次/序列号：%(prod)s × 1"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Add quantity"
-msgstr "增加数量"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
@@ -1514,12 +1431,6 @@ msgstr "产品"
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Unpacked"
-msgstr "未装包"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Qty:"
 msgstr "数量："
 
@@ -1532,47 +1443,35 @@ msgstr "已拣："
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Lot"
-msgstr "批次号"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Serial"
-msgstr "序列号"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Select this product, then scan"
-msgstr "点击选中产品后再扫码"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Collapse / expand"
 msgstr "折叠 / 展开"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Remove package (unpack)"
-msgstr "删除包裹号（拆包）"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "No transfer selected. Scan a transfer name to begin."
-msgstr "未选择调拨单，请扫描调拨单号开始。"
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
-msgid "Multiple transfers match — select one:"
-msgstr "匹配到多个调拨单，请选择一个："
-
-#. module: stock_barcodes_picking
-#. odoo-javascript
-#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
 msgid "Active:"
 msgstr "当前："
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "Add one"
+msgstr "增加一个"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "| Lot"
+msgstr "| 批号"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "| Picked"
+msgstr "| 已拣"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.xml:0
+msgid "| Serial"
+msgstr "| 序列号"

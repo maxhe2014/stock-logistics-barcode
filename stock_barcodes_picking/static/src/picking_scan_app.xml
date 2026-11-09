@@ -299,7 +299,7 @@
                                                                 <t t-out="line.location_name" />
                                                                 ·
                                                                 <i class="fa fa-archive"/>
-                                                                <t t-out="line.package_name || 'Unpacked'" />
+                                                                <t t-out="line.package_name || this.unpackedName" />
                                                             </span>
                                                             <t t-if="state.editingLotLineId === line.id">
                                                                 <input
@@ -389,7 +389,7 @@
                                 <span class="o_scan_pkg_left">
                                     <span class="o_scan_pkg_name">
                                         <i t-att-class="pkg.package_id ? 'fa fa-archive' : 'fa fa-inbox'"/>
-                                        <t t-out="pkg.package_name || 'Unpacked'" />
+                                        <t t-out="pkg.package_name || this.unpackedName" />
                                     </span>
                                     <button t-if="pkg.package_id"
                                             type="button"

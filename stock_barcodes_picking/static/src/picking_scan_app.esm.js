@@ -1246,6 +1246,14 @@ export class PickingScanApp extends Component {
 
     // --- Computed getters for template visibility ---
 
+    /**
+     * Label of the stack holding lines that are not in any package.
+     * Lives in JS (not the template) so ``_t`` extraction picks it up.
+     */
+    get unpackedName() {
+        return _t("Unpacked");
+    }
+
     get barcodePlaceholder() {
         if (this.state.visible_force_add) {
             return _t("Confirm or cancel the new product…");
