@@ -1497,8 +1497,8 @@ msgstr "| 序列号"
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Product already on the transfer — scan it to pick."
-msgstr "产品已在调拔单中 — 扫码即可拣货。"
+msgid "Product already on the transfer — demand increased by %s."
+msgstr "产品已在调拔单中 — 需求数量已增加 %s。"
 
 #. module: stock_barcodes_picking
 #. odoo-python

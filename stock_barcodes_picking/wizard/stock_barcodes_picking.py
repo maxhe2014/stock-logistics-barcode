@@ -429,7 +429,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         client action to render.
         """
         self.ensure_one()
+        # ★ 强制刷新 related 字段缓存 — wizard.move_ids 是 picking.move_ids
+        # 的 related，新增/删除 move 后必须 invalidate 才能看到最新值。
+        self.invalidate_recordset()
         picking = self.picking_id
+        picking.invalidate_recordset()
+        # 直接 print 到 stderr（不依赖 logging 配置），确保能在日志里看到
+        print(f"[SCAN_STATE] wiz={self.id} picking={picking.name}({picking.id}) picking.move_ids={len(picking.move_ids)}", flush=True)
         # Step labels are built here (not as a class attribute) so _() is
         # evaluated at request time under the correct lang context. Unknown
         # keys fall back to the raw key string (no default label) so a
@@ -455,13 +461,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         # picking paid ~N extra SELECTs per scan (10 moves -> 10 separate
         # stock_lot queries). Warming the cache here keeps the loop below
         # query-free and also benefits _compute_totals.
-        # Exclude moves that are confirmed but never assigned — they have no
-        # move_line_ids and nothing for the scan app to operate on.
+        # Exclude moves that are done or cancelled.
+        # NOTE: we intentionally do NOT filter out confirmed moves with no
+        # move_line_ids yet — the scan UI lets the operator pre-add a product
+        # before reserving stock, and we want those to show up so they can be
+        # scanned (consuming raw material / creating demand).
         active_moves = self.move_ids.filtered(
-            lambda m: (
-                m.state not in ("done", "cancel")
-                and bool(m.move_line_ids)
-            )
+            lambda m: m.state not in ("done", "cancel")
         )
         all_lines = picking.move_line_ids
         lot_name_by_id = {lot.id: lot.name for lot in all_lines.lot_id}
@@ -495,6 +501,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             # keeps serial/lot grouping precise when the same product comes
             # from multiple locations into one package.
             package_groups = {}  # (pkg_id, pkg_name, loc_id, loc_name) -> [lines]
+            # Default location for this move — used as fallback when the
+            # move has no picked lines at all (nothing to derive a location
+            # from), and when we synthesise the "unpacked remainder" row.
+            default_loc_id = mv.location_id.id or False
+            default_loc_name = (
+                mv.location_id.display_name
+                or location_name_by_id.get(default_loc_id, "")
+            )
             for l in picked_lines:
                 pkg_id = l.result_package_id.id or False
                 pkg_name = package_name_by_id.get(pkg_id, "")
@@ -505,8 +519,6 @@ class WizStockBarcodesPicking(models.TransientModel):
                     package_groups[key] = []
                 package_groups[key].append(l)
             if not package_groups:
-                default_loc_id = mv.location_id.id or False
-                default_loc_name = mv.location_id.display_name or location_name_by_id.get(default_loc_id, "")
                 package_groups[(False, "", default_loc_id, default_loc_name)] = []
             # Whether the move has any packaged group (to decide showing
             # the "未装包" label on the unpacked group).
@@ -2874,27 +2886,39 @@ class WizStockBarcodesPicking(models.TransientModel):
         Called from the scan UI's "Add Product" button when the operator
         wants to pick a product that isn't on the transfer yet (force-add).
         """
+        _log = self.env['ir.logging']._log if hasattr(self.env['ir.logging'], '_log') else None
+        import logging as _logging
+        _logger = _logging.getLogger(__name__)
+        _logger.warning("=== action_add_product_to_picking CALLED: wiz=%s picking=%s product_id=%s qty=%s ===",
+                        self.id, self.picking_id.name, product_id, qty)
         self.ensure_one()
         if not self.picking_id:
+            _logger.warning("action_add_product_to_picking: NO picking_id!")
             return False
         product = self.env["product.product"].browse(product_id)
         if not product.exists():
+            _logger.warning("action_add_product_to_picking: product %s not found!", product_id)
             return False
-        # Avoid duplicates — if the product is already on the picking, tell
-        # the operator instead of silently creating another move.
+        # If the product is already on the picking, increase the demand of
+        # the first open move instead of refusing — the operator may need to
+        # pick more of the same product (e.g. already-picked qty is packed
+        # but extra units just arrived).
         existing = self.picking_id.move_ids.filtered(
-            lambda m: m.product_id.id == product_id and m.state != "done"
+            lambda m: m.product_id.id == product_id and m.state not in ("done", "cancel")
         )
         if existing:
+            move = existing[0]
+            # 已拣量可能超过需求（超拣/历史数据），必须在 max(需求, 已拣)
+            # 的基础上加，否则 demand-qty 为负，未装包剩余行永远不会出现。
+            move.product_uom_qty = max(move.product_uom_qty, move.quantity) + qty
             self._set_message(
-                "info",
-                self.env._("Product already on the transfer — scan it to pick.")
+                "success",
+                self.env._("Product already on the transfer — demand increased by %s.") % qty
             )
             return True
         src_loc = self.location_id or self.picking_location_id
         dst_loc = self.location_dest_id or self.picking_location_dest_id
         self.picking_id.move_ids.create({
-            "name": product.display_name,
             "product_id": product_id,
             "product_uom": product.uom_id.id,
             "product_uom_qty": qty,

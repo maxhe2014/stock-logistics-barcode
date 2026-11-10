@@ -191,6 +191,8 @@
         gap: 5px;
         margin-bottom: 8px;
         overflow: hidden;
+        min-width: 0;
+        width: 100%;
 
         // Packed stacks are done: fade them so the operator's eye stays on
         // the unpacked work on top.
@@ -204,6 +206,7 @@
         background: var(--scan-card);
         display: flex;
         flex-direction: column;
+        width: 100%;
 
         &:first-child {
             border-radius: 4px 4px 0 0;
@@ -241,18 +244,31 @@
 
     .o_scan_card_head {
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: center;
-        position: relative;
+        // row 布局：左边文字堆（flex:1 自适应收缩）+ 右边按钮组（flex-shrink:0 自然宽度）
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
         padding: 4px 5px;
-        gap: 0;
         min-height: 44px;
+        // 宽度约束链：让子元素 flex item 能被压缩
+        width: 100%;
+        min-width: 0;
 
         &.is-selectable {
             cursor: pointer;
         }
     }
+
+    // 左侧文字块（flex column：源库位 / 产品名 / 元信息 垂直堆）
+    .o_scan_text_block {
+        flex: 1 1 auto;
+        min-width: 0;  // 关键：让这个 flex item 能被压缩 → 子元素能换行
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        overflow: hidden;
+    }
+
     .o_scan_pmeta_loc {
         font-size: 9px;
         font-weight: 700;
@@ -264,14 +280,11 @@
         font-size: 12px;
         font-weight: 700;
         line-height: 17px;
+        // 关键：flex item 可压缩 + 长词换行
         min-width: 0;
-        word-break: break-word;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
         width: 100%;
+        word-break: break-word;
+        // 不要 line-clamp —— 设计稿里是自然多行换行
     }
     .o_scan_pmeta {
         font-size: 9px;
@@ -280,14 +293,16 @@
         color: var(--scan-text-2);
         flex-shrink: 0;
     }
+
+    // 右侧按钮组（flex-shrink:0 自然宽度，不用 absolute + padding 硬编码）
+    // 无论按钮 0/1/2/3 个都自适应
     .o_scan_head_actions {
-        position: absolute;
-        right: 5px;
-        top: 4px;
         display: flex;
+        flex-direction: row;
         gap: 5px;
         align-items: center;
         flex-shrink: 0;
+        margin-left: 4px;
     }
 
     // 26x26 square buttons

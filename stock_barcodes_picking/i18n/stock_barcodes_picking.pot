@@ -1473,7 +1473,7 @@ msgstr ""
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Product already on the transfer — scan it to pick."
+msgid "Product already on the transfer — demand increased by %s."
 msgstr ""
 
 #. module: stock_barcodes_picking

@@ -468,18 +468,47 @@ export class PickingScanApp extends Component {
             {
                 resModel: "product.product",
                 title: _t("选择或创建产品"),
-                onSelected: async (records) => {
-                    const productId = records?.[0]?.id;
+                noCreate: false,
+                onSelected: async (resIds) => {
+                    // SelectCreateDialog 传 resIds（纯数字 ID 数组），
+                    // 不是 record 对象数组！records?.[0]?.id 会得到 undefined。
+                    const productId = resIds?.[0];
                     if (!productId) {
+                        this.notification.add(
+                            _t("请先选择一个产品"),
+                            { type: "warning" }
+                        );
                         return;
                     }
-                    await this.orm.call(
-                        "wiz.stock.barcodes.picking",
-                        "action_add_product_to_picking",
-                        [this.wizId],
-                        { product_id: productId }
-                    );
-                    await this._refreshState();
+                    try {
+                        this.notification.add(
+                            _t("正在添加产品 (id=%(id)s)...", { id: productId }),
+                            { type: "info" }
+                        );
+                        const result = await this.orm.call(
+                            "wiz.stock.barcodes.picking",
+                            "action_add_product_to_picking",
+                            [this.wizId],
+                            { product_id: productId }
+                        );
+                        this.notification.add(
+                            _t("后端返回: %(res)s", { res: String(result) }),
+                            { type: result ? "success" : "warning" }
+                        );
+                        await this._refreshState();
+                        this.notification.add(
+                            _t("已刷新产品列表"),
+                            { type: "success" }
+                        );
+                    } catch (err) {
+                        this.notification.add(
+                            _t("添加产品失败: %(err)s", {
+                                err: err?.message || JSON.stringify(err),
+                            }),
+                            { type: "danger" }
+                        );
+                        console.error("onAddProduct error:", err);
+                    }
                 },
             },
             { onClose: () => {} }

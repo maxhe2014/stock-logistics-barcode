@@ -124,15 +124,17 @@
                                      t-att-class="'o_scan_card_head' + (pkg.package_id ? '' : ' is-selectable')"
                                      t-att-title="pkg.package_id ? '' : 'Select this product, then scan'"
                                      t-on-click="() => !pkg.package_id &amp;&amp; this.onSelectMove(group.move.id)">
-                                    <div class="o_scan_pmeta_loc" t-if="mv.location_name">
-                                        从：<t t-out="mv.location_name" />
-                                    </div>
-                                    <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
-                                    <div class="o_scan_pmeta">
-                                        需求 <t t-out="mv.demand_qty" />
-                                        | 已拣 <t t-out="group.totalPicked" />
-                                        <t t-if="group.move.tracking === 'lot'"> | 批号</t>
-                                        <t t-if="group.move.tracking === 'serial'"> | 序列号</t>
+                                    <div class="o_scan_text_block">
+                                        <div class="o_scan_pmeta_loc" t-if="mv.location_name">
+                                            从：<t t-out="mv.location_name" />
+                                        </div>
+                                        <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
+                                        <div class="o_scan_pmeta">
+                                            需求 <t t-out="mv.demand_qty" />
+                                            | 已拣 <t t-out="group.totalPicked" />
+                                            <t t-if="group.move.tracking === 'lot'"> | 批号</t>
+                                            <t t-if="group.move.tracking === 'serial'"> | 序列号</t>
+                                        </div>
                                     </div>
                                     <div class="o_scan_head_actions">
                                         <span t-if="!pkg.package_id" class="o_scan_sq o_scan_sq_hand">
@@ -143,13 +145,15 @@
 
                                 <!-- Untracked product head: +1 / pencil / inline qty edit -->
                                 <div t-else="" class="o_scan_card_head">
-                                    <div class="o_scan_pmeta_loc" t-if="mv.location_name">
-                                        从：<t t-out="mv.location_name" />
-                                    </div>
-                                    <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
-                                    <div class="o_scan_pmeta">
-                                        需求 <t t-out="mv.demand_qty" />
-                                        | 已拣 <t t-out="group.totalPicked" />
+                                    <div class="o_scan_text_block">
+                                        <div class="o_scan_pmeta_loc" t-if="mv.location_name">
+                                            从：<t t-out="mv.location_name" />
+                                        </div>
+                                        <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
+                                        <div class="o_scan_pmeta">
+                                            需求 <t t-out="mv.demand_qty" />
+                                            | 已拣 <t t-out="group.totalPicked" />
+                                        </div>
                                     </div>
                                     <div class="o_scan_head_actions">
                                         <button t-if="!pkg.package_id"
