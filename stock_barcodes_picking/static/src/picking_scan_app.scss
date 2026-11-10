@@ -89,8 +89,8 @@
     // ---------- scan row ----------
     .o_scan_scanrow {
         display: flex;
-        gap: 8px;
-        padding: 6px 12px 8px;
+        gap: 5px;
+        padding: 6px 10px 8px;
 
         .o_picking_scan_input {
             flex: 1;
@@ -113,9 +113,10 @@
         height: 34.5px;
         min-width: 40px;
     }
-    // design 17: 扫描行左侧返回按钮固定 54px 宽（纯图标，去掉左右 padding）
-    .o_picking_scan_back {
-        width: 54px;
+    // design 20: 返回键与右侧相机按钮等宽（40.75px），纯图标
+    .o_picking_scan_back,
+    .o_picking_scan_camera {
+        width: 40.75px;
         padding-left: 0;
         padding-right: 0;
         flex-shrink: 0;
@@ -326,7 +327,98 @@
         gap: 5px;
         align-items: center;
         flex-shrink: 0;
+        min-width: 0;
+        max-width: 60%;
         margin-left: 4px;
+
+        // 数量追溯卡：design 20 右侧是纵向两行
+        //   上 = 已拣块，下 = 按钮行
+        // 宽度按内容自适应（min 65px），但不超过卡片一半，保证左侧
+        // 产品名容器始终有空间换行，大数字不会溢出压到文字。
+        &.is-stacked {
+            min-width: 65px;
+            width: auto;
+            max-width: 52%;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0;
+            margin-left: 5px;
+
+            // 数量编辑态：输入框 + 勾 + 叉 需要的宽度，允许向左扩张
+            &.is-editing {
+                width: auto;
+                max-width: 70%;
+            }
+        }
+    }
+    .o_scan_actions_row {
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 5px;
+        width: auto;
+        min-height: 30px;
+    }
+
+    // 已拣块：小标签 + 大号数字 + 单位（design 20 rule 4）
+    // 容器不溢出：数字位数多时自动降档（见 .is-long / .is-xlong）
+    .o_scan_picked {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: 3px;
+        min-width: 0;
+        max-width: 100%;
+        height: 30px;
+        line-height: 30px;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .o_scan_picked_lbl {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--scan-text-2);
+        flex-shrink: 0;
+    }
+    .o_scan_picked_num {
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 24px;
+        color: var(--scan-text);
+        min-width: 0;
+
+        &.is-long {
+            font-size: 16px;
+            line-height: 20px;
+        }
+        &.is-xlong {
+            font-size: 13px;
+            line-height: 18px;
+            letter-spacing: -0.3px;
+        }
+    }
+    .o_scan_picked_uom {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--scan-text-2);
+        flex-shrink: 0;
+    }
+
+    // 拣货完成徽章：使用设计稿原始 SVG（绿色齿形徽章 + 镂空勾）
+    .o_scan_badge_done {
+        width: 31.5337px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .o_scan_done_icon {
+        display: block;
+        width: 100%;
+        height: 100%;
     }
 
     // 30x30 square buttons (design 17)
@@ -352,15 +444,19 @@
         background: var(--scan-purple);
         color: #FFFFFF;
     }
-    .o_scan_sq_del {
-        background: var(--scan-purple);
-        color: #FFFFFF;
-    }
     .o_scan_sq_hand {
         background: transparent;
         color: #BCC0C7;
         width: 30px;
         font-size: 17px;
+
+        &.is-active {
+            color: #404144;
+        }
+        &.is-disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
     }
 
     // inline qty edit inside header
@@ -467,10 +563,33 @@
         text-overflow: ellipsis;
     }
     .o_scan_row_qty {
-        font-size: 12px;
+        font-size: 10px;
+        line-height: 14px;
         color: var(--scan-text-2);
         white-space: nowrap;
-        opacity: 0.9;
+    }
+    // 批号/序列号行右侧纵列：上=已拣数量，下=按钮（与卡片头右列一致）
+    .o_scan_row_side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 2px;
+        flex-shrink: 0;
+        min-width: 0;
+    }
+    .o_scan_row_btns {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 5px;
+        min-height: 30px;
+
+        // 没有按钮时（如 mandatory 策略的预留批次行）不占高度
+        &:empty {
+            min-height: 0;
+        }
     }
 
     // inline lot / reserved-lot editing panel

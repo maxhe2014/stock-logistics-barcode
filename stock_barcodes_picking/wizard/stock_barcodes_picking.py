@@ -482,8 +482,25 @@ class WizStockBarcodesPicking(models.TransientModel):
             location.id: location.display_name or ""
             for location in all_lines.location_dest_id
         }
+        # Unit of measure is only meaningful when the UoM feature is on;
+        # otherwise every product is a plain count and the card hides the
+        # unit next to the picked quantity (design 20 rule 4).
+        # The default counting unit (Units/单位/件) carries no information,
+        # so it is hidden too — only real units (kg, m, Pack of 6…) show.
+        uom_enabled = self.env.user.has_group("uom.group_uom")
+        default_uom = self.env.ref(
+            "uom.product_uom_unit", raise_if_not_found=False
+        )
         product_info_by_id = {
-            prod.id: (prod.display_name or "", prod.tracking or "none")
+            prod.id: (
+                prod.display_name or "",
+                prod.tracking or "none",
+                (
+                    (prod.uom_id.name or "")
+                    if uom_enabled and prod.uom_id != default_uom
+                    else ""
+                ),
+            )
             for prod in active_moves.product_id
         }
         lines_by_move_id = {}
@@ -658,6 +675,9 @@ class WizStockBarcodesPicking(models.TransientModel):
                     "lots_multi_location": lots_multi_location,
                     "product_uom_qty": mv.product_uom_qty,
                     "demand_qty": demand_qty,
+                    "uom_name": product_info_by_id.get(
+                        mv.product_id.id, ("", "none", "")
+                    )[2],
                     "quantity": group_qty,
                     "picked": picked_all,
                     "tracking": product_info_by_id.get(
@@ -693,6 +713,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             # ``web.CogMenu`` OWL component rendered in the top-right corner.
             "action_menu_items": self._get_picking_action_menu_items(),
             "barcode_lot_scan_policy": lot_scan_policy,
+            "uom_enabled": uom_enabled,
             "location_id": self.location_id.id or False,
             "location_name": self.location_id.display_name or "",
             "location_dest_id": self.location_dest_id.id or False,
@@ -2266,12 +2287,17 @@ class WizStockBarcodesPicking(models.TransientModel):
             )
         return result
 
-    def action_add_move_quantity(self, move_id):
-        """Add one to a non-tracked move while preserving SET semantics.
+    def action_add_move_quantity(self, move_id, quantity=None):
+        """Fill a non-tracked move's quantity up to its demand.
 
         Available in both mandatory and optional policies — non-tracked
         products don't need a lot/serial scan, so the operator may
         always add quantity directly through this shortcut.
+
+        ``quantity`` is the *target* picked quantity (SET semantics, the
+        design's green ``+N`` button sends the row demand), so one tap
+        fills the row instead of adding one unit. Without it the legacy
+        +1 behaviour is kept.
 
         Tracked products use the per-lot +1 button inside reserved
         badges (optional policy only), handled by
@@ -2295,7 +2321,12 @@ class WizStockBarcodesPicking(models.TransientModel):
             for line in move.move_line_ids
             if line.picked and not line.result_package_id
         )
-        return self.action_consume_with_qty(picked_qty + 1.0)
+        target_qty = (
+            picked_qty + 1.0
+            if quantity is None
+            else float(quantity)
+        )
+        return self.action_consume_with_qty(target_qty)
 
     def action_validate_picking(self):
         """Validate the current picking (finalize the transfer).
@@ -2797,8 +2828,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         qty = float(qty) if qty else 0.0
         if qty <= 0:
-            self._set_message("error", self.env._("Quantity must be positive"))
-            return False
+            # The design keeps a single edit button per product (no trash):
+            # entering 0 clears the package row instead of deleting it.
+            lines.write({"quantity": 0.0, "picked": False})
+            self._set_message(
+                "success",
+                self.env._("Cleared the picked quantity of the package."),
+            )
+            return True
         product = lines[0].product_id
         moves = self.picking_id.move_ids.filtered(
             lambda m: m.product_id == product and m.state != "cancel"

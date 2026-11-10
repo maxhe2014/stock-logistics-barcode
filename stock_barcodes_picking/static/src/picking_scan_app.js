@@ -680,8 +680,8 @@ export class PickingScanApp extends Component {
             return;
         }
         const qty = parseFloat(this.state.draftQty);
-        if (!qty || qty <= 0) {
-            this.notification.add(_t("Please enter a positive quantity"), {
+        if (Number.isNaN(qty) || qty < 0) {
+            this.notification.add(_t("Please enter a quantity"), {
                 type: "danger",
             });
             this._playAlert();
@@ -689,7 +689,21 @@ export class PickingScanApp extends Component {
         }
         this.state.scanning = true;
         try {
-            if (mv.package_id) {
+            if (qty === 0) {
+                // 输入 0 = 清空该行（设计稿去掉删除按钮，只保留修改按钮）
+                const res = mv.package_id
+                    ? await this.orm.call(
+                        "wiz.stock.barcodes.picking",
+                        "action_edit_package_qty",
+                        [[this.wizId], mv.id, mv.package_id, 0]
+                    )
+                    : await this.orm.call(
+                        "wiz.stock.barcodes.picking",
+                        "action_remove_move_qty",
+                        [[this.wizId], rowKey]
+                    );
+                await this._handleActionResult(res, "Clear quantity");
+            } else if (mv.package_id) {
                 // Packaged row: the consume flow below only SETs unpacked
                 // lines, so edit the lines that actually sit in this package.
                 let res = await this.orm.call(
@@ -756,7 +770,11 @@ export class PickingScanApp extends Component {
         this.state.draftQty = "";
     }
 
-    async onAddMoveQuantity(moveId) {
+    /**
+     * Green ``+N`` button of a quantity card: fill the row up to its
+     * demand in one tap (``quantity`` is the row demand, SET semantics).
+     */
+    async onAddMoveQuantity(moveId, quantity = null) {
         if (this.state.scanning || !this.wizId) {
             return;
         }
@@ -765,7 +783,7 @@ export class PickingScanApp extends Component {
             const res = await this.orm.call(
                 "wiz.stock.barcodes.picking",
                 "action_add_move_quantity",
-                [[this.wizId], moveId]
+                [[this.wizId], moveId, quantity]
             );
             await this._handleActionResult(res, "Add quantity");
         } catch (err) {
@@ -913,11 +931,17 @@ export class PickingScanApp extends Component {
         }
         const lineId = this.state.editingLotLineId;
         const qty = parseFloat(this.state.draftLotQty);
-        if (!qty || qty <= 0) {
-            this.notification.add(_t("Please enter a positive quantity"), {
+        if (Number.isNaN(qty) || qty < 0) {
+            this.notification.add(_t("Please enter a quantity"), {
                 type: "danger",
             });
             this._playAlert();
+            return;
+        }
+        if (qty === 0) {
+            // 输入 0 = 移除该批次/序列号行（替代已去掉的删除按钮）
+            this.onCancelLotQty();
+            await this._removeMoveLine(lineId);
             return;
         }
         this.state.scanning = true;
@@ -962,25 +986,6 @@ export class PickingScanApp extends Component {
         }
     }
 
-    /**
-     * Remove from the exact line. A multi-line badge first expands its real
-     * source/package lines so the operator can choose which one to correct.
-     */
-    async onRemoveMoveLot(rowKey, lotKey) {
-        if (this.state.scanning || !this.wizId) {
-            return;
-        }
-        const lot = this._findLot(rowKey, lotKey);
-        if (!lot?.picked || !lot.lines?.length) {
-            return;
-        }
-        if (lot.lines.length > 1) {
-            this.onEditLotQty(rowKey, lotKey);
-            return;
-        }
-        await this._removeMoveLine(lot.lines[0].id);
-    }
-
     async _removeMoveLine(lineId) {
         if (this.state.scanning || !this.wizId) {
             return;
@@ -1010,8 +1015,9 @@ export class PickingScanApp extends Component {
     }
 
     /**
-     * Delete the whole picked quantity of one row (quantity-tracked
-     * products), mirroring the per-lot trash button of tracked products.
+     * Clear the whole picked quantity of one row (quantity-tracked
+     * products). Reached by entering 0 in the row's edit field — the
+     * design has no dedicated delete button any more.
      */
     async onRemoveMoveQty(rowKey) {
         if (this.state.scanning || !this.wizId) {
@@ -1515,13 +1521,30 @@ export class PickingScanApp extends Component {
             }
             const p = pkgs.get(key);
             if (!p.groups.has(mv.id)) {
-                p.groups.set(mv.id, { move: mv, rows: [], totalPicked: 0 });
+                p.groups.set(mv.id, {
+                    move: mv,
+                    rows: [],
+                    totalPicked: 0,
+                    demandTotal: 0,
+                    uomName: mv.uom_name || "",
+                    isComplete: false,
+                });
             }
             const g = p.groups.get(mv.id);
             g.rows.push(mv);
             const qty = Number(mv.quantity) || 0;
             g.totalPicked += qty;
+            g.demandTotal += Number(mv.demand_qty) || 0;
             p.qty += qty;
+            // 拣货完成徽章：已拣 >= 需求（需求为 0 的空行不算完成）
+            g.isComplete = g.demandTotal > 0 && g.totalPicked >= g.demandTotal;
+            if (!g.uomName && mv.uom_name) {
+                g.uomName = mv.uom_name;
+            }
+            // 大数字降档：位数越多字号越小，避免撑破右列压到产品名
+            const digits = String(Math.round(g.totalPicked * 100) / 100).length;
+            g.pickedNumClass =
+                digits >= 7 ? "is-xlong" : digits >= 5 ? "is-long" : "";
         }
         // Unpacked stays on top (design: what is not packed yet — including
         // the unpicked remainder — is always the first stack), packaged

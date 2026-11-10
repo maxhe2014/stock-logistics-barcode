@@ -133,19 +133,37 @@
                                         <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
                                         <div class="o_scan_pmeta">
                                             需求 <t t-out="mv.demand_qty" />
-                                            | 已拣 <t t-out="group.totalPicked" />
                                             <t t-if="group.move.tracking === 'lot'"> | 批号</t>
                                             <t t-if="group.move.tracking === 'serial'"> | 序列号</t>
                                         </div>
                                     </div>
-                                    <div class="o_scan_head_actions">
-                                        <span t-if="!pkg.package_id" class="o_scan_sq o_scan_sq_hand">
-                                            <i t-att-class="state.active_move_id === group.move.id ? 'fa fa-hand-o-right' : 'fa fa-hand-o-right opacity-50'"/>
-                                        </span>
+                                    <div class="o_scan_head_actions is-stacked">
+                                        <div class="o_scan_picked">
+                                            <span class="o_scan_picked_lbl">已拣:</span>
+                                            <span t-att-class="'o_scan_picked_num ' + (group.pickedNumClass || '')"><t t-out="group.totalPicked" /></span>
+                                            <span class="o_scan_picked_uom" t-if="mv.uom_name"><t t-out="mv.uom_name" /></span>
+                                        </div>
+                                        <div class="o_scan_actions_row">
+                                            <!-- 点选该产品为当前扫码目标（未装包的卡才可点） -->
+                                            <button t-if="!pkg.package_id"
+                                                    type="button"
+                                                    t-att-class="'o_scan_sq o_scan_sq_hand' + (state.active_move_id === group.move.id ? ' is-active' : '')"
+                                                    title="选择该产品"
+                                                    t-on-click.stop="() => this.onSelectMove(group.move.id)">
+                                                <i class="fa fa-hand-o-right"/>
+                                            </button>
+                                            <span t-else="" class="o_scan_sq o_scan_sq_hand is-disabled">
+                                                <i class="fa fa-hand-o-right"/>
+                                            </span>
+                                            <!-- 拣货完成徽章：已拣 >= 需求 -->
+                                            <span t-if="group.isComplete" class="o_scan_badge_done" title="拣货完成">
+                                                <img class="o_scan_done_icon" src="/stock_barcodes_picking/static/src/img/scan_done.svg" alt=""/>
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <!-- Untracked product head: +1 / pencil / inline qty edit -->
+                                <!-- Untracked product head: 已拣 block + pencil + green +N -->
                                 <div t-else="" class="o_scan_card_head">
                                     <div class="o_scan_text_block">
                                         <div class="o_scan_pmeta_loc" t-if="mv.location_name">
@@ -155,17 +173,15 @@
                                         <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
                                         <div class="o_scan_pmeta">
                                             需求 <t t-out="mv.demand_qty" />
-                                            | 已拣 <t t-out="group.totalPicked" />
                                         </div>
                                     </div>
-                                    <div class="o_scan_head_actions">
-                                        <button t-if="!pkg.package_id"
-                                                type="button"
-                                                class="o_scan_sq o_scan_sq_add"
-                                                title="Add one"
-                                                t-on-click.stop="() => this.onAddMoveQuantity(group.move.id)">
-                                            +1
-                                        </button>
+                                    <div t-att-class="'o_scan_head_actions is-stacked' + (state.editingQtyMoveId === mv.row_key ? ' is-editing' : '')">
+                                        <div class="o_scan_picked">
+                                            <span class="o_scan_picked_lbl">已拣:</span>
+                                            <span t-att-class="'o_scan_picked_num ' + (group.pickedNumClass || '')"><t t-out="group.totalPicked" /></span>
+                                            <span class="o_scan_picked_uom" t-if="mv.uom_name"><t t-out="mv.uom_name" /></span>
+                                        </div>
+                                        <div class="o_scan_actions_row">
                                         <t t-if="state.editingQtyMoveId === mv.row_key">
                                             <span class="o_scan_qty_edit" t-on-click.stop="">
                                                 <input
@@ -193,18 +209,22 @@
                                         <t t-else="">
                                             <button type="button"
                                                     class="o_scan_sq o_scan_sq_edit"
-                                                    title="Edit quantity"
+                                                    title="修改数量（可输入 0 清空）"
                                                     t-on-click.stop="() => this.onEditMoveQty(mv.row_key)">
                                                 <i class="fa fa-pencil"/>
                                             </button>
-                                            <button t-if="group.totalPicked > 0"
+                                            <!-- 需求量直接作为一次点击的加满数量（对齐企业版扫码）；拣完则显示完成徽章 -->
+                                            <button t-if="!group.isComplete and !pkg.package_id and mv.demand_qty > 0"
                                                     type="button"
-                                                    class="o_scan_sq o_scan_sq_del"
-                                                    title="Delete picked quantity"
-                                                    t-on-click.stop="() => this.onRemoveMoveQty(mv.row_key)">
-                                                <i class="fa fa-trash"/>
-                                            </button>
+                                                    class="o_scan_sq o_scan_sq_add"
+                                                    t-att-title="'加满需求量 ' + mv.demand_qty"
+                                                    t-on-click.stop="() => this.onAddMoveQuantity(group.move.id, mv.demand_qty)"
+                                            >+<t t-out="mv.demand_qty" /></button>
+                                            <span t-elif="group.isComplete" class="o_scan_badge_done" title="拣货完成">
+                                                <img class="o_scan_done_icon" src="/stock_barcodes_picking/static/src/img/scan_done.svg" alt=""/>
+                                            </span>
                                         </t>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -226,7 +246,7 @@
                                              class="o_scan_row is-collapsed-single"
                                              t-att-data-scan-row="mv.row_key">
                                             <span class="o_scan_row_name"><t t-out="summary.name" /></span>
-                                            <span class="o_scan_row_qty">Picked: <t t-out="summary.total" /></span>
+                                            <span class="o_scan_row_qty">已拣: <t t-out="summary.total" /></span>
                                         </div>
                                     </t>
                                     <t t-else="">
@@ -235,7 +255,7 @@
                                                  t-att-data-scan-row="mv.row_key"
                                                  t-att-data-scan-lot="mv.row_key + ':' + lot.id">
 
-                                                <!-- Picked lot: name / qty / [pencil lot only] / trash -->
+                                                <!-- Picked lot: 名称 | 右侧纵列（上=已拣，下=按钮） -->
                                                 <t t-if="lot.picked">
                                                     <span class="o_scan_row_name">
                                                         <t t-out="lot.name" />
@@ -244,23 +264,20 @@
                                                             <span class="o_scan_row_loc" t-if="lot.location_dest_name">至：<t t-out="lot.location_dest_name" /></span>
                                                         </t>
                                                     </span>
-                                                    <span class="o_scan_row_qty">Picked: <t t-out="lot.picked_quantity" /></span>
-                                                    <button t-if="mv.tracking === 'lot'"
-                                                            type="button"
-                                                            class="o_scan_sq o_scan_sq_edit"
-                                                            title="Edit quantity"
-                                                            t-on-click.stop="() => this.onEditLotQty(mv.row_key, lot.key)">
-                                                        <i class="fa fa-pencil"/>
-                                                    </button>
-                                                    <button type="button"
-                                                            class="o_scan_sq o_scan_sq_del"
-                                                            t-att-title="'Remove ' + lot.name"
-                                                            t-on-click.stop="() => this.onRemoveMoveLot(mv.row_key, lot.key)">
-                                                        <i class="fa fa-trash"/>
-                                                    </button>
+                                                    <div class="o_scan_row_side">
+                                                        <span class="o_scan_row_qty">已拣: <t t-out="lot.picked_quantity" /></span>
+                                                        <div class="o_scan_row_btns">
+                                                            <button type="button"
+                                                                    class="o_scan_sq o_scan_sq_edit"
+                                                                    title="修改数量（可输入 0 清空）"
+                                                                    t-on-click.stop="() => this.onEditLotQty(mv.row_key, lot.key)">
+                                                                <i class="fa fa-pencil"/>
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </t>
 
-                                                <!-- Reserved lot: name / qty / +1 / [pencil lot only] -->
+                                                <!-- Reserved lot: 名称 | 右侧纵列（上=已拣，下=+1/修改） -->
                                                 <t t-else="">
                                                     <span class="o_scan_row_name">
                                                         <t t-out="lot.name" />
@@ -269,22 +286,26 @@
                                                             <span class="o_scan_row_loc" t-if="lot.location_dest_name">至：<t t-out="lot.location_dest_name" /></span>
                                                         </t>
                                                     </span>
-                                                    <span class="o_scan_row_qty">Picked: <t t-out="lot.picked_quantity || 0" /></span>
-                                                    <t t-if="state.barcode_lot_scan_policy === 'optional'">
-                                                        <button type="button"
-                                                                class="o_scan_sq o_scan_sq_add"
-                                                                title="Pick reserved lot"
-                                                                t-on-click.stop="() => this.onPickReservedLot(mv.id, lot.id)">
-                                                            +1
-                                                        </button>
-                                                        <button t-if="mv.tracking === 'lot'"
-                                                                type="button"
-                                                                class="o_scan_sq o_scan_sq_edit"
-                                                                title="Edit quantity"
-                                                                t-on-click.stop="() => this.onEditReservedLotQty(mv.row_key, lot.key)">
-                                                            <i class="fa fa-pencil"/>
-                                                        </button>
-                                                    </t>
+                                                    <div class="o_scan_row_side">
+                                                        <span class="o_scan_row_qty">已拣: <t t-out="lot.picked_quantity || 0" /></span>
+                                                        <div class="o_scan_row_btns">
+                                                            <t t-if="state.barcode_lot_scan_policy === 'optional'">
+                                                                <button type="button"
+                                                                        class="o_scan_sq o_scan_sq_add"
+                                                                        title="Pick reserved lot"
+                                                                        t-on-click.stop="() => this.onPickReservedLot(mv.id, lot.id)">
+                                                                    +1
+                                                                </button>
+                                                                <button t-if="mv.tracking === 'lot'"
+                                                                        type="button"
+                                                                        class="o_scan_sq o_scan_sq_edit"
+                                                                        title="Edit quantity"
+                                                                        t-on-click.stop="() => this.onEditReservedLotQty(mv.row_key, lot.key)">
+                                                                    <i class="fa fa-pencil"/>
+                                                                </button>
+                                                            </t>
+                                                        </div>
+                                                    </div>
                                                 </t>
 
                                                 <!-- Reserved lot qty edit (lot only) -->
@@ -351,18 +372,11 @@
                                                             </t>
                                                             <t t-else="">
                                                                 <strong>× <t t-out="line.quantity" /></strong>
-                                                                <button t-if="mv.tracking !== 'serial'"
-                                                                        type="button"
+                                                                <button type="button"
                                                                         class="o_scan_sq o_scan_sq_edit"
-                                                                        title="Edit quantity"
+                                                                        title="修改数量（可输入 0 清空）"
                                                                         t-on-click.stop="() => this.onSelectLotLine(line)">
                                                                     <i class="fa fa-pencil"/>
-                                                                </button>
-                                                                <button type="button"
-                                                                        class="o_scan_sq o_scan_sq_del"
-                                                                        t-att-title="'Remove ' + lot.name"
-                                                                        t-on-click.stop="() => this._removeMoveLine(line.id)">
-                                                                    <i class="fa fa-trash"/>
                                                                 </button>
                                                             </t>
                                                         </div>
@@ -425,7 +439,7 @@
                                         <i class="fa fa-pencil"/>
                                     </button>
                                 </span>
-                                <span class="o_scan_pkg_qty">Qty: <t t-out="pkg.qty" /></span>
+                                <span class="o_scan_pkg_qty">数量：<t t-out="pkg.qty" /></span>
                                 <button t-if="pkg.package_id"
                                         type="button"
                                         class="o_scan_pkg_del"
@@ -442,7 +456,7 @@
             <!-- Footer -->
             <div class="o_scan_footer">
                 <div class="o_scan_footer_progress" t-if="state.picking_id">
-                    Progress: <t t-out="state.total_done" />/<t t-out="state.total_demand" />
+                    进度：<t t-out="state.total_done" />/<t t-out="state.total_demand" />
                 </div>
                 <div class="o_scan_footer_actions">
                     <!-- 左：绿色添加产品按钮 -->
