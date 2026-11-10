@@ -36,8 +36,15 @@
                 <CogMenu t-if="state.picking_id" t-props="cogMenuProps"/>
             </div>
 
-            <!-- Scan row: manual input + camera + back -->
+            <!-- Scan row: back + manual input + camera (design 17) -->
             <div class="o_scan_scanrow">
+                <button
+                    type="button"
+                    class="o_scan_key o_picking_scan_back"
+                    t-on-click="onBack"
+                    title="返回">
+                    <i class="fa fa-arrow-left"/>
+                </button>
                 <input
                     type="text"
                     class="o_picking_scan_input"
@@ -54,13 +61,6 @@
                     title="扫码"
                 >
                     <i class="fa fa-camera" aria-hidden="true"/>
-                </button>
-                <button
-                    type="button"
-                    class="o_scan_key o_picking_scan_back"
-                    t-on-click="onBack"
-                    title="返回">
-                    <i class="fa fa-arrow-left"/> 返回
                 </button>
             </div>
 
@@ -125,8 +125,10 @@
                                      t-att-title="pkg.package_id ? '' : 'Select this product, then scan'"
                                      t-on-click="() => !pkg.package_id &amp;&amp; this.onSelectMove(group.move.id)">
                                     <div class="o_scan_text_block">
-                                        <div class="o_scan_pmeta_loc" t-if="mv.location_name">
-                                            从：<t t-out="mv.location_name" />
+                                        <!-- 从/至：序列号卡且内部序列号来自不同位置时隐藏（此时每个序列号行内自带来源） -->
+                                        <div class="o_scan_pmeta_loc" t-if="mv.location_name and !(group.move.tracking === 'serial' and mv.lots_multi_location)">
+                                            <span>从：<t t-out="mv.location_name" /></span>
+                                            <span t-if="mv.location_dest_name">至：<t t-out="mv.location_dest_name" /></span>
                                         </div>
                                         <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
                                         <div class="o_scan_pmeta">
@@ -147,7 +149,8 @@
                                 <div t-else="" class="o_scan_card_head">
                                     <div class="o_scan_text_block">
                                         <div class="o_scan_pmeta_loc" t-if="mv.location_name">
-                                            从：<t t-out="mv.location_name" />
+                                            <span>从：<t t-out="mv.location_name" /></span>
+                                            <span t-if="mv.location_dest_name">至：<t t-out="mv.location_dest_name" /></span>
                                         </div>
                                         <div class="o_scan_pname"><t t-out="group.move.product_name" /></div>
                                         <div class="o_scan_pmeta">
@@ -234,7 +237,13 @@
 
                                                 <!-- Picked lot: name / qty / [pencil lot only] / trash -->
                                                 <t t-if="lot.picked">
-                                                    <span class="o_scan_row_name"><t t-out="lot.name" /></span>
+                                                    <span class="o_scan_row_name">
+                                                        <t t-out="lot.name" />
+                                                        <t t-if="mv.tracking === 'serial' and mv.lots_multi_location">
+                                                            <span class="o_scan_row_loc" t-if="lot.location_name">从：<t t-out="lot.location_name" /></span>
+                                                            <span class="o_scan_row_loc" t-if="lot.location_dest_name">至：<t t-out="lot.location_dest_name" /></span>
+                                                        </t>
+                                                    </span>
                                                     <span class="o_scan_row_qty">Picked: <t t-out="lot.picked_quantity" /></span>
                                                     <button t-if="mv.tracking === 'lot'"
                                                             type="button"
@@ -253,7 +262,13 @@
 
                                                 <!-- Reserved lot: name / qty / +1 / [pencil lot only] -->
                                                 <t t-else="">
-                                                    <span class="o_scan_row_name"><t t-out="lot.name" /></span>
+                                                    <span class="o_scan_row_name">
+                                                        <t t-out="lot.name" />
+                                                        <t t-if="mv.tracking === 'serial' and mv.lots_multi_location">
+                                                            <span class="o_scan_row_loc" t-if="lot.location_name">从：<t t-out="lot.location_name" /></span>
+                                                            <span class="o_scan_row_loc" t-if="lot.location_dest_name">至：<t t-out="lot.location_dest_name" /></span>
+                                                        </t>
+                                                    </span>
                                                     <span class="o_scan_row_qty">Picked: <t t-out="lot.picked_quantity || 0" /></span>
                                                     <t t-if="state.barcode_lot_scan_policy === 'optional'">
                                                         <button type="button"

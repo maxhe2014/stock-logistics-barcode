@@ -478,6 +478,10 @@ class WizStockBarcodesPicking(models.TransientModel):
             location.id: location.display_name or ""
             for location in all_lines.location_id
         }
+        location_dest_name_by_id = {
+            location.id: location.display_name or ""
+            for location in all_lines.location_dest_id
+        }
         product_info_by_id = {
             prod.id: (prod.display_name or "", prod.tracking or "none")
             for prod in active_moves.product_id
@@ -509,11 +513,22 @@ class WizStockBarcodesPicking(models.TransientModel):
                 mv.location_id.display_name
                 or location_name_by_id.get(default_loc_id, "")
             )
+            default_dest_name = mv.location_dest_id.display_name or ""
+            tracking = product_info_by_id.get(
+                mv.product_id.id, ("", "none")
+            )[1]
             for l in picked_lines:
                 pkg_id = l.result_package_id.id or False
                 pkg_name = package_name_by_id.get(pkg_id, "")
-                loc_id = l.location_id.id or False
-                loc_name = location_name_by_id.get(loc_id, "")
+                # Serial-tracked moves stay on ONE card per package: each
+                # serial row shows its own 从/至 inside the card body
+                # (design rule 3). Other tracking modes split one card per
+                # source location (design rule 2).
+                if tracking == "serial":
+                    loc_id, loc_name = default_loc_id, default_loc_name
+                else:
+                    loc_id = l.location_id.id or False
+                    loc_name = location_name_by_id.get(loc_id, "")
                 key = (pkg_id, pkg_name, loc_id, loc_name)
                 if key not in package_groups:
                     package_groups[key] = []
@@ -552,6 +567,16 @@ class WizStockBarcodesPicking(models.TransientModel):
                             "name": lot_name_by_id.get(l.lot_id.id, ""),
                             "picked": True,
                             "picked_quantity": 0.0,
+                            # Per-lot 从/至: shown inside the serial row when
+                            # one card mixes serials from different locations.
+                            "location_name": location_name_by_id.get(
+                                l.location_id.id, ""
+                            ),
+                            "location_dest_name": (
+                                location_dest_name_by_id.get(
+                                    l.location_dest_id.id, ""
+                                )
+                            ),
                             # Real move-line identities allow corrections to
                             # target one source/package line instead of the
                             # first line matching move + lot.
@@ -583,6 +608,14 @@ class WizStockBarcodesPicking(models.TransientModel):
                                 "picked": False,
                                 "picked_quantity": 0.0,
                                 "reserved_quantity": 0.0,
+                                "location_name": location_name_by_id.get(
+                                    l.location_id.id, ""
+                                ),
+                                "location_dest_name": (
+                                    location_dest_name_by_id.get(
+                                        l.location_dest_id.id, ""
+                                    )
+                                ),
                                 "lines": [],
                             }
                         lots_by_key[lot_key]["reserved_quantity"] += l.quantity
@@ -598,6 +631,22 @@ class WizStockBarcodesPicking(models.TransientModel):
                     group_qty if pkg_id
                     else max(mv.product_uom_qty - packed_picked, 0.0)
                 )
+                # Row-level 至：take the first line's destination, falling
+                # back to the move's own destination for empty groups.
+                row_dest_name = (
+                    location_dest_name_by_id.get(
+                        lines[0].location_dest_id.id, ""
+                    )
+                    if lines
+                    else default_dest_name
+                )
+                # True when the serials inside this card come from / go to
+                # more than one location — then each serial row shows its own
+                # 从/至 and the card header hides the location line.
+                lots_multi_location = len({
+                    (lot.get("location_name", ""), lot.get("location_dest_name", ""))
+                    for lot in lots
+                }) > 1
                 moves.append({
                     "id": mv.id,
                     "row_key": "%s_%s_%s" % (mv.id, pkg_id or "nopkg", loc_id or 0),
@@ -605,6 +654,8 @@ class WizStockBarcodesPicking(models.TransientModel):
                         mv.product_id.id, ("", "none")
                     )[0],
                     "location_name": loc_name,
+                    "location_dest_name": row_dest_name,
+                    "lots_multi_location": lots_multi_location,
                     "product_uom_qty": mv.product_uom_qty,
                     "demand_qty": demand_qty,
                     "quantity": group_qty,

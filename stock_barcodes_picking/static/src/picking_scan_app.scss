@@ -4,13 +4,13 @@
 // Odoo's color_scheme (web_dark_mode module cookie), not the OS setting.
 
 .o_picking_scan_app {
-    --scan-page: #E4E4E4;
+    --scan-page: #E5E5E5;
     --scan-card: #FFFFFF;
     --scan-frame: #BBBFC6;
     --scan-text: #000000;
     --scan-text-2: #74787B;
     --scan-row-bg: rgba(22, 163, 181, 0.2);
-    --scan-fold-bg: rgba(22, 163, 181, 0.36);
+    --scan-fold-bg: rgba(22, 163, 181, 0.4);
     --scan-hint-bg: #D0ECF0;
     --scan-hint-fg: #0F3A4A;
     --scan-key-bg: #BBBFC6;
@@ -32,19 +32,18 @@
     }
 
     // ---------- top: source btn + doc name + progress + actions ----------
+    // Design 17: bare icons (no button frame), 20px bold doc name.
     .o_scan_topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        padding: 6px 12px 2px;
+        padding: 0 15px;
+        min-height: 34px;
     }
     .o_scan_src_btn,
     .o_scan_actions_btn {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        border: 1px solid var(--scan-frame);
+        border: 0;
         background: transparent;
         color: var(--scan-text);
         display: inline-flex;
@@ -52,10 +51,21 @@
         justify-content: center;
         cursor: pointer;
         flex-shrink: 0;
-        font-size: 15px;
+        font-size: 19px;
+        padding: 4px;
         &:hover {
-            background: var(--scan-row-bg);
+            color: var(--scan-text-2);
         }
+    }
+    // The CogMenu renders Odoo's own dropdown toggle — strip any button
+    // chrome so it reads as a bare icon like the design's right vector.
+    .o_scan_topbar .o-dropdown > .dropdown-toggle {
+        border: 0;
+        background: transparent;
+        color: var(--scan-text);
+        font-size: 19px;
+        padding: 4px;
+        box-shadow: none;
     }
     .o_scan_doc_wrap {
         flex: 1;
@@ -102,6 +112,15 @@
     .o_scan_key {
         height: 34.5px;
         min-width: 40px;
+    }
+    // design 17: 扫描行左侧返回按钮固定 54px 宽（纯图标，去掉左右 padding）
+    .o_picking_scan_back {
+        width: 54px;
+        padding-left: 0;
+        padding-right: 0;
+        flex-shrink: 0;
+    }
+    .o_scan_key {
         padding: 0 10px;
         border: 0;
         border-radius: 4px;
@@ -269,11 +288,16 @@
         overflow: hidden;
     }
 
+    // 从/至 并排一行（design 17: 9px Regular 灰, opacity .8）
     .o_scan_pmeta_loc {
+        display: flex;
+        flex-direction: row;
+        gap: 12px;
         font-size: 9px;
-        font-weight: 700;
+        font-weight: 400;
         line-height: 13px;
         color: var(--scan-text-2);
+        opacity: 0.8;
         flex-shrink: 0;
     }
     .o_scan_pname {
@@ -305,10 +329,10 @@
         margin-left: 4px;
     }
 
-    // 26x26 square buttons
+    // 30x30 square buttons (design 17)
     .o_scan_sq {
-        width: 26px;
-        height: 26px;
+        width: 30px;
+        height: 30px;
         border-radius: 4px;
         border: 0;
         padding: 0;
@@ -335,7 +359,7 @@
     .o_scan_sq_hand {
         background: transparent;
         color: #BCC0C7;
-        width: 26px;
+        width: 30px;
         font-size: 17px;
     }
 
@@ -395,6 +419,8 @@
         gap: 5px;
         padding: 5px;
         position: relative;
+        // design 17: 每行底部 1px 分隔线
+        border-bottom: 1px solid rgba(22, 163, 181, 0.4);
 
         &.is-collapsed-single {
             min-height: 36px;
@@ -423,9 +449,22 @@
         color: var(--scan-text-2);
         flex: 1;
         min-width: 0;
+        // column：名字一行 + 可选的 从/至 两行（序列号多位置时）
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        overflow: hidden;
+    }
+    // lot 行内的 从/至（design 17: 9px 灰 opacity .8）
+    .o_scan_row_loc {
+        font-size: 9px;
+        font-weight: 400;
+        line-height: 13px;
+        color: var(--scan-text-2);
+        opacity: 0.8;
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: nowrap;
     }
     .o_scan_row_qty {
         font-size: 12px;
