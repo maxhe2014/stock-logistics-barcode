@@ -9,6 +9,29 @@
     min-height: 0;
 }
 
+/* Put the picking list/kanban Scan button before Odoo's New button. */
+.o_control_panel_main_buttons > .o_stock_picking_scan_header {
+    order: -1;
+}
+
+/* Mobile: show Scan directly; move New into the adaptive dropdown only. */
+@media (max-width: 767.98px) {
+    .o_control_panel .o_control_panel_main .o_control_panel_main_buttons > .o_stock_picking_scan_header {
+        display: inline-flex !important;
+    }
+    .o_control_panel .o_control_panel_main_buttons:has(> .o_stock_picking_scan_header)
+        > :is(.o_list_button_add, .o-kanban-button-new) {
+        display: none !important;
+    }
+    body .o-control-panel-adaptive-dropdown.dropdown-menu:has(> .o_stock_picking_scan_header)
+        > :is(.o_list_button_add, .o-kanban-button-new) {
+        display: block !important;
+    }
+    body .o-control-panel-adaptive-dropdown.dropdown-menu > .o_stock_picking_scan_header {
+        display: none !important;
+    }
+}
+
 /* Candidate selector: distinct warning style */
 .o_picking_scan_selector .list-group-item {
     cursor: pointer;

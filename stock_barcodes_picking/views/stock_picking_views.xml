@@ -32,7 +32,7 @@
                 <button name="action_open_scan_wizard"
                         type="object"
                         string="Scan"
-                        class="oe_highlight"
+                        class="oe_highlight o_stock_picking_scan_header"
                         display="always"/>
             </xpath>
             <xpath expr="//list/field[@name='priority']" position="before">
@@ -57,7 +57,7 @@
                     <button name="action_open_scan_wizard"
                             type="object"
                             string="Scan"
-                            class="oe_highlight"
+                            class="oe_highlight o_stock_picking_scan_header"
                             display="always"/>
                 </header>
             </xpath>
