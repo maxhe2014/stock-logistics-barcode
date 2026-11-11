@@ -37,38 +37,59 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
-        padding: 0 15px;
+        gap: 0;
+        padding: 0 10px;
         min-height: 34px;
     }
     .o_scan_src_btn,
-    .o_scan_actions_btn {
-        border: 0;
-        background: transparent;
-        color: var(--scan-text);
+    .o_scan_actions_btn,
+    // Odoo 19 CogMenu 按钮结构：.o_cp_action_menus button.btn (不是 dropdown-toggle)
+    .o_scan_topbar .o_cp_action_menus button {
+        border: 0 !important;
+        width: 40px;
+        height: 33px;
+        border-radius: 4px;
+        background: var(--scan-key-bg);
+        color: var(--scan-key-fg);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
         flex-shrink: 0;
-        font-size: 19px;
-        padding: 4px;
+        padding: 0;
+        box-shadow: 0 1.5px 0 0 var(--scan-key-shadow);
         &:hover {
-            color: var(--scan-text-2);
+            background: var(--scan-key-bg);
+            color: var(--scan-key-fg);
+            filter: brightness(0.95);
         }
     }
-    // The CogMenu renders Odoo's own dropdown toggle — strip any button
-    // chrome so it reads as a bare icon like the design's right vector.
-    .o_scan_topbar .o-dropdown > .dropdown-toggle {
-        border: 0;
-        background: transparent;
-        color: var(--scan-text);
-        font-size: 19px;
-        padding: 4px;
-        box-shadow: none;
+    // CogMenu 里的 FontAwesome fa-cog 隐藏，换成设计稿 gear SVG
+    .o_scan_topbar .o_cp_action_menus button > i.fa-cog,
+    .o_scan_topbar .o_cp_action_menus button > i {
+        display: none;
+    }
+    .o_scan_topbar .o_cp_action_menus button {
+        background-image: url('/stock_barcodes_picking/static/src/img/top_gear.svg');
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 18.5px 19px;
+    }
+    // 去掉 Odoo CogMenu 可能带的下拉箭头 caret
+    .o_scan_topbar .o_cp_action_menus,
+    .o_scan_topbar .o_cp_action_menus .lh-1 {
+        gap: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    // SVG icons inside the topbar buttons.
+    .o_scan_src_icon {
+        width: 18px;
+        height: 19px;
+        display: block;
     }
     .o_scan_doc_wrap {
-        flex: 1;
+        flex: none;
         min-width: 0;
         text-align: center;
     }
@@ -83,29 +104,63 @@
     .o_scan_doc_progress {
         font-size: 12px;
         line-height: 18px;
-        color: var(--scan-text-2);
+        color: var(--scan-text);
     }
 
     // ---------- scan row ----------
     .o_scan_scanrow {
         display: flex;
         gap: 5px;
-        padding: 6px 10px 8px;
+        padding: 0 10px;
+        margin-top: 2px;       // 与顶栏的微小间距
 
-        .o_picking_scan_input {
-            flex: 1;
+        // 扫码输入框容器：stroke-wrapper 样式（白底 + 1px 灰边）
+        .o_scan_input_wrap {
+            flex: 1 1 0%;      // 全宽自适应，min-width:0 让 flex item 可压缩
             min-width: 0;
-            height: 35px;
+            height: 33px;
             border: 1px solid var(--scan-frame);
             border-radius: 4px;
             background: #FFFFFF;
-            color: #000000;
             padding: 0 10px;
-            font-size: 15px;
-            &::placeholder {
-                color: #A8ACB3;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+
+            .o_scan_barcode_icon {
+                width: 19.65px;
+                height: 16.49px;
+                flex-shrink: 0;
+                display: block;
+            }
+
+            .o_picking_scan_input {
+                flex: 1 1 0%;
+                min-width: 0;
+                border: 0;
+                outline: none;
+                background: transparent;
+                height: 100%;
+                padding: 0;
+                font-size: 18px;
+                color: #000000;
+                &::placeholder {
+                    color: var(--scan-frame);
+                }
             }
         }
+    }
+
+    // 返回/相机按钮里的 SVG 图标（保持设计稿原尺寸，在按钮内 flex 居中）
+    .o_scan_back_icon {
+        width: 18px;
+        height: 19px;
+        display: block;
+    }
+    .o_scan_camera_icon {
+        width: 24px;
+        height: 16px;
+        display: block;
     }
 
     // key-style button (camera / back / footer actions)
@@ -113,10 +168,10 @@
         height: 34.5px;
         min-width: 40px;
     }
-    // design 20: 返回键与右侧相机按钮等宽（40.75px），纯图标
+    // 返回键与右侧相机按钮等宽（40px，设计稿 23），纯图标
     .o_picking_scan_back,
     .o_picking_scan_camera {
-        width: 40.75px;
+        width: 40px;
         padding-left: 0;
         padding-right: 0;
         flex-shrink: 0;
@@ -154,7 +209,7 @@
 
     // ---------- hint bar ----------
     .o_scan_hintbar {
-        margin: 0 12px;
+        margin: 5px 10px 0;    // 上方与扫码行 gap:5px，左右对齐按钮 padding
         min-height: 25px;
         border-radius: 4px;
         padding: 0 10px;
@@ -162,7 +217,7 @@
         color: var(--scan-hint-fg);
         font-size: 12px;
         line-height: 25px;
-        box-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 4px 4px 0 rgba(22, 163, 181, 0.4);
 
         &.alert-success {
             background: #CFE9D6;

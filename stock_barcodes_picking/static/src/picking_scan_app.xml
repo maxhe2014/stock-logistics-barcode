@@ -22,36 +22,39 @@
     <t t-name="stock_barcodes_picking.PickingScanApp">
         <div class="o_picking_scan_app d-flex flex-column h-100">
 
-            <!-- Top bar: source button + transfer name + progress + actions -->
+            <!-- Top bar: source button + transfer name + progress + cog -->
             <div class="o_scan_topbar" t-if="state.picking_id">
                 <button type="button" class="o_scan_src_btn" t-on-click="onOpenSourcePicking" title="查看源单据">
-                    <i class="fa fa-file-text-o"/>
+                    <img class="o_scan_src_icon" src="/stock_barcodes_picking/static/src/img/top_doc.svg" alt=""/>
                 </button>
                 <div class="o_scan_doc_wrap">
                     <div class="o_scan_doc"><t t-out="state.picking_name" /></div>
                     <div class="o_scan_doc_progress">
-                        <t t-out="state.total_done" />/<t t-out="state.total_demand" />
+                        进度：<t t-out="state.total_done" />/<t t-out="state.total_demand" />
                     </div>
                 </div>
                 <CogMenu t-if="state.picking_id" t-props="cogMenuProps"/>
             </div>
 
-            <!-- Scan row: back + manual input + camera (design 17) -->
+            <!-- Scan row: back + input(with barcode icon) + camera (design 23) -->
             <div class="o_scan_scanrow">
                 <button
                     type="button"
                     class="o_scan_key o_picking_scan_back"
                     t-on-click="onBack"
                     title="返回">
-                    <i class="fa fa-arrow-left"/>
+                    <img class="o_scan_back_icon" src="/stock_barcodes_picking/static/src/img/icon_back.svg" alt=""/>
                 </button>
-                <input
-                    type="text"
-                    class="o_picking_scan_input"
-                    placeholder="扫码或输入条码..."
-                    t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
-                    t-on-keydown="onManualScanEnter"
-                />
+                <div class="o_scan_input_wrap">
+                    <img class="o_scan_barcode_icon" src="/stock_barcodes_picking/static/src/img/icon_barcode.svg" alt=""/>
+                    <input
+                        type="text"
+                        class="o_picking_scan_input"
+                        placeholder="扫码或输入条码..."
+                        t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
+                        t-on-keydown="onManualScanEnter"
+                    />
+                </div>
                 <button
                     type="button"
                     class="o_scan_key o_picking_scan_camera"
@@ -60,7 +63,7 @@
                     aria-label="扫码"
                     title="扫码"
                 >
-                    <i class="fa fa-camera" aria-hidden="true"/>
+                    <img class="o_scan_camera_icon" src="/stock_barcodes_picking/static/src/img/icon_camera.svg" alt=""/>
                 </button>
             </div>
 
