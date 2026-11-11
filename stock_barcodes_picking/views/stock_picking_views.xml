@@ -12,7 +12,7 @@
         <field name="model">stock.picking</field>
         <field name="inherit_id" ref="stock.view_picking_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//header" position="inside">
+            <xpath expr="//header/*[1]" position="before">
                 <button name="action_barcode_scan"
                         type="object"
                         string="Barcode Scan"
