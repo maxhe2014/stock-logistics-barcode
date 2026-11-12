@@ -101,7 +101,6 @@ export class PickingScanApp extends Component {
         // drained in order (see _onScan), so fast scanners lose nothing.
         this._scanQueue = [];
         this._pendingScanTarget = null;
-        this._highlightTimer = null;
         this.state = useState({
             message: "",
             message_type: "info",
@@ -144,17 +143,15 @@ export class PickingScanApp extends Component {
             draftLotQty: "",
             editingReservedLotKey: "",
             draftReservedLotQty: "",
-            // Composite row_key:lot_id highlighted for two seconds after scanning.
+            // Composite row_key:lot_id kept highlighted until the next scan.
             recentScanLotKey: "",
-            // Changes on every lot scan so repeating the same lot restarts
-            // the CSS animation instead of reusing the existing DOM node.
-            recentScanLotNonce: 0,
             // Package rename inline editor (AutoComplete with existing names)
             editingPackageMoveId: false,
             editingPackageId: false,
             packageDraftName: "",
-            // Serial cards collapsed state, keyed by row_key. Local UI only.
-            collapsedSerialRows: {},
+            // Serial cards expanded state, keyed by row_key. Local UI only.
+            // Empty map = every serial card starts collapsed.
+            expandedSerialRows: {},
         });
 
         // Sound alert for scan errors. Only an error tone is used
@@ -205,7 +202,6 @@ export class PickingScanApp extends Component {
         });
         onWillUnmount(() => {
             window.removeEventListener("popstate", this._onPopState, { capture: true });
-            clearTimeout(this._highlightTimer);
             this._closePackageDialog?.();
         });
     }
@@ -304,6 +300,8 @@ export class PickingScanApp extends Component {
                 );
             }
         }
+        // 任何一次新扫描都先清掉上一行的高亮；只有命中序列号/批号时才重新点亮。
+        this.state.recentScanLotKey = "";
         try {
             const res = await this.orm.call(
                 "wiz.stock.barcodes.picking",
@@ -337,18 +335,9 @@ export class PickingScanApp extends Component {
                 break;
             }
             if (scannedTarget) {
-                const lotKey = `${scannedTarget.rowKey}:${scannedTarget.lotId}`;
                 this._pendingScanTarget = scannedTarget;
-                // A new nonce changes the keyed DOM node on repeated scans,
-                // restarting the CSS flash even when lotKey stays identical.
-                this.state.recentScanLotNonce += 1;
-                this.state.recentScanLotKey = lotKey;
-                clearTimeout(this._highlightTimer);
-                this._highlightTimer = setTimeout(() => {
-                    if (this.state.recentScanLotKey === lotKey) {
-                        this.state.recentScanLotKey = "";
-                    }
-                }, 2000);
+                // 高亮一直保留，直到下一次扫描把它清掉 / 换成新的行。
+                this.state.recentScanLotKey = `${scannedTarget.rowKey}:${scannedTarget.lotId}`;
             }
             // Remember the barcode when it was not found, so the
             // operator can force-add it. Clear on any other outcome.
@@ -1579,13 +1568,13 @@ export class PickingScanApp extends Component {
     // ---------- serial card collapse (local UI only) ----------
 
     onToggleSerialFold(rowKey) {
-        const map = { ...this.state.collapsedSerialRows };
+        const map = { ...this.state.expandedSerialRows };
         map[rowKey] = !map[rowKey];
-        this.state.collapsedSerialRows = map;
+        this.state.expandedSerialRows = map;
     }
 
     isSerialCollapsed(rowKey) {
-        return Boolean(this.state.collapsedSerialRows[rowKey]);
+        return !this.state.expandedSerialRows[rowKey];
     }
 
     /**

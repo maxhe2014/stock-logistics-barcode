@@ -3,6 +3,7 @@
 // against PNG). Dark theme lives in picking_scan_app.dark.scss and follows
 // Odoo's color_scheme (web_dark_mode module cookie), not the OS setting.
 
+// 命中高亮保持到下一次扫描（由 JS 的 recentScanLotKey 控制，不自动消失）
 .o_picking_scan_app {
     --scan-page: #E5E5E5;
     --scan-card: #FFFFFF;
@@ -11,14 +12,21 @@
     --scan-text-2: #74787B;
     --scan-row-bg: rgba(22, 163, 181, 0.2);
     --scan-fold-bg: rgba(22, 163, 181, 0.4);
-    --scan-hint-bg: #D0ECF0;
+    // 信息框（设计 3）：浅色 = 青/绿半透明叠在白底上的合成色
+    --scan-hint-bg: #D0EDF0;
     --scan-hint-fg: #0F3A4A;
+    --scan-hint-border: rgba(22, 163, 181, 0.4);
+    --scan-hint-shadow: rgba(22, 163, 181, 0.2);
+    --scan-ok-bg: #A3F5BF;
+    --scan-ok-fg: #404144;
+    --scan-ok-border: rgba(133, 250, 158, 1);
+    --scan-ok-shadow: rgba(82, 197, 107, 0.7);
     --scan-key-bg: #BBBFC6;
     --scan-key-fg: #000000;
     --scan-key-shadow: #74787B;
     --scan-green: #27A844;
     --scan-purple: #8174AA;
-    --scan-hl: rgba(133, 250, 158, 0.7);
+    --scan-hl: rgba(133, 250, 158, 0.6);
 
     background: var(--scan-page);
     color: var(--scan-text);
@@ -29,6 +37,13 @@
         --scan-card: #424346;
         --scan-text: #FFFFFF;
         --scan-text-2: #FFFFFF;
+        // 信息框：深色下非错误框先铺 #404144，再叠青/绿
+        --scan-hint-bg: #38555B;
+        --scan-hint-fg: #FFFFFF;
+        --scan-hint-shadow: rgba(22, 163, 181, 0.3);
+        --scan-ok-bg: #66B883;
+        --scan-ok-fg: #FFFFFF;
+        --scan-ok-border: rgba(133, 250, 158, 0.8);
     }
 
     // ---------- top: source btn + doc name + progress + actions ----------
@@ -207,26 +222,32 @@
         color: #FFFFFF;
     }
 
-    // ---------- hint bar ----------
+    // ---------- hint bar (design 2: 青底信息 / 红底错误 / 绿底成功) ----------
     .o_scan_hintbar {
         margin: 5px 10px 0;    // 上方与扫码行 gap:5px，左右对齐按钮 padding
         min-height: 25px;
+        box-sizing: border-box;
+        border: 1px solid var(--scan-hint-border);
         border-radius: 4px;
         padding: 0 10px;
-        background: var(--scan-hint-bg);
+        background-color: var(--scan-hint-bg);
         color: var(--scan-hint-fg);
         font-size: 12px;
-        line-height: 25px;
-        box-shadow: 0 4px 4px 0 rgba(22, 163, 181, 0.4);
+        line-height: 23px;     // 25px 高减去上下各 1px 描边
+        box-shadow: 0 4px 4px 0 var(--scan-hint-shadow);
 
         &.alert-success {
-            background: #CFE9D6;
-            color: #14532D;
+            border-color: var(--scan-ok-border);
+            background-color: var(--scan-ok-bg);
+            color: var(--scan-ok-fg);
+            box-shadow: 0 4px 4px 0 var(--scan-ok-shadow);
         }
         &.alert-danger,
         &.alert-warning {
-            background: #F6D5D3;
-            color: #8C2018;
+            border-color: rgba(229, 45, 106, 0.7);
+            background-color: rgba(229, 45, 106, 0.7);
+            color: #FFFFFF;
+            box-shadow: 0 4px 4px 0 rgba(165, 46, 86, 0.7);
         }
         .btn {
             line-height: 1.2;
@@ -577,21 +598,29 @@
             min-height: 36px;
         }
 
-        // scan-hit highlight (design: rgba(133,250,158,.7), 36px, centered)
-        &.is-scanned::after {
-            content: "";
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            height: 36px;
-            background: var(--scan-hl);
-            pointer-events: none;
+        // 设计 24：序列号行改为横排「名称 | 已拣 | 按钮」，行高 40px
+        &.is-serial {
+            min-height: 40px;
+
+            .o_scan_row_side {
+                flex-direction: row;
+                align-items: center;
+                gap: 5px;
+            }
+            .o_scan_row_qty {
+                width: 41px;
+                flex-shrink: 0;
+                text-align: center;
+            }
+            .o_scan_row_btns {
+                min-height: 0;
+            }
         }
-        > * {
-            position: relative;
-            z-index: 1;
+
+        // scan-hit highlight (design 24: 整行 rgba(133,250,158,.6) 叠在行底青 0.2 上，常驻)
+        &.is-scanned {
+            background-color: var(--scan-hl);
+            background-image: linear-gradient(var(--scan-row-bg), var(--scan-row-bg));
         }
     }
     .o_scan_row_name {

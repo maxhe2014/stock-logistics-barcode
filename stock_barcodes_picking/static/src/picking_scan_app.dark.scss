@@ -7,6 +7,13 @@
     --scan-card: #424346;
     --scan-text: #FFFFFF;
     --scan-text-2: #FFFFFF;
+    // 信息框：深色下非错误框先铺 #404144，再叠青/绿
+    --scan-hint-bg: #38555B;
+    --scan-hint-fg: #FFFFFF;
+    --scan-hint-shadow: rgba(22, 163, 181, 0.3);
+    --scan-ok-bg: #66B883;
+    --scan-ok-fg: #FFFFFF;
+    --scan-ok-border: rgba(133, 250, 158, 0.8);
 
     .o_scan_card.is-selected > .o_scan_card_head {
         background: #404144;

@@ -246,15 +246,15 @@
                                     <t t-if="group.move.tracking === 'serial' &amp;&amp; this.isSerialCollapsed(mv.row_key)">
                                         <t t-set="summary" t-value="this.getSerialCollapseSummary(mv)" />
                                         <div t-if="summary"
-                                             class="o_scan_row is-collapsed-single"
+                                             t-att-class="'o_scan_row is-collapsed-single' + (state.recentScanLotKey &amp;&amp; state.recentScanLotKey.startsWith(mv.row_key + ':') ? ' is-scanned' : '')"
                                              t-att-data-scan-row="mv.row_key">
                                             <span class="o_scan_row_name"><t t-out="summary.name" /></span>
                                             <span class="o_scan_row_qty">已拣: <t t-out="summary.total" /></span>
                                         </div>
                                     </t>
                                     <t t-else="">
-                                        <t t-foreach="mv.lots" t-as="lot" t-key="lot.key + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ':scan-' + state.recentScanLotNonce : '')">
-                                            <div t-att-class="'o_scan_row' + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ' is-scanned' : '')"
+                                        <t t-foreach="mv.lots" t-as="lot" t-key="lot.key">
+                                            <div t-att-class="'o_scan_row' + (mv.tracking === 'serial' ? ' is-serial' : '') + (state.recentScanLotKey === mv.row_key + ':' + lot.id ? ' is-scanned' : '')"
                                                  t-att-data-scan-row="mv.row_key"
                                                  t-att-data-scan-lot="mv.row_key + ':' + lot.id">
 
