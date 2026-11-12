@@ -33,16 +33,7 @@
                         生产数量：<t t-out="state.finished_qty_producing" /> / <t t-out="state.production_product_qty" />
                     </div>
                 </div>
-                <!-- Escape hatch: drop the component context and go back to
-                     scanning the finished lot/serial. -->
-                <button t-if="canBackToFinishedLot"
-                        type="button"
-                        class="o_scan_topbar_right o_mrp_scan_back_to_sn"
-                        t-on-click="onBackToFinishedLot"
-                        title="转去扫描成品批次/序列号">
-                    <img class="o_scan_barcode_icon" src="/stock_barcodes_mrp/static/src/img/icon_barcode.svg" alt=""/>
-                </button>
-                <span t-else="" class="o_scan_topbar_spacer"/>
+                <CogMenu t-if="state.production_id" t-props="cogMenuProps"/>
             </div>
 
             <!-- Scan row: back + input(with barcode icon) + camera -->
@@ -256,7 +247,7 @@
                                 <t t-if="comp.tracking === 'serial' and this.isComponentCollapsed(comp.id)">
                                     <t t-set="summary" t-value="this.getComponentFoldSummary(comp)" />
                                     <div t-if="summary"
-                                         t-att-class="'o_scan_row is-serial' + (state.recentComponentLotKey and state.recentComponentLotKey.startsWith(comp.id + ':') ? ' is-scanned' : '')"
+                                         t-att-class="'o_scan_row is-serial is-collapsed-single' + (state.recentComponentLotKey and state.recentComponentLotKey.startsWith(comp.id + ':') ? ' is-scanned' : '')"
                                          t-att-data-scan-row="comp.id">
                                         <span class="o_scan_row_name"><t t-out="summary.name" /></span>
                                         <div class="o_scan_row_side">
@@ -344,6 +335,14 @@
             <!-- Footer actions -->
             <div class="o_scan_footer" t-if="state.production_id">
                 <div class="o_scan_footer_actions">
+                    <!-- Escape hatch: drop the component context and go back
+                         to scanning the finished lot/serial. -->
+                    <button t-if="canBackToFinishedLot"
+                            type="button"
+                            class="o_scan_key o_mrp_scan_back_to_sn"
+                            title="转去扫描成品批次/序列号"
+                            t-on-click="onBackToFinishedLot">扫成品SN</button>
+
                     <button t-if="state.visible_switch_selector"
                             type="button"
                             class="o_scan_key o_scan_key_warn o_mrp_scan_candidates"

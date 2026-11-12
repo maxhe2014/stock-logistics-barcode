@@ -632,6 +632,9 @@ class WizStockBarcodesMrp(models.TransientModel):
             "finished_lot_id": finished_lot_id,
             "finished_lot_name": finished_lot_name,
             "visible_force_done": bool(self.visible_force_done),
+            # Toolbar items of the MO form, rendered by the native
+            # web.CogMenu in the scan app's top-right corner.
+            "action_menu_items": self._get_production_action_menu_items(),
             # Task 4: click-selected component move
             "active_move_id": self.active_move_id.id or False,
             "active_move_product_name": (
@@ -2656,6 +2659,31 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.ensure_one()
         if self.production_id:
             return self.production_id.get_formview_action()
+
+    def _get_production_action_menu_items(self):
+        """Return the manufacturing form's toolbar items (actions + print).
+
+        These are the exact same items shown in the native Odoo cog menu
+        on the mrp.production form view — Mark as Done / Scrap /
+        Unbuild / ... plus print reports. The frontend renders them via
+        the standard ``web.CogMenu`` OWL component.
+        """
+        self.ensure_one()
+        if not self.production_id:
+            return {"action": [], "print": []}
+        production_model = self.env["mrp.production"]
+        view_id = self.env.ref("mrp.mrp_production_form_view").id
+        try:
+            result = production_model.get_views(
+                [(view_id, "form")], {"toolbar": True}
+            )
+            toolbar = result["views"]["form"].get("toolbar", {})
+        except Exception:
+            toolbar = {}
+        return {
+            "action": toolbar.get("action", []),
+            "print": toolbar.get("print", []),
+        }
 
     # --- Message helpers ---
     def _set_message(self, message_type, message):

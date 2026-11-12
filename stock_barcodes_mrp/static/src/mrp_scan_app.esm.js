@@ -7,6 +7,20 @@ import { _t } from "@web/core/l10n/translation";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { scanBarcode } from "@web/core/barcode/barcode_dialog";
+import { CogMenu } from "@web/search/cog_menu/cog_menu";
+
+/**
+ * ScanCogMenu — thin wrapper around Odoo's native CogMenu that skips the
+ * cogMenuRegistry entries (archive / restore / ...). Those registry items
+ * run ``isDisplayed(env)`` callbacks that touch ``env.searchModel``, which
+ * a client action does not have. What remains is exactly the MO form's
+ * toolbar: Mark as Done / Scrap / Unbuild / print reports.
+ */
+export class ScanCogMenu extends CogMenu {
+    async _registryItems() {
+        return [];
+    }
+}
 
 /**
  * MrpScanApp — thin OWL client action for the MRP scan flow.
@@ -27,6 +41,7 @@ import { scanBarcode } from "@web/core/barcode/barcode_dialog";
 export class MrpScanApp extends Component {
     static template = "stock_barcodes_mrp.MrpScanApp";
     static props = { ...standardActionServiceProps };
+    static components = { CogMenu: ScanCogMenu };
 
     setup() {
         this.orm = useService("orm");
@@ -78,10 +93,10 @@ export class MrpScanApp extends Component {
             // Task 4: click-selected component move
             active_move_id: false,
             active_move_product_name: "",
-            // Serial component cards fold to a one-line summary. The set
-            // holds the *collapsed* move ids, so an empty object means
-            // "everything expanded" (the design 4 default).
-            collapsedComponentIds: {},
+            // Serial component cards, same convention as the picking app:
+            // the set holds *expanded* move ids, so an empty object means
+            // "all collapsed" (design default).
+            expandedComponentIds: {},
             // Composite move_id:lot_id highlighted after scanning. It stays
             // highlighted until the next scan (design: persistent hit row).
             recentComponentLotKey: "",
@@ -632,6 +647,25 @@ export class MrpScanApp extends Component {
         );
     }
 
+    /** Props for the native Odoo CogMenu rendered in the top-right
+     *  corner. Items come from the MO form's toolbar (Mark as Done /
+     *  Scrap / Unbuild / print reports), so the UI and behaviour are
+     *  exactly what the manufacturing order form shows. */
+    get cogMenuProps() {
+        const items = this.state.action_menu_items || {};
+        return {
+            resModel: "mrp.production",
+            getActiveIds: () =>
+                this.state.production_id ? [this.state.production_id] : [],
+            context: this.props.context || {},
+            items: {
+                action: items.action || [],
+                print: items.print || [],
+            },
+            isDomainSelected: false,
+        };
+    }
+
     /** Apply Lot visible: tracked (non-serial) finished product + a lot is
      *  pending/selected + positive qty. Serial products auto-apply the SN at
      *  scan time (Direction B), so the button is redundant and hidden. */
@@ -743,28 +777,41 @@ export class MrpScanApp extends Component {
     /** Fold / unfold a serial component card. Pure UI state: it only
      *  switches between the full SN list and the one-line summary. */
     onToggleComponentFold(moveId) {
-        const next = Object.assign({}, this.state.collapsedComponentIds);
+        const next = Object.assign({}, this.state.expandedComponentIds);
         if (next[moveId]) {
             delete next[moveId];
         } else {
             next[moveId] = true;
         }
-        this.state.collapsedComponentIds = next;
+        this.state.expandedComponentIds = next;
     }
 
     isComponentCollapsed(moveId) {
-        return !!this.state.collapsedComponentIds[moveId];
+        return !this.state.expandedComponentIds[moveId];
     }
 
-    /** Summary for a collapsed serial card: the last scanned lot (the scan
-     *  handler moves the hit lot to the end of `comp.lots`) or the first
-     *  one, plus the component's total picked quantity. */
+    /** Summary for a collapsed serial card (same rule as the picking app):
+     *  the lot just scanned, otherwise the latest lot, plus the total
+     *  picked quantity across all lots. */
     getComponentFoldSummary(comp) {
         const lots = comp.lots || [];
         if (!lots.length) {
             return null;
         }
-        return { name: lots[lots.length - 1].name, total: comp.quantity };
+        let lot = false;
+        const recentKey = this.state.recentComponentLotKey;
+        if (recentKey && recentKey.startsWith(comp.id + ":")) {
+            const lotKey = recentKey.slice(String(comp.id).length + 1);
+            lot = lots.find((candidate) => candidate.key === lotKey) || false;
+        }
+        if (!lot) {
+            lot = lots[lots.length - 1];
+        }
+        const total = lots.reduce(
+            (sum, candidate) => sum + (Number(candidate.picked_quantity) || 0),
+            0
+        );
+        return { name: lot.name, total };
     }
 
     /** Remove a single scanned component SN (unlinks its move line). */
