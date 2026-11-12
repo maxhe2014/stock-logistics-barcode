@@ -14,7 +14,6 @@
     --scan-row-bg: rgba(22, 163, 181, 0.2);
     --scan-row-border: rgba(22, 163, 181, 0.4);
     --scan-fold-bg: rgba(22, 163, 181, 0.4);
-    --scan-body-bg: rgba(196, 196, 196, 0.2);
     // Hint bar: teal/green translucency composited over white (design 4).
     --scan-hint-bg: #D0EDF0;
     --scan-hint-fg: #0F3A4A;
@@ -47,7 +46,6 @@
         --scan-ok-bg: #66B883;
         --scan-ok-fg: #FFFFFF;
         --scan-ok-border: rgba(133, 250, 158, 0.8);
-        --scan-body-bg: rgba(64, 65, 68, 0.55);
     }
 
     // ---------- top bar: doc button + MO name + producing qty ----------
@@ -537,18 +535,17 @@
     }
 
     // ---------- card body / lot rows ----------
+    // Same as the picking app: rows fill the card edge to edge, no inner
+    // padding or lighter frame (that frame showed up as a white border
+    // around the serial rows).
     .o_scan_card_body {
         display: flex;
         flex-direction: column;
-        gap: 1px;
-        background: var(--scan-body-bg);
-        padding: 5px;
+        background: var(--scan-row-bg);
     }
     // Finished-lot row lives directly on the white card.
     .o_scan_card_body.is-plain {
         background: transparent;
-        padding: 0;
-        gap: 0;
     }
 
     .o_scan_row {
@@ -559,6 +556,7 @@
         padding: 5px;
         position: relative;
         background: var(--scan-row-bg);
+        border-bottom: 1px solid var(--scan-row-border);
 
         &.is-serial {
             min-height: 40px;
@@ -593,6 +591,7 @@
     .o_scan_row.is-plain {
         background: transparent;
         border-top: 1px solid var(--scan-frame);
+        border-bottom: 0;
         min-height: 39px;
     }
 
@@ -680,11 +679,33 @@
     }
     .o_scan_footer_actions {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
         align-items: center;
         gap: 10px;
         flex-wrap: wrap;
         padding-bottom: 6px;
+    }
+    .o_scan_footer_actions_right {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+        flex: 1;
+    }
+    // Same green key style as the picking app's "添加产品".
+    .o_scan_key_add_component {
+        background-color: var(--scan-green);
+        color: #FFFFFF;
+        font-weight: 600;
+        min-width: 130px;
+        box-shadow: 0 1.5px 0 0 var(--scan-key-shadow);
+
+        &:hover {
+            filter: brightness(0.95);
+        }
+        &:active {
+            filter: brightness(0.9);
+        }
     }
 
     // ---------- misc ----------

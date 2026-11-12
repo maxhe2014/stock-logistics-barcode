@@ -335,38 +335,46 @@
             <!-- Footer actions -->
             <div class="o_scan_footer" t-if="state.production_id">
                 <div class="o_scan_footer_actions">
-                    <!-- Escape hatch: drop the component context and go back
-                         to scanning the finished lot/serial. -->
-                    <button t-if="canBackToFinishedLot"
-                            type="button"
-                            class="o_scan_key o_mrp_scan_back_to_sn"
-                            title="转去扫描成品批次/序列号"
-                            t-on-click="onBackToFinishedLot">扫成品SN</button>
+                    <!-- Left: add an extra component (same style as the
+                         picking app's "添加产品"). -->
+                    <button type="button"
+                            class="o_scan_key o_scan_key_add_component o_mrp_scan_add_component"
+                            t-on-click="onAddComponent"><i class="fa fa-plus"/> 添加组件</button>
 
-                    <button t-if="state.visible_switch_selector"
-                            type="button"
-                            class="o_scan_key o_scan_key_warn o_mrp_scan_candidates"
-                            t-on-click="onViewCandidates">查看候选</button>
+                    <div class="o_scan_footer_actions_right">
+                        <!-- Escape hatch: drop the component context and go
+                             back to scanning the finished lot/serial. -->
+                        <button t-if="canBackToFinishedLot"
+                                type="button"
+                                class="o_scan_key o_mrp_scan_back_to_sn"
+                                title="转去扫描成品批次/序列号"
+                                t-on-click="onBackToFinishedLot">扫成品SN</button>
 
-                    <button t-if="canApplyLot"
-                            type="button"
-                            class="o_scan_key o_mrp_scan_apply_lot"
-                            t-on-click="onApplyLot">Apply Lot</button>
+                        <button t-if="state.visible_switch_selector"
+                                type="button"
+                                class="o_scan_key o_scan_key_warn o_mrp_scan_candidates"
+                                t-on-click="onViewCandidates">查看候选</button>
 
-                    <button t-if="state.visible_force_done"
-                            type="button"
-                            class="o_scan_key o_scan_key_warn o_mrp_scan_force_done"
-                            t-on-click="onForceDone">Force Consume</button>
+                        <button t-if="canApplyLot"
+                                type="button"
+                                class="o_scan_key o_mrp_scan_apply_lot"
+                                t-on-click="onApplyLot">Apply Lot</button>
 
-                    <button t-if="canConfirm"
-                            type="button"
-                            class="o_scan_key o_scan_key_primary o_mrp_scan_confirm"
-                            t-on-click="onConfirm">Confirm</button>
+                        <button t-if="state.visible_force_done"
+                                type="button"
+                                class="o_scan_key o_scan_key_warn o_mrp_scan_force_done"
+                                t-on-click="onForceDone">Force Consume</button>
 
-                    <button t-if="canFinish"
-                            type="button"
-                            class="o_scan_key o_scan_key_primary o_mrp_scan_finish"
-                            t-on-click="onFinishProduction">Finish Production</button>
+                        <button t-if="canConfirm"
+                                type="button"
+                                class="o_scan_key o_scan_key_primary o_mrp_scan_confirm"
+                                t-on-click="onConfirm">Confirm</button>
+
+                        <button t-if="canFinish"
+                                type="button"
+                                class="o_scan_key o_scan_key_primary o_mrp_scan_finish"
+                                t-on-click="onFinishProduction">Finish Production</button>
+                    </div>
                 </div>
             </div>
         </div>

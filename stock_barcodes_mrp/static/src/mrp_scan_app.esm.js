@@ -8,6 +8,7 @@ import { useBus, useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { scanBarcode } from "@web/core/barcode/barcode_dialog";
 import { CogMenu } from "@web/search/cog_menu/cog_menu";
+import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog";
 
 /**
  * ScanCogMenu — thin wrapper around Odoo's native CogMenu that skips the
@@ -47,6 +48,7 @@ export class MrpScanApp extends Component {
         this.orm = useService("orm");
         this.actionService = useService("action");
         this.notification = useService("notification");
+        this.dialog = useService("dialog");
         this.barcodeService = useService("barcode");
         // Global keyboard scanner: any barcode_scanned event from the
         // CE barcode service triggers _onScan. This covers hardware
@@ -305,6 +307,35 @@ export class MrpScanApp extends Component {
                 { type: "danger" }
             );
         }
+    }
+
+    /**
+     * Footer "添加组件": pick an existing or new product and add it to the
+     * MO as an extra raw material. Mirrors the picking app's "Add product":
+     * the move carries the demand and the operator scans it afterwards.
+     */
+    onAddComponent() {
+        if (!this.state.production_id) {
+            this.notification.add(_t("请先选择生产单"), { type: "warning" });
+            return;
+        }
+        this.dialog.add(SelectCreateDialog, {
+            resModel: "product.product",
+            title: _t("选择或创建组件"),
+            noCreate: false,
+            onSelected: async (resIds) => {
+                // SelectCreateDialog hands back a plain array of ids.
+                const productId = resIds?.[0];
+                if (!productId) {
+                    return;
+                }
+                await this._callAction(
+                    "action_add_component_to_production",
+                    _t("添加组件"),
+                    [productId, 1]
+                );
+            },
+        });
     }
 
     /**

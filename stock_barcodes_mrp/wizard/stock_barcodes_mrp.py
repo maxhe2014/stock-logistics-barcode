@@ -2685,6 +2685,76 @@ class WizStockBarcodesMrp(models.TransientModel):
             "print": toolbar.get("print", []),
         }
 
+    def action_add_component_to_production(self, product_id, qty=1.0):
+        """Add a product to the current MO as an extra raw material.
+
+        Called from the scan UI's "添加组件" button. Mirrors the picking
+        app's "Add product": a move with the given demand is created (or
+        the demand of an existing component is increased) and the
+        operator then scans the product/lot to consume it.
+        """
+        self.ensure_one()
+        if not self.production_id:
+            self._set_message(
+                "error", self.env._("No manufacturing order selected")
+            )
+            return False
+        try:
+            qty = float(qty or 0.0)
+        except (TypeError, ValueError):
+            qty = 0.0
+        if qty <= 0:
+            self._set_message("error", self.env._("Quantity must be positive"))
+            return False
+        product = self.env["product.product"].browse(int(product_id))
+        if not product.exists():
+            self._set_message("error", self.env._("Product not found"))
+            return False
+        if product.type != "consu":
+            self._set_message(
+                "error",
+                self.env._("Only consumable products can be added as components"),
+            )
+            return False
+        production = self.production_id
+        existing = production.move_raw_ids.filtered(
+            lambda m: m.product_id == product and m.state not in ("done", "cancel")
+        )
+        if existing:
+            move = existing[0]
+            # Same guard as the picking app: already-consumed quantity may
+            # exceed the recorded demand, so grow from the max of both.
+            move.product_uom_qty = max(move.product_uom_qty, move.quantity) + qty
+            self._set_message(
+                "success",
+                self.env._(
+                    "Component already on the MO — demand increased by %s.", qty
+                ),
+            )
+            return True
+        src_loc = self.location_id or production.location_src_id
+        dst_loc = product.with_company(
+            production.company_id
+        ).property_stock_production
+        move = self.env["stock.move"].create({
+            "product_id": product.id,
+            "product_uom": product.uom_id.id,
+            "product_uom_qty": qty,
+            "location_id": src_loc.id,
+            "location_dest_id": dst_loc.id,
+            "raw_material_production_id": production.id,
+            "production_id": production.id,
+        })
+        move._action_confirm()
+        self._set_message(
+            "success",
+            self.env._(
+                "Component added: %(product)s — scan it to consume.",
+                product=product.display_name,
+            ),
+        )
+        return True
+
     # --- Message helpers ---
     def _set_message(self, message_type, message):
         self.message_type = message_type
