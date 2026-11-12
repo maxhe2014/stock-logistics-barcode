@@ -100,7 +100,13 @@
                 <t t-if="state.production_id">
                     <div class="o_scan_section_title">产品</div>
                     <div class="o_scan_stack">
-                        <div class="o_scan_card">
+                        <!-- Clicking this card activates the "scan finished
+                             SN" context (same as the removed escape button):
+                             it drops any component selection so the next
+                             barcode is matched against the finished SN. -->
+                        <div t-att-class="'o_scan_card' + (canBackToFinishedLot ? ' is-selectable-card' : '')"
+                             t-att-title="canBackToFinishedLot ? '点击回到扫描成品批次/序列号' : ''"
+                             t-on-click="onSelectFinishedLot">
                             <div class="o_scan_card_head">
                                 <div class="o_scan_text_block">
                                     <div class="o_scan_pmeta_loc"
@@ -342,14 +348,6 @@
                             t-on-click="onAddComponent"><i class="fa fa-plus"/> 添加组件</button>
 
                     <div class="o_scan_footer_actions_right">
-                        <!-- Escape hatch: drop the component context and go
-                             back to scanning the finished lot/serial. -->
-                        <button t-if="canBackToFinishedLot"
-                                type="button"
-                                class="o_scan_key o_mrp_scan_back_to_sn"
-                                title="转去扫描成品批次/序列号"
-                                t-on-click="onBackToFinishedLot">扫成品SN</button>
-
                         <button t-if="state.visible_switch_selector"
                                 type="button"
                                 class="o_scan_key o_scan_key_warn o_mrp_scan_candidates"

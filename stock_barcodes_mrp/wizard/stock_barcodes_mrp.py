@@ -1496,16 +1496,16 @@ class WizStockBarcodesMrp(models.TransientModel):
         """Clear the component-scan context and return to finished-lot
         scanning.
 
-        RPC entry for the OWL "Scan Finished SN" button shown in the
-        component context bar. When the operator accidentally selects a
-        component row before scanning the finished SN, every subsequent
-        barcode is routed to the component (via active_move_id in
-        _scan_lot / _create_new_lot_flow). This method drops the
-        component selection so the next scan can match the finished
-        product's SN again.
+        RPC entry for the finished-product card in the OWL scan app
+        (clicking that card returns to finished-SN scanning). When the
+        operator accidentally selects a component row before scanning the
+        finished SN, every subsequent barcode is routed to the component
+        (via active_move_id in _scan_lot / _create_new_lot_flow). This
+        method drops the component selection so the next scan can match
+        the finished product's SN again.
 
         Only meaningful when no finished lot is bound yet; once a
-        finished SN is bound the button is hidden by the UI.
+        finished SN is bound the card is inert.
         """
         self.ensure_one()
         self.active_move_id = False

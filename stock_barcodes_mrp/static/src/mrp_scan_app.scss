@@ -167,8 +167,7 @@
     }
 
     .o_mrp_scan_back,
-    .o_mrp_scan_camera,
-    .o_mrp_scan_back_to_sn {
+    .o_mrp_scan_camera {
         width: 40px;
         padding-left: 0;
         padding-right: 0;
@@ -191,6 +190,9 @@
     .o_scan_key {
         height: 34.5px;
         min-width: 40px;
+        // Never shrink below the label: on narrow screens the footer wraps
+        // instead of squeezing the button (text used to spill outside).
+        flex-shrink: 0;
         padding: 0 10px;
         border: 0;
         border-radius: 4px;
@@ -299,6 +301,11 @@
         flex-direction: column;
         width: 100%;
         min-width: 0;
+
+        // Finished-product card doubles as the "scan finished SN" entry.
+        &.is-selectable-card {
+            cursor: pointer;
+        }
 
         &.is-selected > .o_scan_card_head {
             box-shadow: 2px 4px 4px 0 rgba(64, 65, 68, 0.9) inset;

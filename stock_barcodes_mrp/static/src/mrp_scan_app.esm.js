@@ -466,18 +466,29 @@ export class MrpScanApp extends Component {
         this.state.draftQty = "";
     }
 
-    /** Show the "Scan Finished SN" escape button next to the scan input.
-     *  Only relevant when:
+    /** The finished-product card is clickable when:
      *    - a finished SN has NOT been bound yet, AND
      *    - a component context is active (product scanned or row clicked).
-     *  Once the finished SN is bound the button is hidden because the
-     *  component phase is the correct next step. */
+     *  That is exactly when the component context would hijack the next
+     *  barcode away from the finished SN. Once the finished SN is bound
+     *  the card is inert. */
     get canBackToFinishedLot() {
         return (
             !this.state.finished_lot_id &&
             !this.state.finished_lot_name &&
             (!!this.state.product_id || !!this.state.active_move_id)
         );
+    }
+
+    /** The finished-product card doubles as the "scan finished SN" entry:
+     *  only acts when the component context is the thing getting in the
+     *  way (see canBackToFinishedLot), so clicking the card never resets
+     *  a bound finished lot by accident. */
+    async onSelectFinishedLot() {
+        if (!this.canBackToFinishedLot) {
+            return;
+        }
+        await this.onBackToFinishedLot();
     }
 
     /** Escape the component-scan context and return to finished-lot
