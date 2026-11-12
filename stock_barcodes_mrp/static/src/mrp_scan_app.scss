@@ -228,12 +228,17 @@
         box-sizing: border-box;
         border: 1px solid var(--scan-hint-border);
         border-radius: 4px;
-        padding: 0 10px;
+        padding: 1px 10px;
         background-color: var(--scan-hint-bg);
         color: var(--scan-hint-fg);
         font-size: 12px;
-        line-height: 23px;
+        line-height: 21px;
         box-shadow: 0 4px 4px 0 var(--scan-hint-shadow);
+        // Long lot/serial numbers and long product names must wrap onto
+        // new lines instead of being clipped on narrow screens; the bar
+        // grows with the content (min-height keeps the single-line look).
+        word-break: break-word;
+        overflow-wrap: anywhere;
 
         &.alert-success {
             border-color: var(--scan-ok-border);
@@ -605,6 +610,10 @@
         flex-direction: column;
         justify-content: center;
         overflow: hidden;
+        // Serial numbers are long unbroken tokens: break them so the row
+        // grows in height instead of clipping the right-hand characters.
+        word-break: break-word;
+        overflow-wrap: anywhere;
     }
     .o_scan_row_label {
         font-size: 12px;
