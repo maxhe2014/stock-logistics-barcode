@@ -4,425 +4,370 @@
   License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
   Template for the MrpScanApp client action (OWL).
-  Renders a touch-friendly scan flow:
-    - manual input box (Enter to submit; also driven by global
-      barcode_service keyboard listener)
-    - consolidated hint area (status message + active-scan target + qty)
-    - MO info strip (production name + finished product + qty)
-    - component checklist (per move: name, demand, picked)
-    - action buttons (fixed at bottom for shop-floor scanning)
+  Responsive card-stack layout, design source:
+  /home/max/下载/html-设计文件 (4)/html
+
+  Structure:
+    - top bar (open MO + MO name + produced qty)
+    - scan row (back + input + camera)
+    - hint bar (status + active scan target)
+    - finished-product card (section 产品)
+    - component cards (section 组件), lot/serial rows per card
+    - footer action buttons
+
+  JS hooks kept: .o_mrp_scan_input, .o_mrp_scan_finished_sn,
+  [data-scan-row], [data-scan-lot].
 -->
 <templates id="template" xml:space="preserve">
     <t t-name="stock_barcodes_mrp.MrpScanApp">
         <div class="o_mrp_scan_app d-flex flex-column h-100">
-            <!-- Header: manual scan input + escape-hatch button + back -->
-            <div class="o_mrp_scan_header p-3 border-bottom">
-                <div class="row g-2 align-items-center">
-                    <div class="col">
-                        <input
-                            type="text"
-                            class="form-control form-control-lg o_mrp_scan_input"
-                            placeholder="Scan or type barcode…"
-                            t-att-disabled="state.scanning ? 'disabled' : ''"
-                            t-on-keydown="onManualScanEnter"
-                        />
-                    </div>
-                    <!-- Escape hatch: when the finished SN has not been
-                         scanned yet, the operator may have clicked a
-                         component row by mistake. This button drops the
-                         component context so the next scan matches the
-                         finished product SN. -->
-                    <div t-if="canBackToFinishedLot" class="col-auto">
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary btn-lg"
-                            t-on-click="onBackToFinishedLot">
-                            <i class="fa fa-barcode me-1"/>扫成品SN
-                        </button>
-                    </div>
-                    <div class="col-auto">
-                        <button
-                            type="button"
-                            class="btn btn-secondary btn-lg o_mrp_scan_camera"
-                            t-att-disabled="state.scanning ? 'disabled' : ''"
-                            t-on-click="onCameraScan"
-                            aria-label="Scan with camera"
-                            title="Scan with camera"
-                        >
-                            <i class="fa fa-camera" aria-hidden="true"/>
-                        </button>
-                    </div>
-                    <div class="col-auto">
-                        <button
-                            type="button"
-                            class="btn btn-secondary btn-lg o_mrp_scan_header_back"
-                            t-on-click="onBack"
-                        >Back</button>
+
+            <!-- Top bar: open MO + name + produced qty (+ finished-lot escape) -->
+            <div class="o_scan_topbar o_mrp_scan_mo_info" t-if="state.production_id">
+                <button type="button" class="o_scan_src_btn" t-on-click="onOpenProduction" title="查看生产单">
+                    <img class="o_scan_src_icon" src="/stock_barcodes_mrp/static/src/img/icon_doc.svg" alt=""/>
+                </button>
+                <div class="o_scan_doc_wrap">
+                    <div class="o_scan_doc o_mrp_scan_doc_name"><t t-out="state.production_name" /></div>
+                    <div class="o_scan_doc_progress">
+                        生产数量：<t t-out="state.finished_qty_producing" /> / <t t-out="state.production_product_qty" />
                     </div>
                 </div>
-            </div>
-
-            <!-- Consolidated operational hints: status message +
-                 active-scan target merged into one alert box. The quantity
-                 input for non-serial components lives inline on the
-                 component row (pencil button) instead of here. -->
-            <div t-if="state.message || state.active_move_product_name"
-                 class="o_mrp_scan_message m-3">
-                <div t-att-class="'alert ' + (state.message ? alertClass : 'alert-info') + ' mb-0'">
-                    <t t-if="state.message"><t t-out="state.message" /></t>
-                    <t t-if="state.message &amp;&amp; state.active_move_product_name"><br/></t>
-                    <t t-if="state.active_move_product_name">
-                        <span class="text-primary">
-                            <i class="fa fa-hand-o-right me-1"/>正在扫描：
-                            <t t-out="state.active_move_product_name" />
-                        </span>
-                    </t>
-                </div>
-            </div>
-
-            <!-- MO info strip (only when an MO is selected) -->
-            <div t-if="state.production_id" class="o_mrp_scan_mo_info m-3 p-2 border rounded">
-                <div class="d-flex flex-wrap gap-3">
-                    <span><strong>MO:</strong> <t t-out="state.production_name" /></span>
-                    <span><strong>Product:</strong> <t t-out="state.production_product_name" /></span>
-                    <span t-if="state.location_name"><strong>Location:</strong> <t t-out="state.location_name" /></span>
-                    <span><strong>Qty producing:</strong> <t t-out="state.finished_qty_producing" /> / <t t-out="state.production_product_qty" /></span>
-                </div>
-            </div>
-
-            <!-- Finished SN display + clear button -->
-            <div t-if="state.finished_lot_name || state.finished_lot_id"
-                 class="o_mrp_scan_finished_sn d-flex align-items-center flex-wrap gap-2 px-3 py-2 bg-light border-bottom">
-                <i class="fa fa-barcode text-success"/>
-                <span class="text-muted">成品 SN：</span>
-                <span class="fw-bold text-break" style="min-width: 0;">
-                    <t t-out="state.finished_lot_name" />
-                </span>
-                <button t-if="canCleanFinishedLot"
+                <!-- Escape hatch: drop the component context and go back to
+                     scanning the finished lot/serial. -->
+                <button t-if="canBackToFinishedLot"
                         type="button"
-                        class="btn btn-sm btn-outline-danger ms-auto"
-                        t-on-click="onCleanFinishedLot">Clear SN</button>
+                        class="o_scan_topbar_right o_mrp_scan_back_to_sn"
+                        t-on-click="onBackToFinishedLot"
+                        title="转去扫描成品批次/序列号">
+                    <img class="o_scan_barcode_icon" src="/stock_barcodes_mrp/static/src/img/icon_barcode.svg" alt=""/>
+                </button>
+                <span t-else="" class="o_scan_topbar_spacer"/>
             </div>
 
-            <!-- Component checklist -->
-            <div class="o_mrp_scan_components flex-grow-1 overflow-auto p-3">
-                <div t-if="!state.components.length" class="text-muted">
-                    No components to display. Scan a finished product / MO first.
+            <!-- Scan row: back + input(with barcode icon) + camera -->
+            <div class="o_scan_scanrow">
+                <button
+                    type="button"
+                    class="o_scan_key o_mrp_scan_back"
+                    t-on-click="onBack"
+                    title="返回">
+                    <img class="o_scan_back_icon" src="/stock_barcodes_mrp/static/src/img/icon_back.svg" alt=""/>
+                </button>
+                <div class="o_scan_input_wrap">
+                    <img class="o_scan_barcode_icon" src="/stock_barcodes_mrp/static/src/img/icon_barcode.svg" alt=""/>
+                    <input
+                        type="text"
+                        class="o_mrp_scan_input"
+                        placeholder="扫码或输入条码..."
+                        t-att-disabled="isScanDisabled ? 'disabled' : ''"
+                        t-on-keydown="onManualScanEnter"
+                    />
                 </div>
-                <table t-else="" class="table table-sm align-middle">
-                    <thead>
-                        <tr>
-                            <th class="text-center" style="width:2rem"></th>
-                            <th>Component</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <t t-foreach="state.components" t-as="comp" t-key="comp.id">
-                            <tr
-                                t-att-class="!comp.picked ? 'table-danger' : 'table-success'"
-                                t-att-style="state.active_move_id === comp.id ? 'border-left:4px solid #0d6efd;' : ''"
-                                t-att-data-scan-row="comp.id"
-                                t-on-click="() => this.onSelectMove(comp.id)"
-                                role="button"
-                            >
-                                <td class="text-center align-middle">
-                                    <i
-                                        t-att-class="state.active_move_id === comp.id ? 'fa fa-hand-o-right text-primary' : 'fa fa-hand-o-right text-muted opacity-25'"
-                                    />
-                                </td>
-                                <td class="align-middle">
-                                    <!-- Line 1: component name -->
-                                    <div><t t-out="comp.product_name" /></div>
-                                    <!-- Line 2: qty line (MO form semantics) -->
-                                    <div class="small text-muted lh-sm">
-                                        待消耗
-                                        <t t-out="comp.to_consume" />
-                                        /
-                                        <t t-out="comp.total_demand" />
-                                        <span class="mx-1">·</span>
-                                        已消耗
-                                        <t t-out="comp.quantity" />
+                <button
+                    type="button"
+                    class="o_scan_key o_mrp_scan_camera"
+                    t-att-disabled="isScanDisabled ? 'disabled' : ''"
+                    t-on-click="onCameraScan"
+                    aria-label="扫码"
+                    title="扫码">
+                    <img class="o_scan_camera_icon" src="/stock_barcodes_mrp/static/src/img/icon_camera.svg" alt=""/>
+                </button>
+            </div>
+
+            <!-- Hint bar: status message + active scan target -->
+            <div t-if="state.message || state.active_move_product_name"
+                 t-att-class="'o_scan_hintbar ' + (state.message ? alertClass : 'alert-info')">
+                <t t-if="state.message"><t t-out="state.message" /></t>
+                <t t-if="state.message and state.active_move_product_name"> · </t>
+                <span class="o_scan_hint_active" t-if="state.active_move_product_name">
+                    正在扫描：<t t-out="state.active_move_product_name" />
+                </span>
+            </div>
+
+            <!-- Candidate MO selector overlay -->
+            <div t-if="state.visible_switch_selector"
+                 class="o_mrp_scan_selector p-3 border rounded">
+                <div class="fw-bold mb-2">
+                    <i class="fa fa-exclamation-triangle me-1"/>
+                    多个生产单匹配，请选择：
+                </div>
+                <button type="button"
+                        class="o_scan_key o_scan_key_warn o_mrp_scan_candidates"
+                        t-on-click="onViewCandidates">
+                    查看候选生产单
+                </button>
+            </div>
+
+            <!-- Scrollable body -->
+            <div class="o_mrp_scan_components">
+                <div t-if="!state.production_id" class="o_scan_empty">
+                    扫描生产单号或成品序列号开始
+                </div>
+
+                <!-- ============ 产品：finished product card ============ -->
+                <t t-if="state.production_id">
+                    <div class="o_scan_section_title">产品</div>
+                    <div class="o_scan_stack">
+                        <div class="o_scan_card">
+                            <div class="o_scan_card_head">
+                                <div class="o_scan_text_block">
+                                    <div class="o_scan_pmeta_loc"
+                                         t-if="state.production_source_name or state.production_dest_name">
+                                        <span t-if="state.production_source_name">从：<t t-out="state.production_source_name" /></span>
+                                        <span t-if="state.production_dest_name">至：<t t-out="state.production_dest_name" /></span>
                                     </div>
-                                    <!-- Line 3: SN + actions (consume/reset) merged here to
-                                         save columns and give the component name full width -->
-                                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                                        <t t-if="comp.lots.length === 1">
-                                            <span t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (comp.lots[0].picked ? 'bg-info' : 'bg-light text-muted border') + (state.recentComponentLotKey === comp.id + ':' + comp.lots[0].key ? ' o_mrp_scan_recent' : '')"
-                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[0].key">
-                                                <i class="fa fa-barcode"/>
-                                                <span class="small">
-                                                    <t t-out="comp.lots[0].name" />
-                                                </span>
-                                                <strong t-if="comp.lots[0].picked">× <t t-out="comp.lots[0].picked_quantity" /></strong>
-                                                <t t-else="">
-                                                    <span class="small opacity-75">待消耗</span>
-                                                    <strong>× <t t-out="comp.lots[0].reserved_quantity" /></strong>
-                                                </t>
-                                                <button t-if="comp.lots[0].picked"
-                                                        type="button"
-                                                        class="btn btn-sm btn-link text-danger p-0"
-                                                        t-att-title="'Remove ' + comp.lots[0].name"
-                                                        t-on-click.stop="() => this.onRemoveComponentLot(comp.id, comp.lots[0].id)">
-                                                    <i class="fa fa-trash"/>
-                                                </button>
-                                                <t t-if="!comp.lots[0].picked &amp;&amp; state.barcode_mrp_lot_scan_policy === 'optional'">
-                                                    <button t-if="comp.tracking === 'serial'"
-                                                            type="button"
-                                                            class="btn btn-sm btn-outline-success p-0 px-1"
-                                                            title="Consume reserved lot"
-                                                            t-on-click.stop="() => this.onConsumeReservedLot(comp.id, comp.lots[0].id)">
-                                                        <i class="fa fa-check"/>
-                                                    </button>
-                                                    <t t-else="">
-                                                        <button type="button"
-                                                                class="btn btn-sm btn-outline-success p-0 px-1"
-                                                                title="Consume reserved lot"
-                                                                t-on-click.stop="() => this.onConsumeReservedLot(comp.id, comp.lots[0].id)">
-                                                            +1
-                                                        </button>
-                                                        <button type="button"
-                                                                class="btn btn-sm btn-outline-primary p-0 px-1"
-                                                                title="Edit quantity"
-                                                                t-on-click.stop="() => this.onEditReservedLotQty(comp.id, comp.lots[0].key)">
-                                                            <i class="fa fa-pencil"/>
-                                                        </button>
-                                                    </t>
-                                                </t>
-                                            </span>
-                                            <div t-if="!comp.lots[0].picked &amp;&amp; comp.tracking !== 'serial' &amp;&amp; state.editingReservedLotKey === comp.id + ':' + comp.lots[0].key"
-                                                 class="d-flex align-items-center gap-1 border rounded p-2 bg-white text-dark w-100"
-                                                 t-on-click.stop="">
-                                                <input type="number"
-                                                       min="0"
-                                                       step="any"
-                                                       class="form-control form-control-sm"
-                                                       style="width: 6rem;"
-                                                       t-att-value="state.draftReservedLotQty"
-                                                       t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
-                                                       t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, comp.id, comp.lots[0].id)"/>
-                                                <button type="button"
-                                                        class="btn btn-sm btn-success"
-                                                        title="Confirm quantity"
-                                                        t-on-click.stop="() => this.onConfirmReservedLotQty(comp.id, comp.lots[0].id)">
-                                                    <i class="fa fa-check"/>
-                                                </button>
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-secondary"
-                                                        title="Cancel"
-                                                        t-on-click.stop="() => this.onCancelReservedLotQty()">
-                                                    <i class="fa fa-times"/>
-                                                </button>
-                                            </div>
-                                        </t>
-                                        <t t-elif="comp.lots.length > 1">
-                                            <span t-att-class="'badge d-inline-flex align-items-center gap-1 ' + (comp.lots[comp.lots.length - 1].picked ? 'bg-info' : 'bg-light text-muted border') + (state.recentComponentLotKey === comp.id + ':' + comp.lots[comp.lots.length - 1].key ? ' o_mrp_scan_recent' : '')"
-                                                  t-att-data-scan-lot="comp.id + ':' + comp.lots[comp.lots.length - 1].key">
-                                                <i class="fa fa-barcode"/>
-                                                <t t-out="comp.lots[comp.lots.length - 1].name" />
-                                                <strong t-if="comp.lots[comp.lots.length - 1].picked">× <t t-out="comp.lots[comp.lots.length - 1].picked_quantity" /></strong>
-                                                <t t-else="">
-                                                    <span class="small opacity-75">待消耗</span>
-                                                    <strong>× <t t-out="comp.lots[comp.lots.length - 1].reserved_quantity" /></strong>
-                                                </t>
-                                            </span>
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                                                    t-att-title="state.expandedComponentId === comp.id ? '收起全部' : '展开全部'"
-                                                    t-on-click.stop="() => this.onToggleComponentLots(comp.id)">
-                                                <i t-att-class="state.expandedComponentId === comp.id ? 'fa fa-caret-up' : 'fa fa-caret-down'"/>
-                                                共 <t t-out="comp.lots.length" /> 个
-                                            </button>
-                                        </t>
+                                    <div class="o_scan_pname"><t t-out="state.production_product_name" /></div>
+                                    <div class="o_scan_pmeta">
+                                        成品
+                                        <t t-if="state.finished_product_tracking === 'lot'"> | 批号</t>
+                                        <t t-elif="state.finished_product_tracking === 'serial'"> | 序列号</t>
+                                        <t t-else=""> | 无追踪</t>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="o_scan_card_body is-plain">
+                                <div class="o_mrp_scan_finished_sn o_scan_row is-plain"
+                                     t-if="state.finished_lot_name">
+                                    <span class="o_scan_row_label">批号/序列号：</span>
+                                    <span class="o_scan_row_name">
+                                        <t t-out="state.finished_lot_name" />
+                                    </span>
+                                    <button t-if="canCleanFinishedLot"
+                                            type="button"
+                                            class="o_scan_sq o_scan_sq_edit"
+                                            title="清除成品批次/序列号"
+                                            t-on-click.stop="onCleanFinishedLot">
+                                        <img class="o_scan_icon_trash" src="/stock_barcodes_mrp/static/src/img/icon_trash.svg" alt=""/>
+                                    </button>
+                                </div>
+                                <div class="o_scan_row is-plain" t-elif="state.finished_product_tracking !== 'none'">
+                                    <span class="o_scan_row_label">批号/序列号：</span>
+                                    <span class="o_scan_row_qty">尚未扫描</span>
+                                </div>
+                                <div class="o_scan_row is-plain" t-else="">
+                                    <span class="o_scan_row_qty">非追踪成品，无需成品批次/序列号</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- ============ 组件：component cards ============ -->
+                <div class="o_scan_section_title" t-if="state.components.length">组件</div>
+                <div class="o_scan_stack" t-if="state.components.length">
+                    <t t-foreach="state.components" t-as="comp" t-key="comp.id">
+                        <div t-att-class="'o_scan_card' + (state.active_move_id === comp.id ? ' is-selected' : '')">
+
+                            <!-- Card head: click selects the scan target -->
+                            <div class="o_scan_card_head is-selectable"
+                                 title="点击选中该组件后再扫码"
+                                 t-on-click="() => this.onSelectMove(comp.id)">
+                                <div class="o_scan_text_block">
+                                    <div class="o_scan_pmeta_loc" t-if="comp.location_name">
+                                        <span>从：<t t-out="comp.location_name" /></span>
+                                        <span t-if="comp.location_dest_name">至：<t t-out="comp.location_dest_name" /></span>
+                                    </div>
+                                    <div class="o_scan_pname"><t t-out="comp.product_name" /></div>
+                                    <div class="o_scan_pmeta">
+                                        需求 <t t-out="comp.total_demand" />
+                                        <t t-if="comp.tracking === 'lot'"> | 批次号</t>
+                                        <t t-if="comp.tracking === 'serial'"> | 序列号</t>
+                                    </div>
+                                </div>
+                                <div t-att-class="'o_scan_head_actions is-stacked' + (state.editingQtyMoveId === comp.id ? ' is-editing' : '')">
+                                    <div class="o_scan_picked">
+                                        <span class="o_scan_picked_lbl">已拣:</span>
+                                        <span class="o_scan_picked_num"><t t-out="comp.quantity" /></span>
+                                        <span class="o_scan_picked_uom" t-if="comp.uom_name"><t t-out="comp.uom_name" /></span>
+                                    </div>
+                                    <div class="o_scan_actions_row">
+                                        <!-- Tracked: hand = select scan target.
+                                             Untracked: edit qty / consume demand / reset. -->
+                                        <button t-if="comp.tracking !== 'none'"
+                                                type="button"
+                                                t-att-class="'o_scan_sq o_scan_sq_hand' + (state.active_move_id === comp.id ? ' is-active' : '')"
+                                                title="选中该组件"
+                                                t-on-click.stop="() => this.onSelectMove(comp.id)">
+                                            <img class="o_scan_icon_hand" src="/stock_barcodes_mrp/static/src/img/icon_hand.svg" alt=""/>
+                                        </button>
+
                                         <t t-else="">
-                                            <!-- Serial component, no SN yet: hint the operator -->
-                                            <span t-if="comp.tracking === 'serial' &amp;&amp; !comp.picked"
-                                                  class="small text-info d-inline-flex align-items-center gap-1">
-                                                <i class="fa fa-barcode"/>
-                                                请扫描序列号
-                                            </span>
-                                        </t>
-                                        <!-- Non-tracked components keep demand/custom actions and gain +1. -->
-                                        <t t-if="comp.tracking === 'none'">
-                                            <button t-if="state.barcode_mrp_lot_scan_policy === 'optional'"
-                                                    type="button"
-                                                    class="btn btn-sm btn-outline-success"
-                                                    title="Add quantity"
-                                                    t-on-click.stop="() => this.onAddComponentQuantity(comp.id)">
-                                                +1
-                                            </button>
-                                            <t t-if="!comp.picked">
-                                                <t t-if="state.editingQtyMoveId === comp.id">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="any"
-                                                        class="form-control form-control-sm"
-                                                        style="width: 6rem;"
-                                                        t-att-value="state.draftQty || comp.total_demand"
-                                                        t-on-input="(ev) => this.onDraftQtyInput(ev)"
-                                                        t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, comp.id)"
-                                                        t-on-click.stop=""
-                                                    />
+                                            <t t-if="state.editingQtyMoveId === comp.id">
+                                                <span class="o_scan_qty_edit" t-on-click.stop="">
+                                                    <input type="number"
+                                                           min="0"
+                                                           step="any"
+                                                           t-att-value="state.draftQty"
+                                                           t-on-input="(ev) => this.onDraftQtyInput(ev)"
+                                                           t-on-keydown="(ev) => this.onDraftQtyKeydown(ev, comp.id)"/>
                                                     <button type="button"
-                                                            class="btn btn-sm btn-success"
-                                                            title="Confirm quantity"
+                                                            class="o_scan_sq o_scan_sq_add"
+                                                            title="确认数量"
                                                             t-on-click.stop="() => this.onConfirmComponentQty(comp.id)">
                                                         <i class="fa fa-check"/>
                                                     </button>
                                                     <button type="button"
-                                                            class="btn btn-sm btn-outline-secondary"
-                                                            title="Cancel"
+                                                            class="o_scan_sq"
+                                                            title="取消"
                                                             t-on-click.stop="() => this.onCancelComponentQty()">
                                                         <i class="fa fa-times"/>
                                                     </button>
-                                                </t>
-                                                <t t-else="">
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-success"
-                                                            title="Consume BOM demand quantity"
-                                                            t-on-click.stop="() => this.onConsumeByDemand(comp.id)">
-                                                        消耗
-                                                    </button>
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-primary"
-                                                            title="Edit quantity to consume"
-                                                            t-on-click.stop="() => this.onEditComponentQty(comp.id)">
-                                                        <i class="fa fa-pencil"/>
-                                                    </button>
-                                                </t>
+                                                </span>
                                             </t>
-                                            <button t-if="comp.picked"
-                                                    type="button"
-                                                    class="btn btn-sm btn-outline-warning"
-                                                    title="Reset consumed quantity"
-                                                    t-on-click.stop="() => this.onResetComponentMove(comp.id)">
-                                                重置
-                                            </button>
+                                            <t t-else="">
+                                                <button type="button"
+                                                        class="o_scan_sq o_scan_sq_edit"
+                                                        title="修改数量"
+                                                        t-on-click.stop="() => this.onEditComponentQty(comp.id)">
+                                                    <img class="o_scan_icon_pencil" src="/stock_barcodes_mrp/static/src/img/icon_pencil.svg" alt=""/>
+                                                </button>
+                                                <button t-if="!comp.picked and comp.to_consume > 0"
+                                                        type="button"
+                                                        class="o_scan_sq o_scan_sq_add"
+                                                        t-att-title="'按 BOM 需求消耗 ' + comp.to_consume"
+                                                        t-on-click.stop="() => this.onConsumeByDemand(comp.id)"
+                                                >+<t t-out="comp.to_consume" /></button>
+                                                <button t-if="comp.picked"
+                                                        type="button"
+                                                        class="o_scan_sq o_scan_sq_edit"
+                                                        title="重置已消耗数量"
+                                                        t-on-click.stop="() => this.onResetComponentMove(comp.id)">
+                                                    <img class="o_scan_icon_trash" src="/stock_barcodes_mrp/static/src/img/icon_trash.svg" alt=""/>
+                                                </button>
+                                            </t>
                                         </t>
                                     </div>
-                                </td>
-                            </tr>
-                            <tr t-if="state.expandedComponentId === comp.id">
-                                <td colspan="2" class="ps-4 py-1 bg-white">
-                                    <t t-foreach="comp.lots" t-as="sn" t-key="sn.key">
-                                        <div class="d-flex align-items-center flex-wrap gap-2 small text-muted">
-                                            <i class="fa fa-circle-o"/>
-                                            <span t-att-class="'text-break' + (state.recentComponentLotKey === comp.id + ':' + sn.key ? ' badge bg-info o_mrp_scan_recent' : '')"
-                                                  t-att-data-scan-lot="comp.id + ':' + sn.key"
-                                                  style="min-width: 0;">
-                                                <t t-out="sn.name" />
-                                            </span>
-                                            <strong t-if="sn.picked">× <t t-out="sn.picked_quantity" /></strong>
-                                            <t t-else="">
-                                                <span class="small opacity-75">待消耗</span>
-                                                <strong>× <t t-out="sn.reserved_quantity" /></strong>
-                                            </t>
-                                            <button t-if="sn.picked"
-                                                    type="button"
-                                                    class="btn btn-sm btn-link text-danger p-0 flex-shrink-0"
-                                                    t-att-title="'Remove ' + sn.name"
-                                                    t-on-click.stop="() => this.onRemoveComponentLot(comp.id, sn.id)">
-                                                <i class="fa fa-trash"/>
-                                            </button>
-                                            <t t-if="!sn.picked &amp;&amp; state.barcode_mrp_lot_scan_policy === 'optional'">
-                                                <button t-if="comp.tracking === 'serial'"
-                                                        type="button"
-                                                        class="btn btn-sm btn-outline-success p-0 px-1"
-                                                        title="Consume reserved lot"
-                                                        t-on-click.stop="() => this.onConsumeReservedLot(comp.id, sn.id)">
-                                                    <i class="fa fa-check"/>
-                                                </button>
-                                                <t t-else="">
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-success p-0 px-1"
-                                                            title="Consume reserved lot"
-                                                            t-on-click.stop="() => this.onConsumeReservedLot(comp.id, sn.id)">
-                                                        +1
+                                </div>
+                            </div>
+
+                            <!-- Fold bar: serial cards only -->
+                            <button t-if="comp.tracking === 'serial'"
+                                    type="button"
+                                    class="o_scan_foldbar"
+                                    t-att-title="this.isComponentCollapsed(comp.id) ? '展开序列号' : '收起序列号'"
+                                    t-on-click="() => this.onToggleComponentFold(comp.id)">
+                                <span class="o_scan_grip"/>
+                            </button>
+
+                            <!-- Lot / serial rows -->
+                            <div t-if="comp.tracking !== 'none'" class="o_scan_card_body">
+                                <!-- Collapsed serial: last scanned (or first) lot + total -->
+                                <t t-if="comp.tracking === 'serial' and this.isComponentCollapsed(comp.id)">
+                                    <t t-set="summary" t-value="this.getComponentFoldSummary(comp)" />
+                                    <div t-if="summary"
+                                         t-att-class="'o_scan_row is-serial' + (state.recentComponentLotKey and state.recentComponentLotKey.startsWith(comp.id + ':') ? ' is-scanned' : '')"
+                                         t-att-data-scan-row="comp.id">
+                                        <span class="o_scan_row_name"><t t-out="summary.name" /></span>
+                                        <div class="o_scan_row_side">
+                                            <span class="o_scan_row_qty">已拣: <t t-out="summary.total" /></span>
+                                        </div>
+                                    </div>
+                                </t>
+
+                                <t t-elif="comp.lots.length">
+                                    <t t-foreach="comp.lots" t-as="lot" t-key="lot.key">
+                                        <div t-att-class="'o_scan_row' + (comp.tracking === 'serial' ? ' is-serial' : '') + (state.recentComponentLotKey === comp.id + ':' + lot.key ? ' is-scanned' : '')"
+                                             t-att-data-scan-row="comp.id"
+                                             t-att-data-scan-lot="comp.id + ':' + lot.key">
+                                            <span class="o_scan_row_name"><t t-out="lot.name" /></span>
+                                            <div class="o_scan_row_side">
+                                                <span class="o_scan_row_qty">已拣: <t t-out="lot.picked_quantity" /></span>
+                                                <div class="o_scan_row_btns">
+                                                    <!-- Picked: remove this very lot/SN.
+                                                         Reserved: optional-policy actions. -->
+                                                    <button t-if="lot.picked"
+                                                            type="button"
+                                                            class="o_scan_sq o_scan_sq_edit"
+                                                            t-att-title="'移除 ' + lot.name"
+                                                            t-on-click.stop="() => this.onRemoveComponentLot(comp.id, lot.id)">
+                                                        <img class="o_scan_icon_trash" src="/stock_barcodes_mrp/static/src/img/icon_trash.svg" alt=""/>
                                                     </button>
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-primary p-0 px-1"
-                                                            title="Edit quantity"
-                                                            t-on-click.stop="() => this.onEditReservedLotQty(comp.id, sn.key)">
-                                                        <i class="fa fa-pencil"/>
-                                                    </button>
-                                                </t>
-                                            </t>
-                                            <div t-if="!sn.picked &amp;&amp; comp.tracking !== 'serial' &amp;&amp; state.editingReservedLotKey === comp.id + ':' + sn.key"
-                                                 class="d-flex align-items-center gap-1 border rounded p-2 bg-white text-dark w-100"
+                                                    <t t-elif="state.barcode_mrp_lot_scan_policy === 'optional'">
+                                                        <button type="button"
+                                                                class="o_scan_sq o_scan_sq_add"
+                                                                title="消耗该预留批次/序列号"
+                                                                t-on-click.stop="() => this.onConsumeReservedLot(comp.id, lot.id)">+1</button>
+                                                        <button t-if="comp.tracking === 'lot'"
+                                                                type="button"
+                                                                class="o_scan_sq o_scan_sq_edit"
+                                                                title="修改数量"
+                                                                t-on-click.stop="() => this.onEditReservedLotQty(comp.id, lot.key)">
+                                                            <img class="o_scan_icon_pencil" src="/stock_barcodes_mrp/static/src/img/icon_pencil.svg" alt=""/>
+                                                        </button>
+                                                    </t>
+                                                </div>
+                                            </div>
+
+                                            <!-- Reserved lot qty edit (lot only) -->
+                                            <div t-if="!lot.picked and comp.tracking !== 'serial' and state.editingReservedLotKey === comp.id + ':' + lot.key"
+                                                 class="o_scan_lot_edit"
                                                  t-on-click.stop="">
-                                                <input type="number"
-                                                       min="0"
-                                                       step="any"
-                                                       class="form-control form-control-sm"
-                                                       style="width: 6rem;"
-                                                       t-att-value="state.draftReservedLotQty"
-                                                       t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
-                                                       t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, comp.id, sn.id)"/>
-                                                <button type="button"
-                                                        class="btn btn-sm btn-success"
-                                                        title="Confirm quantity"
-                                                        t-on-click.stop="() => this.onConfirmReservedLotQty(comp.id, sn.id)">
-                                                    <i class="fa fa-check"/>
-                                                </button>
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-secondary"
-                                                        title="Cancel"
-                                                        t-on-click.stop="() => this.onCancelReservedLotQty()">
-                                                    <i class="fa fa-times"/>
-                                                </button>
+                                                <div class="o_scan_lot_edit_line">
+                                                    <input type="number"
+                                                           min="0"
+                                                           step="any"
+                                                           t-att-value="state.draftReservedLotQty"
+                                                           t-on-input="(ev) => this.onDraftReservedLotQtyInput(ev)"
+                                                           t-on-keydown="(ev) => this.onDraftReservedLotQtyKeydown(ev, comp.id, lot.id)"/>
+                                                    <button type="button"
+                                                            class="o_scan_sq o_scan_sq_add"
+                                                            title="确认数量"
+                                                            t-on-click.stop="() => this.onConfirmReservedLotQty(comp.id, lot.id)">
+                                                        <i class="fa fa-check"/>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="o_scan_sq"
+                                                            title="取消"
+                                                            t-on-click.stop="() => this.onCancelReservedLotQty()">
+                                                        <i class="fa fa-times"/>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </t>
-                                </td>
-                            </tr>
-                        </t>
-                    </tbody>
-                </table>
+                                </t>
+
+                                <t t-else="">
+                                    <!-- No lot yet -->
+                                    <div class="o_scan_row">
+                                        <span class="o_scan_row_qty" t-if="comp.tracking === 'serial'">请扫描序列号</span>
+                                        <span class="o_scan_row_qty" t-else="">请扫描批次号</span>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+                </div>
             </div>
 
-            <!-- Action buttons (fixed at bottom for shop-floor scanning) -->
-            <div class="o_mrp_scan_actions p-3 border-top d-flex gap-2 flex-wrap justify-content-between">
-                <button
-                    type="button"
-                    class="btn btn-secondary btn-lg o_mrp_scan_back"
-                    t-on-click="onBack"
-                >Back</button>
+            <!-- Footer actions -->
+            <div class="o_scan_footer" t-if="state.production_id">
+                <div class="o_scan_footer_actions">
+                    <button t-if="state.visible_switch_selector"
+                            type="button"
+                            class="o_scan_key o_scan_key_warn o_mrp_scan_candidates"
+                            t-on-click="onViewCandidates">查看候选</button>
 
-                <div class="d-flex gap-2 flex-wrap">
-                    <button
-                        t-if="state.visible_switch_selector"
-                        type="button"
-                        class="btn btn-warning btn-lg o_mrp_scan_candidates"
-                        t-on-click="onViewCandidates"
-                    >View candidate MOs</button>
+                    <button t-if="canApplyLot"
+                            type="button"
+                            class="o_scan_key o_mrp_scan_apply_lot"
+                            t-on-click="onApplyLot">Apply Lot</button>
 
-                    <button
-                        t-if="canApplyLot"
-                        type="button"
-                        class="btn btn-primary btn-lg o_mrp_scan_apply_lot"
-                        t-on-click="onApplyLot"
-                    >Apply Lot</button>
+                    <button t-if="state.visible_force_done"
+                            type="button"
+                            class="o_scan_key o_scan_key_warn o_mrp_scan_force_done"
+                            t-on-click="onForceDone">Force Consume</button>
 
-                    <button
-                        t-if="canConfirm"
-                        type="button"
-                        class="btn btn-primary btn-lg o_mrp_scan_confirm"
-                        t-on-click="onConfirm"
-                    >Confirm</button>
+                    <button t-if="canConfirm"
+                            type="button"
+                            class="o_scan_key o_scan_key_primary o_mrp_scan_confirm"
+                            t-on-click="onConfirm">Confirm</button>
 
-                    <button
-                        t-if="state.visible_force_done"
-                        type="button"
-                        class="btn btn-warning btn-lg o_mrp_scan_force_done"
-                        t-on-click="onForceDone"
-                    >Force Consume</button>
-
-                    <button
-                        t-if="canFinish"
-                        type="button"
-                        class="btn btn-success btn-lg o_mrp_scan_finish"
-                        t-on-click="onFinishProduction"
-                    >Finish Production</button>
+                    <button t-if="canFinish"
+                            type="button"
+                            class="o_scan_key o_scan_key_primary o_mrp_scan_finish"
+                            t-on-click="onFinishProduction">Finish Production</button>
                 </div>
             </div>
         </div>

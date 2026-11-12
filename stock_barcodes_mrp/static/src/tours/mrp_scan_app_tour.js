@@ -35,7 +35,7 @@ registry.category("web_tour.tours").add("mrp_scan_app_single_match", {
         {
             // After the single RPC round-trip the MO info strip
             // should now show the matched MO's name.
-            trigger: ".o_mrp_scan_mo_info:contains('MO:')",
+            trigger: ".o_mrp_scan_mo_info .o_mrp_scan_doc_name",
             content: "MO info strip updates with matched MO name",
         },
     ],
@@ -98,7 +98,7 @@ registry.category("web_tour.tours").add("mrp_scan_app_finished_sn_display", {
             run: "edit SERIAL_FP_BARCODE_001 && press Enter",
         },
         {
-            trigger: ".o_mrp_scan_mo_info:contains('MO:')",
+            trigger: ".o_mrp_scan_mo_info .o_mrp_scan_doc_name",
             content: "MO info strip appears",
         },
         {

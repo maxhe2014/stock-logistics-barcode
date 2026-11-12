@@ -578,6 +578,11 @@ class WizStockBarcodesMrp(models.TransientModel):
             components.append({
                 "id": mv.id,
                 "product_name": mv.product_id.display_name or "",
+                # Display-only fields for the card layout (design 4):
+                # per-card 从/至 and the unit shown next to 已拣.
+                "uom_name": mv.product_uom.name or "",
+                "location_name": mv.location_id.display_name or "",
+                "location_dest_name": mv.location_dest_id.display_name or "",
                 # Match the MO form's "To Consume" / "Consumed" semantics:
                 #   - should_consume_qty = (qty_producing - qty_produced) * unit_factor
                 #   - product_uom_qty    = BOM total demand (denominator of the
@@ -605,6 +610,9 @@ class WizStockBarcodesMrp(models.TransientModel):
             "production_id": production.id,
             "production_name": production.name or "",
             "production_product_name": self.production_product_id.display_name or "",
+            # Display-only: 从/至 of the finished-product card.
+            "production_source_name": production.location_src_id.display_name or "",
+            "production_dest_name": production.location_dest_id.display_name or "",
             "location_name": self.location_id.display_name or "",
             "product_name": self.product_id.display_name or "",
             "lot_name": self.lot_id.display_name or "",

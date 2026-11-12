@@ -45,7 +45,6 @@ export class MrpScanApp extends Component {
         // drained in order (see _onScan), so fast scanners lose nothing.
         this._scanQueue = [];
         this._pendingComponentScanTarget = null;
-        this._highlightTimer = null;
         // Local UI mirror of the wizard state. Hydrated from
         // `get_scan_state()` after every scan; rendered by the
         // t-* directives in the template.
@@ -79,9 +78,12 @@ export class MrpScanApp extends Component {
             // Task 4: click-selected component move
             active_move_id: false,
             active_move_product_name: "",
-            // Component scanned-SN expansion row (move id or false)
-            expandedComponentId: false,
-            // Composite move_id:lot_id highlighted for two seconds after scanning.
+            // Serial component cards fold to a one-line summary. The set
+            // holds the *collapsed* move ids, so an empty object means
+            // "everything expanded" (the design 4 default).
+            collapsedComponentIds: {},
+            // Composite move_id:lot_id highlighted after scanning. It stays
+            // highlighted until the next scan (design: persistent hit row).
             recentComponentLotKey: "",
             // Inline quantity editing for components and reserved lots
             editingQtyMoveId: false,
@@ -126,7 +128,7 @@ export class MrpScanApp extends Component {
         });
 
         onWillUnmount(() => {
-            clearTimeout(this._highlightTimer);
+            this._scanQueue = [];
         });
     }
 
@@ -171,6 +173,9 @@ export class MrpScanApp extends Component {
      */
     async _scanOne(barcode) {
         this.state.scanning = true;
+        // Any new scan clears the previous hit highlight; it is re-applied
+        // below only if this scan actually changed a component row.
+        this.state.recentComponentLotKey = "";
         const componentStateBefore = new Map();
         for (const comp of this.state.components) {
             componentStateBefore.set(comp.id, {
@@ -209,15 +214,10 @@ export class MrpScanApp extends Component {
                 break;
             }
             if (scannedTarget) {
-                const lotKey = `${scannedTarget.moveId}:${scannedTarget.lotKey}`;
                 this._pendingComponentScanTarget = scannedTarget;
-                this.state.recentComponentLotKey = lotKey;
-                clearTimeout(this._highlightTimer);
-                this._highlightTimer = setTimeout(() => {
-                    if (this.state.recentComponentLotKey === lotKey) {
-                        this.state.recentComponentLotKey = "";
-                    }
-                }, 2000);
+                // Persistent until the next scan (no timeout) — matches the
+                // picking scan app and the "已拣" row state in design 4.
+                this.state.recentComponentLotKey = `${scannedTarget.moveId}:${scannedTarget.lotKey}`;
             }
             if (res.action) {
                 // Multi-match: auto-open the filtered MO list.
@@ -268,6 +268,28 @@ export class MrpScanApp extends Component {
     /** Back button — return to the previous controller (the MO list). */
     onBack() {
         this.env.config.historyBack();
+    }
+
+    /** Top-bar document button — open the linked manufacturing order. */
+    async onOpenProduction() {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        try {
+            const action = await this.orm.call(
+                "wiz.stock.barcodes.mrp",
+                "action_open_production",
+                [[this.wizId]]
+            );
+            if (action) {
+                await this.actionService.doAction(action);
+            }
+        } catch (err) {
+            this.notification.add(
+                _t("Open MO failed: %(err)s", { err: err?.message || String(err) }),
+                { type: "danger" }
+            );
+        }
     }
 
     /**
@@ -556,8 +578,7 @@ export class MrpScanApp extends Component {
     /**
      * Reset (undo) a component's consumed quantity. Works for all
      * tracking types (serial SNs are unlinked; lot/none lines are
-     * zeroed). Collapses the expansion row if the reset component was
-     * expanded (its SN list is now empty).
+     * zeroed).
      */
     async onResetComponentMove(moveId) {
         if (this.state.scanning || !this.wizId) {
@@ -570,9 +591,6 @@ export class MrpScanApp extends Component {
                 [[this.wizId], moveId]
             );
             await this._refreshState();
-            if (this.state.expandedComponentId === moveId) {
-                this.state.expandedComponentId = false;
-            }
         } catch (err) {
             this.notification.add(
                 _t("Reset component failed: %(err)s", {
@@ -583,7 +601,7 @@ export class MrpScanApp extends Component {
         }
     }
 
-    /** Map message_type → alert CSS class for the message bar. */
+    /** Map message_type → alert CSS class for the hint bar. */
     get alertClass() {
         const t = this.state.message_type || "info";
         return {
@@ -592,7 +610,26 @@ export class MrpScanApp extends Component {
             warning: "alert-warning",
             error: "alert-danger",
             not_found: "alert-danger",
+            more_match: "alert-warning",
         }[t] || "alert-info";
+    }
+
+    /** An inline quantity editor is open: block new scans until saved. */
+    get isQuantityEditing() {
+        return (
+            !!this.state.editingQtyMoveId ||
+            !!this.state.editingReservedLotKey
+        );
+    }
+
+    /** Manual input / camera disabled while a scan or an editor is running
+     *  or while the operator must resolve a candidate MO selector. */
+    get isScanDisabled() {
+        return (
+            !!this.state.scanning ||
+            this.isQuantityEditing ||
+            !!this.state.visible_switch_selector
+        );
     }
 
     /** Apply Lot visible: tracked (non-serial) finished product + a lot is
@@ -703,10 +740,31 @@ export class MrpScanApp extends Component {
         return this._callAction("action_clean_finished_lot", _t("Clear SN"));
     }
 
-    /** Toggle the scanned-SN expansion row for a component move. */
-    onToggleComponentLots(moveId) {
-        this.state.expandedComponentId =
-            this.state.expandedComponentId === moveId ? false : moveId;
+    /** Fold / unfold a serial component card. Pure UI state: it only
+     *  switches between the full SN list and the one-line summary. */
+    onToggleComponentFold(moveId) {
+        const next = Object.assign({}, this.state.collapsedComponentIds);
+        if (next[moveId]) {
+            delete next[moveId];
+        } else {
+            next[moveId] = true;
+        }
+        this.state.collapsedComponentIds = next;
+    }
+
+    isComponentCollapsed(moveId) {
+        return !!this.state.collapsedComponentIds[moveId];
+    }
+
+    /** Summary for a collapsed serial card: the last scanned lot (the scan
+     *  handler moves the hit lot to the end of `comp.lots`) or the first
+     *  one, plus the component's total picked quantity. */
+    getComponentFoldSummary(comp) {
+        const lots = comp.lots || [];
+        if (!lots.length) {
+            return null;
+        }
+        return { name: lots[lots.length - 1].name, total: comp.quantity };
     }
 
     /** Remove a single scanned component SN (unlinks its move line). */
@@ -718,16 +776,6 @@ export class MrpScanApp extends Component {
                 [[this.wizId], moveId, lotId]
             );
             await this._refreshState();
-            // If the component has 0 or 1 lot left, collapse the expand
-            // row. With 1 lot the SN is shown directly in the column (no
-            // badge to click), so the expand row would otherwise be stuck
-            // open with no way to collapse it.
-            const comp = (this.state.components || []).find(
-                (c) => c.id === moveId
-            );
-            if (!comp || !comp.lots || comp.lots.length <= 1) {
-                this.state.expandedComponentId = false;
-            }
         } catch (err) {
             this.notification.add(
                 _t("Remove SN failed: %(err)s", {

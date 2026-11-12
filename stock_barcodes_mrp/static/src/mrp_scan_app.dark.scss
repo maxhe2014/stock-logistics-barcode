@@ -1,0 +1,24 @@
+// MRP scan app — dark theme overrides.
+// Loaded only in web.assets_web_dark, i.e. when Odoo's color_scheme is "dark"
+// (driven by the web_dark_mode module / user preference, not the OS).
+// Keep in sync with the &[data-theme="dark"] block in mrp_scan_app.scss.
+
+.o_mrp_scan_app {
+    --scan-page: #0B0B0B;
+    --scan-card: #424346;
+    --scan-text: #FFFFFF;
+    --scan-text-2: #FFFFFF;
+    // Hint bar: dark surface first, then the teal/green tint on top.
+    --scan-hint-bg: #38555B;
+    --scan-hint-fg: #FFFFFF;
+    --scan-hint-shadow: rgba(22, 163, 181, 0.3);
+    --scan-ok-bg: #66B883;
+    --scan-ok-fg: #FFFFFF;
+    --scan-ok-border: rgba(133, 250, 158, 0.8);
+    --scan-body-bg: rgba(64, 65, 68, 0.55);
+
+    .o_scan_card.is-selected > .o_scan_card_head {
+        background: #404144;
+        box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.9) inset;
+    }
+}

@@ -23,6 +23,10 @@
             "stock_barcodes_mrp/static/src/mrp_scan_app.esm.js",
             "stock_barcodes_mrp/static/src/mrp_scan_app.xml",
             "stock_barcodes_mrp/static/src/mrp_scan_app.css",
+            "stock_barcodes_mrp/static/src/mrp_scan_app.scss",
+        ],
+        "web.assets_web_dark": [
+            "stock_barcodes_mrp/static/src/mrp_scan_app.dark.scss",
         ],
         "web.assets_tests": [
             "stock_barcodes_mrp/static/src/tours/mrp_scan_app_tour.js",
