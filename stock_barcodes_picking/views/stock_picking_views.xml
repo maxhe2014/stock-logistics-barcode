@@ -31,16 +31,21 @@
             <xpath expr="//list/header" position="inside">
                 <button name="action_open_scan_wizard"
                         type="object"
-                        string="Scan"
+                        icon="fa-barcode"
+                        title="Barcode Scan"
                         class="oe_highlight o_stock_picking_scan_header"
                         display="always"/>
             </xpath>
             <xpath expr="//list/field[@name='priority']" position="before">
+                <!-- width: Odoo pins button columns to DEFAULT_MIN_WIDTH (80px)
+                     unless the button declares one; 34px hugs the icon so the
+                     star / reference columns sit right next to it. -->
                 <button name="action_open_scan_wizard"
                         type="object"
-                        string="Scan"
                         icon="fa-barcode"
-                        class="btn btn-primary btn-sm"
+                        title="Barcode Scan"
+                        width="34px"
+                        class="btn btn-primary btn-sm o_picking_scan_row_btn"
                         invisible="state not in ('confirmed', 'assigned', 'partially_available', 'waiting')"/>
             </xpath>
         </field>
