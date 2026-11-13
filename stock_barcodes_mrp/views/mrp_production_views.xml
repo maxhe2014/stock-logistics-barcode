@@ -36,8 +36,9 @@
             <xpath expr="//list/header" position="inside">
                 <button name="action_open_scan_wizard"
                         type="object"
-                        string="Scan"
-                        class="oe_highlight"
+                        icon="fa-barcode"
+                        title="Barcode Scan"
+                        class="oe_highlight o_mrp_scan_header"
                         display="always" />
             </xpath>
             <!-- Row-level shortcut: per-MO scan entry via the client
@@ -48,11 +49,14 @@
                  <button name="..." type="object" icon="..."/>
                  inside <list>). -->
             <xpath expr="//list/field[@name='priority']" position="before">
+                <!-- width: button columns default to DEFAULT_MIN_WIDTH (80px);
+                     pin it to the glyph so priority/reference sit closer. -->
                 <button name="action_open_scan_wizard"
                         type="object"
-                        string="Scan"
                         icon="fa-barcode"
-                        class="btn btn-primary btn-sm"
+                        title="Barcode Scan"
+                        width="34px"
+                        class="btn btn-primary btn-sm o_mrp_scan_row_btn"
                         invisible="state not in ('confirmed', 'progress', 'to_close')" />
             </xpath>
         </field>
@@ -76,17 +80,18 @@
                 <header>
                     <button name="action_open_scan_wizard"
                             type="object"
-                            string="Scan"
-                            class="oe_highlight"
+                            icon="fa-barcode"
+                            title="Barcode Scan"
+                            class="oe_highlight o_mrp_scan_header"
                             display="always" />
                 </header>
             </xpath>
             <xpath expr="//field[@name='priority']" position="before">
                 <button name="action_open_scan_wizard"
                         type="object"
-                        string="Scan"
                         icon="fa-barcode"
-                        class="btn btn-primary me-2 flex-shrink-0 o_kanban_scan_btn"
+                        title="Barcode Scan"
+                        class="btn btn-primary me-2 flex-shrink-0 o_mrp_scan_kanban_btn"
                         invisible="state not in ('confirmed', 'progress', 'to_close')" />
             </xpath>
         </field>
