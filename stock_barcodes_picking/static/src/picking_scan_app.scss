@@ -166,15 +166,16 @@
         }
     }
 
-    // 返回/相机按钮里的 SVG 图标（保持设计稿原尺寸，在按钮内 flex 居中）
+    // 返回/相机按钮里的 SVG 图标（与 MRP 扫码页保持同一套设计稿图标；
+    // 图标保留 40×33 原始坐标系，按钮内等宽居中）
     .o_scan_back_icon {
-        width: 18px;
-        height: 19px;
+        width: 40px;
+        height: 33px;
         display: block;
     }
     .o_scan_camera_icon {
-        width: 24px;
-        height: 16px;
+        width: 40px;
+        height: 33px;
         display: block;
     }
 
@@ -182,6 +183,9 @@
     .o_scan_key {
         height: 34.5px;
         min-width: 40px;
+        // Never shrink below the label: on narrow screens the footer wraps
+        // instead of squeezing the button (text used to spill outside).
+        flex-shrink: 0;
     }
     // 返回键与右侧相机按钮等宽（40px，设计稿 23），纯图标
     .o_picking_scan_back,
@@ -229,12 +233,17 @@
         box-sizing: border-box;
         border: 1px solid var(--scan-hint-border);
         border-radius: 4px;
-        padding: 0 10px;
+        padding: 1px 10px;
         background-color: var(--scan-hint-bg);
         color: var(--scan-hint-fg);
         font-size: 12px;
-        line-height: 23px;     // 25px 高减去上下各 1px 描边
+        line-height: 21px;
         box-shadow: 0 4px 4px 0 var(--scan-hint-shadow);
+        // Long barcodes / product names wrap onto new lines instead of
+        // being clipped; the bar grows with the content (min-height keeps
+        // the single-line look).
+        word-break: break-word;
+        overflow-wrap: anywhere;
 
         &.alert-success {
             border-color: var(--scan-ok-border);
@@ -527,7 +536,9 @@
         font-size: 17px;
 
         &.is-active {
-            color: #404144;
+            // Selected product: the hand disappears (the card inset shadow
+            // and the hint bar already show the active target).
+            opacity: 0;
         }
         &.is-disabled {
             opacity: 0.45;
@@ -634,6 +645,10 @@
         flex-direction: column;
         justify-content: center;
         overflow: hidden;
+        // Serial numbers are long unbroken tokens: break them so the row
+        // grows in height instead of clipping the right-hand characters.
+        word-break: break-word;
+        overflow-wrap: anywhere;
     }
     // lot 行内的 从/至（design 17: 9px 灰 opacity .8）
     .o_scan_row_loc {

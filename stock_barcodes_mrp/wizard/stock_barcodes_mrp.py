@@ -138,6 +138,16 @@ class WizStockBarcodesMrp(models.TransientModel):
         compute="_compute_totals",
     )
 
+    # Cache for the MO form toolbar rendered by the CogMenu. Those items
+    # only change when the operator switches MO, so rebuilding the view
+    # toolbar on every scan snapshot is wasted work (~5 ms per scan).
+    action_menu_items_cache = fields.Json(readonly=True)
+    action_menu_items_production_id = fields.Many2one(
+        comodel_name="mrp.production",
+        string="Action Menu Items For",
+        readonly=True,
+    )
+
     # --- TODO-C4: component checklist ---
     component_move_ids = fields.One2many(
         related="production_id.move_raw_ids",
@@ -1972,10 +1982,12 @@ class WizStockBarcodesMrp(models.TransientModel):
         ]
         if self.lot_id:
             domain.append(("lot_id", "=", self.lot_id.id))
-        groups = self.env["stock.quant"].read_group(
-            domain, ["quantity"], [], orderby="id"
+        # Odoo 19: read_group is deprecated — use _read_group and unpack
+        # the aggregate tuple instead (same on-hand sum).
+        groups = self.env["stock.quant"]._read_group(
+            domain, aggregates=["quantity:sum"]
         )
-        self.qty_available = groups[0]["quantity"] if groups else 0.0
+        self.qty_available = groups[0][0] if groups else 0.0
 
     # --- Action methods ---
     def action_confirm(self):
@@ -2050,17 +2062,15 @@ class WizStockBarcodesMrp(models.TransientModel):
         if self.product_id.tracking == "serial":
             quantity = 0.0
             if self.lot_id:
-                groups = self.env["stock.quant"].read_group(
+                groups = self.env["stock.quant"]._read_group(
                     [
                         ("product_id", "=", self.product_id.id),
                         ("location_id", "child_of", self.location_id.id),
                         ("lot_id", "=", self.lot_id.id),
                     ],
-                    ["quantity"],
-                    [],
-                    orderby="id",
+                    aggregates=["quantity:sum"],
                 )
-                quantity = groups[0]["quantity"] if groups else 0.0
+                quantity = groups[0][0] if groups else 0.0
             self.qty_available = quantity
             if self.product_id.uom_id.compare(quantity, 1.0) < 0:
                 self._set_message(
@@ -2667,10 +2677,19 @@ class WizStockBarcodesMrp(models.TransientModel):
         on the mrp.production form view — Mark as Done / Scrap /
         Unbuild / ... plus print reports. The frontend renders them via
         the standard ``web.CogMenu`` OWL component.
+
+        The toolbar depends on the MO form view, not on the scan state, so
+        it is computed once per MO and cached on the wizard; otherwise
+        every scan snapshot pays a ``get_views(toolbar=True)`` round trip.
         """
         self.ensure_one()
         if not self.production_id:
             return {"action": [], "print": []}
+        if (
+            self.action_menu_items_production_id == self.production_id
+            and self.action_menu_items_cache
+        ):
+            return self.action_menu_items_cache
         production_model = self.env["mrp.production"]
         view_id = self.env.ref("mrp.mrp_production_form_view").id
         try:
@@ -2680,10 +2699,15 @@ class WizStockBarcodesMrp(models.TransientModel):
             toolbar = result["views"]["form"].get("toolbar", {})
         except Exception:
             toolbar = {}
-        return {
+        items = {
             "action": toolbar.get("action", []),
             "print": toolbar.get("print", []),
         }
+        self.write({
+            "action_menu_items_production_id": self.production_id.id,
+            "action_menu_items_cache": items,
+        })
+        return items
 
     def action_add_component_to_production(self, product_id, qty=1.0):
         """Add a product to the current MO as an extra raw material.

@@ -262,8 +262,8 @@
 
     // ---------- section title (产品 / 组件) ----------
     .o_scan_section_title {
-        height: 25px;
-        line-height: 25px;
+        height: 30px;
+        line-height: 30px;
         text-align: center;
         font-size: 12px;
         font-weight: 700;
@@ -287,7 +287,8 @@
         display: flex;
         flex-direction: column;
         gap: 5px;
-        margin-bottom: 8px;
+        // Same as picking's flat (no-package) stack.
+        margin-bottom: 5px;
         min-width: 0;
         width: 100%;
     }
@@ -475,8 +476,10 @@
         width: 30px;
         font-size: 17px;
 
+        // Selected component: the hand disappears (the card inset shadow
+        // and the hint bar already show the active target).
         &.is-active {
-            opacity: 1;
+            opacity: 0;
         }
         &.is-disabled {
             opacity: 0.45;
@@ -499,10 +502,6 @@
         height: 29.92px;
         display: block;
         opacity: 0.55;
-
-        &.is-active {
-            opacity: 1;
-        }
     }
 
     // inline qty edit inside header
@@ -567,7 +566,9 @@
         gap: 5px;
         padding: 5px;
         position: relative;
-        background: var(--scan-row-bg);
+        // No background here: `.o_scan_card_body` already paints the teal
+        // 0.2 layer. Painting it twice composited to 0.36 (#ABDEE4) and
+        // made the lot rows visibly darker than the picking app.
         border-bottom: 1px solid var(--scan-row-border);
 
         &.is-serial {
@@ -710,17 +711,17 @@
     }
     // Same green key style as the picking app's "添加产品".
     .o_scan_key_add_component {
-        background-color: var(--scan-green);
+        background-color: #27A844;
         color: #FFFFFF;
         font-weight: 600;
         min-width: 130px;
         box-shadow: 0 1.5px 0 0 var(--scan-key-shadow);
 
         &:hover {
-            filter: brightness(0.95);
+            background-color: darken(#27A844, 5%);
         }
         &:active {
-            filter: brightness(0.9);
+            background-color: darken(#27A844, 8%);
         }
     }
 
