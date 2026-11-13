@@ -61,7 +61,8 @@
                 <header>
                     <button name="action_open_scan_wizard"
                             type="object"
-                            string="Scan"
+                            icon="fa-barcode"
+                            title="Barcode Scan"
                             class="oe_highlight o_stock_picking_scan_header"
                             display="always"/>
                 </header>
@@ -69,9 +70,9 @@
             <xpath expr="//field[@name='priority']" position="before">
                 <button name="action_open_scan_wizard"
                         type="object"
-                        string="Scan"
                         icon="fa-barcode"
-                        class="btn btn-primary me-2 flex-shrink-0 o_kanban_scan_btn"
+                        title="Barcode Scan"
+                        class="btn btn-primary me-2 flex-shrink-0 o_picking_scan_kanban_btn"
                         invisible="state not in ('confirmed', 'assigned', 'partially_available', 'waiting')"/>
             </xpath>
         </field>
