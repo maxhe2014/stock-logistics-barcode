@@ -93,6 +93,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             ("not_found", "Not found"),
             ("more_match", "Multiple matches"),
             ("success", "Success"),
+            ("warning", "Warning"),
             ("error", "Error"),
         ],
         readonly=True,
@@ -2437,6 +2438,22 @@ class WizStockBarcodesPicking(models.TransientModel):
                 barcode_view=True
             ).action_put_in_pack()
         except Exception as exc:
+            # Core creates the package and writes result_package_id BEFORE
+            # calling _post_put_in_pack_hook (label printing). If the lines
+            # are packed now, only the label step failed: report "packed,
+            # printing failed" instead of a misleading pack failure.
+            packed_now = self.env["stock.move.line"].search_count([
+                ("id", "in", unpacked.ids),
+                ("result_package_id", "!=", False),
+            ])
+            if packed_now:
+                self._set_message(
+                    "warning",
+                    self.env._(
+                        "装包成功、打印失败：%(msg)s", **{"msg": str(exc)}
+                    ),
+                )
+                return True
             self._set_message(
                 "error",
                 self.env._("Failed to put in package: %(msg)s", **{"msg": str(exc)}),
