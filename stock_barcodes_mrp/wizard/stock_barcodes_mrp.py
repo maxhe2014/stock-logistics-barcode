@@ -488,6 +488,12 @@ class WizStockBarcodesMrp(models.TransientModel):
         lookup matches the scanned barcode against MOs that have the SN
         pre-assigned in lot_producing_ids.
         """
+        # Hardware scanners, the camera service and the manual input can all
+        # deliver a trailing CR/LF or padding. Strip it here so every entry
+        # path (OWL RPC, onchange, hardware mixin) matches barcodes exactly —
+        # otherwise an existing lot name is "not found" and the scan falls
+        # through to the new-finished-SN fallback.
+        barcode = barcode.strip() if isinstance(barcode, str) else barcode
         if not barcode:
             return
         # C5: scan-first SN reverse lookup (only fires when no MO is set)
@@ -849,17 +855,42 @@ class WizStockBarcodesMrp(models.TransientModel):
         # Guard: existing lot of any product → don't shadow it
         if self.env["stock.lot"].search([("name", "=", barcode)], limit=1):
             return False
-        # --- Rejection guard: MO already has a finished lot bound ---
-        # The scanned barcode is a brand-new lot name (not in stock.lot),
-        # so it can never match the bound lot (which exists in stock.lot).
-        # Any second scan while a lot is bound is therefore a different SN
-        # and must be rejected, not replaced.
+        # --- MO already has a finished lot bound ---
+        # The scanned barcode is a brand-new lot name (not in stock.lot), so
+        # it cannot be another finished SN to bind (core allows only one per
+        # MO). Treat it as a component lot/serial instead: the operator is
+        # picking components after the finished SN was bound. Only ask for a
+        # component target when the MO has more than one tracked component.
         current_bound = self.production_id.lot_producing_ids
         if current_bound:
+            tracked_moves = self._tracked_component_moves()
+            if len(tracked_moves) == 1:
+                # Unambiguous: the barcode can only be this component's
+                # lot/serial.
+                self.active_move_id = tracked_moves
+                self.product_id = tracked_moves.product_id
+                self.product_uom_id = tracked_moves.product_id.uom_id
+                return self._create_new_lot_flow(barcode)
+            if tracked_moves:
+                # Several tracked components: let the operator pick the row.
+                self._set_message(
+                    "info",
+                    self.env._(
+                        "MO already has %(sn)s. Scan/click a component row, then "
+                        "scan its lot/serial.",
+                        sn=current_bound[0].name,
+                    ),
+                )
+                return True
+            # No tracked component at all: this really is a different
+            # finished SN, keep the explicit clear-first error.
             self._set_message(
                 "error",
-                self.env._("MO already has SN %(cur)s bound. Clear it first to "
-                  "scan a different one.", **{"cur": current_bound[0].name}),
+                self.env._(
+                    "MO already has SN %(cur)s bound. Clear it first to "
+                    "scan a different one.",
+                    cur=current_bound[0].name,
+                ),
             )
             return True
         # --- No bound lot yet: create + bind it ---
@@ -880,6 +911,23 @@ class WizStockBarcodesMrp(models.TransientModel):
             self.env._("%(type)s %(lot)s bound to MO", **{"type": self.env._("Serial") if is_serial else self.env._("Lot"), "lot": barcode}),
         )
         return True
+
+    def _tracked_component_moves(self):
+        """Component moves of the MO that need a lot/serial to be consumed.
+
+        Used when the MO already has its finished lot/serial bound: a new
+        barcode can then only be a component lot/serial, so the scan is
+        routed to that component instead of being rejected as "another
+        finished SN".
+        """
+        self.ensure_one()
+        return self.production_id.move_raw_ids.filtered(
+            lambda move: (
+                move.state not in ("done", "cancel")
+                and move.product_id != self.production_id.product_id
+                and move.product_id.tracking != "none"
+            )
+        )
 
     def _scan_production(self, barcode):
         """Scan-first MO switching by MO reference (mrp.production.name).
@@ -1155,14 +1203,23 @@ class WizStockBarcodesMrp(models.TransientModel):
         # If the product is NOT a component of the current MO, run the
         # TODO-A1 fallback BEFORE overwriting the in-progress scan state:
         # a MO switch must stash the *old* progress, not the product that
-        # triggered the switch.
-        if self.production_id:
-            component_moves = self.production_id.move_raw_ids.filtered(
-                lambda m: m.product_id == product and m.state != "cancel"
-            )
-            if not component_moves:
-                return self._scan_product_fallback(product)
-        # Normal component of this MO -> set scanned product on wizard
+        # triggered the switch. From here on production_id is guaranteed:
+        # every scan-first (no MO) branch above returned already.
+        component_moves = self.production_id.move_raw_ids.filtered(
+            lambda m: m.product_id == product and m.state != "cancel"
+        )
+        if not component_moves:
+            return self._scan_product_fallback(product)
+        # Quantity-tracked component: when nothing is reserved (manual
+        # reservation policy) one product scan picks one unit — the scan
+        # equivalent of the row's "+1". When stock IS reserved the operator
+        # keeps the quantity step below (SET over the reservation), so a
+        # partial production can still keep the reserved total intact.
+        if product.tracking == "none" and not component_moves.move_line_ids.filtered(
+            lambda line: not line.picked and line.quantity > 0
+        ):
+            return self._scan_untracked_component(component_moves)
+        # Normal (tracked) component of this MO -> set scanned product
         self.product_id = product
         # Task 4: if the scanned product differs from the click-selected
         # component move's product, the selection is stale — drop it so
@@ -1186,9 +1243,58 @@ class WizStockBarcodesMrp(models.TransientModel):
                 self._set_message("info", self.env._("Product: %s. Scan lot.", product.name))
                 self.step = 3
         else:
-            self._set_message("info", self.env._("Product: %s. Enter qty and confirm.", product.name))
+            # Reserved quantity-tracked component: the operator chooses the
+            # consumed qty (SET over the reservation) and confirms.
+            self._set_message(
+                "info",
+                self.env._("Product: %s. Enter qty and confirm.", product.name),
+            )
             self.step = 4
         self._set_message_step()
+        return True
+
+    def _scan_untracked_component(self, moves):
+        """Pick one unit of a quantity-tracked component per barcode scan.
+
+        Only reached when the component has no un-picked reservation left
+        (manual reservation, or already fully picked): each scan then adds
+        exactly one unit, accumulating over consecutive scans (1, 2, 3,
+        ...) instead of re-SETting the line to a single unit. The scanned
+        move stays highlighted (``active_move_id``) so the operator sees
+        which row received the unit.
+
+        Guards, SET semantics and the demand cap stay in the regular
+        confirm path (``action_consume_component_with_qty``), so exceeding
+        the BOM demand keeps the existing over-consumption flow (banner +
+        Force Consume button).
+        """
+        self.ensure_one()
+        move = self.active_move_id if self.active_move_id in moves else moves[:1]
+        if not move:
+            return False
+        self.active_move_id = move
+        picked_qty = sum(line.quantity for line in move.move_line_ids if line.picked)
+        result = self.action_consume_component_with_qty(move.id, picked_qty + 1.0)
+        if result:
+            # action_confirm's own banner is replaced by _clean_values()'s
+            # step instruction, so set the scan feedback afterwards. Keep
+            # the scanned product selected for the row actions but clear
+            # the quantity: a leftover target would show a Confirm button
+            # that SETs the line back to that same value.
+            self.product_id = move.product_id
+            self.product_uom_id = move.product_uom
+            self.lot_id = False
+            self.lot_name = False
+            self.product_qty = 0.0
+            self.step = 2
+            self._set_message(
+                "success",
+                self.env._(
+                    "Component %(product)s +1 (picked: %(total)s)",
+                    product=move.product_id.display_name,
+                    total=move.product_uom.round(picked_qty + 1.0),
+                ),
+            )
         return True
 
     def action_open_candidate_list(self):
@@ -1296,7 +1402,12 @@ class WizStockBarcodesMrp(models.TransientModel):
             # of hitting "Barcode not found".
             return self._scan_lot_without_product(barcode)
         if search_product.tracking == "none":
-            return False
+            # A quantity-tracked product can never own a lot, so this
+            # barcode must belong to another component (or to the finished
+            # product). Resolve it globally instead of dead-ending in
+            # "Barcode not found": the product selection is often just left
+            # over from the previous quantity scan.
+            return self._scan_lot_without_product(barcode)
         lot_domain = [("name", "=", barcode), ("product_id", "=", search_product.id)]
         lots = self.env["stock.lot"].search(lot_domain)
         if not lots:
@@ -1313,20 +1424,91 @@ class WizStockBarcodesMrp(models.TransientModel):
         self.product_id = lot.product_id
         self.product_uom_id = lot.product_id.uom_id
         self._compute_qty_available()
-        # Task 5: one serial SN = one physical item. Auto-consume qty=1
-        # instead of forcing the operator to click Confirm. Lot-tracked and
-        # non-tracked products keep the manual qty + Confirm flow because a
-        # single lot may represent several units.
+        # One scan = one physical unit, for serials and lots alike:
+        # auto-consume instead of forcing the operator to click Confirm.
+        # Scanning the same lot again accumulates one more unit (see
+        # _consume_scanned_lot).
         if self.product_tracking == "serial":
             self.product_qty = 1.0
             if not self.location_id:
                 self.location_id = self.production_id.location_src_id
             self.action_confirm()
             return True
-        self._set_message("info", self.env._("Lot: %s. Enter qty and confirm.", lot.name))
-        self.step = 4
-        self._set_message_step()
+        return self._consume_scanned_lot(lot)
+
+    def _consume_scanned_lot(self, lot):
+        """Pick one unit of ``lot`` as soon as it is scanned.
+
+        Mirrors the serial-number flow and the picking app: the lot scan
+        adds one unit to that lot's picked quantity — the SET target
+        includes what is already picked for the lot, so scanning the same
+        lot again accumulates — and the screen returns to the component
+        step. Parking at the quantity step instead is a dead end in the OWL
+        screen, which has no quantity editor for tracked rows.
+        """
+        self.ensure_one()
+        self.product_id = lot.product_id
+        self.product_uom_id = lot.product_id.uom_id
+        self.lot_id = lot
+        self.lot_name = lot.name
+        if not self.location_id:
+            self.location_id = self.production_id.location_src_id
+        self._lot_scan_qty(lot)
+        total = self.product_qty
+        # action_confirm keeps its own error banner (over-demand, no stock,
+        # ...) when the unit cannot be consumed.
+        if not self.action_confirm():
+            return True
+        # action_confirm's success banner is replaced by _clean_values()'s
+        # step instruction, so set the scan feedback afterwards.
+        self._set_message(
+            "success",
+            self.env._(
+                "Lot %(lot)s +1 (picked: %(total)s)",
+                lot=lot.name,
+                total=lot.product_id.uom_id.round(total),
+            ),
+        )
         return True
+
+    def _lot_scan_qty(self, lot):
+        """Quantity proposed after scanning ``lot``: one unit more than what
+        is already picked for it.
+
+        ``_process_stock_move_line`` uses SET semantics, so the target has
+        to include the units already picked for this lot; otherwise scanning
+        the same lot twice would keep resetting the line to one unit. The
+        OWL screen has no standalone quantity field for tracked rows, so
+        this accumulation is how several units of one lot get picked.
+        """
+        self.ensure_one()
+        if not lot:
+            self._ensure_product_qty()
+            return self.product_qty
+        picked_qty = sum(
+            line.quantity
+            for line in self.production_id.move_raw_ids.filtered(
+                lambda move: (
+                    move.product_id == lot.product_id
+                    and move.state != "cancel"
+                )
+            ).move_line_ids
+            if line.picked and line.lot_id == lot
+        )
+        self.product_qty = picked_qty + 1.0
+        return self.product_qty
+
+    def _ensure_product_qty(self):
+        """Default the quantity step to one unit.
+
+        The OWL scan screen has no standalone quantity field for tracked
+        components, so a scan that lands on step 4 must carry a positive
+        ``product_qty`` itself. Without it the Confirm button stays hidden
+        (``canConfirm`` requires qty > 0) and the scan looks unregistered.
+        """
+        self.ensure_one()
+        if not self.product_qty or self.product_qty <= 0:
+            self.product_qty = 1.0
 
     # --- TODO-A2: lot reverse lookup ---
     def _scan_lot_without_product(self, barcode):
@@ -1480,9 +1662,24 @@ class WizStockBarcodesMrp(models.TransientModel):
                 # stock); _set_message_step() would overwrite it.
                 self.step = 3
             return True
-        self._set_message("info", self.env._("New lot: %s. Enter qty and confirm.", barcode))
-        self.step = 4
-        self._set_message_step()
+        # Lot-tracked products follow the same one-scan-one-unit rule as an
+        # existing lot: action_confirm creates the lot from lot_name and
+        # picks the first unit. On failure keep action_confirm's specific
+        # error (over-demand / no stock) and let the operator re-scan.
+        self.product_qty = 1.0
+        if not self.location_id:
+            self.location_id = self.production_id.location_src_id
+        if not self.action_confirm():
+            self.step = 4
+            return True
+        self._set_message(
+            "success",
+            self.env._(
+                "Lot %(lot)s +1 (picked: %(total)s)",
+                lot=barcode,
+                total=1.0,
+            ),
+        )
         return True
 
     def set_active_move(self, move_id):
@@ -1738,10 +1935,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                     if self.action_confirm():
                         self._set_message_step()
                     return True
-                self._set_message(
-                    "info", self.env._("Lot: %s. Enter qty and confirm.", lot.name)
-                )
-                self.step = 4
+                return self._consume_scanned_lot(lot)
             else:
                 self.lot_id = False
                 self.lot_name = False
@@ -1751,6 +1945,7 @@ class WizStockBarcodesMrp(models.TransientModel):
                     )
                     self.step = 3
                 else:
+                    self._ensure_product_qty()
                     self._set_message(
                         "info",
                         self.env._("Product: %s. Enter qty and confirm.", product.name),

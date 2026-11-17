@@ -286,7 +286,7 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(move.move_line_ids.quantity, 3.0)
 
     def test_02_scan_component_with_lot(self):
-        """Test scanning a tracked component with lot."""
+        """Test scanning a tracked component with lot picks one unit."""
         wiz = self.WizScanMrp.create({
             "production_id": self.production.id,
         })
@@ -296,19 +296,20 @@ class TestStockBarcodesMrp(TransactionCase):
         # Scan product (tracked component)
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
         self.assertEqual(wiz.product_id, self.component_tracked)
-        # Scan lot
+        # One lot scan picks one unit (no qty prompt)
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
-        self.assertEqual(wiz.lot_id, self.component_lot)
-        # Set quantity and confirm
-        wiz.product_qty = 2.0
-        res = wiz.action_confirm()
-        self.assertTrue(res)
-        # Verify move line was created with correct quantity and lot
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("LOT-COMP-001", wiz.message)
+        self.assertEqual(wiz.step, 2)
+        # Verify the move line carries the lot and one unit
         move = self.production.move_raw_ids.filtered(
             lambda m: m.product_id == self.component_tracked
         )
-        self.assertEqual(move.move_line_ids.quantity, 2.0)
-        self.assertEqual(move.move_line_ids.lot_id, self.component_lot)
+        line = move.move_line_ids.filtered(
+            lambda candidate: candidate.lot_id == self.component_lot
+        )
+        self.assertEqual(line.quantity, 1.0)
+        self.assertTrue(line.picked)
 
     def test_03_scan_non_component_product(self):
         """Test scanning a product that is not a component of the MO."""
@@ -347,13 +348,11 @@ class TestStockBarcodesMrp(TransactionCase):
         })
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
-        # Scan a non-existent lot barcode
+        # Scan a non-existent lot barcode: the lot is created and one unit
+        # is picked immediately.
         self.action_barcode_scanned(wiz, "LOT-NEW-999")
-        self.assertFalse(wiz.lot_id)
-        self.assertEqual(wiz.lot_name, "LOT-NEW-999")
-        wiz.product_qty = 2.0
-        res = wiz.action_confirm()
-        self.assertTrue(res)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("LOT-NEW-999", wiz.message)
         # Verify lot was created in database (wizard cleans lot_id after confirm)
         new_lot = self.StockProductionLot.search([
             ("name", "=", "LOT-NEW-999"),
@@ -366,6 +365,8 @@ class TestStockBarcodesMrp(TransactionCase):
         # Filter move lines by the new lot (other tests may have added lines with different lots)
         new_lot_line = move.move_line_ids.filtered(lambda l: l.lot_id == new_lot)
         self.assertEqual(new_lot_line.lot_id, new_lot)
+        self.assertEqual(new_lot_line.quantity, 1.0)
+        self.assertTrue(new_lot_line.picked)
 
     def test_06_quantity_exceeds_demand(self):
         """Test that scanning more than demand shows force done option."""
@@ -453,13 +454,10 @@ class TestStockBarcodesMrp(TransactionCase):
         wiz.finished_qty_producing = 1.0
         res = wiz.action_apply_finished_lot()
         self.assertTrue(res)
-        # Consume tracked material lot
+        # Consume tracked material lot (one scan = one unit)
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
-        wiz.product_qty = 2.0
-        res = wiz.action_confirm()
-        self.assertTrue(res)
         # Forward traceability: finished lot → consumed material lots
         self.finished_lot.invalidate_recordset()
         self.assertIn(self.component_lot.id, self.finished_lot.consumed_lot_ids.ids)
@@ -477,8 +475,6 @@ class TestStockBarcodesMrp(TransactionCase):
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
-        wiz.product_qty = 2.0
-        wiz.action_confirm()
         # Backward traceability: material lot → produced finished lots
         self.component_lot.invalidate_recordset()
         self.assertIn(self.finished_lot.id, self.component_lot.produced_lot_ids.ids)
@@ -561,11 +557,24 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.message_type, "error")
 
     def _scan_component(self, mo, _product, barcode, qty, lot_barcode=None):
+        """Scan the product and apply an explicit quantity.
+
+        A lot barcode now picks one unit as soon as it is scanned, while the
+        tests below exercise the explicit SET path (substitution / split /
+        over-pick redistribution). The lot is therefore bound directly
+        instead of being scanned, so the requested quantity is applied by
+        the regular confirm path.
+        """
         wiz = self.WizScanMrp.create({"production_id": mo.id})
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.action_barcode_scanned(wiz, barcode)
         if lot_barcode:
-            self.action_barcode_scanned(wiz, lot_barcode)
+            lot = self.StockProductionLot.search([
+                ("name", "=", lot_barcode),
+                ("product_id", "=", wiz.product_id.id),
+            ], limit=1)
+            wiz.lot_id = lot
+            wiz.lot_name = lot.name if lot else lot_barcode
         wiz.product_qty = qty
         return wiz, wiz.action_confirm()
 
@@ -797,9 +806,9 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertFalse(wiz.finished_lot_id)
         self.assertFalse(wiz.finished_lot_name)
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        # Two lots scans = two units of the tracked component (demand 2)
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
-        wiz.product_qty = 2.0
-        self.assertTrue(wiz.action_confirm())
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
         self.action_barcode_scanned(wiz, "PROD-COMP-S")
         wiz.product_qty = 3.0
         self.assertTrue(wiz.action_confirm())
@@ -1114,11 +1123,19 @@ class TestStockBarcodesMrp(TransactionCase):
         # Lock to the first tracked component
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
         self.assertEqual(wiz.product_id, self.component_tracked)
-        # Scan comp_b's lot -> reverse lookup switches product & binds lot
+        # Scan comp_b's lot -> reverse lookup resolves the product and
+        # immediately picks one unit of it
         self.action_barcode_scanned(wiz, "LOT-COMP-B-001")
-        self.assertEqual(wiz.product_id, comp_b)
-        self.assertEqual(wiz.lot_id, lot_b)
-        self.assertEqual(wiz.lot_name, "LOT-COMP-B-001")
+        self.assertEqual(wiz.message_type, "success")
+        move_b = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == comp_b
+        )
+        line_b = move_b.move_line_ids.filtered(
+            lambda candidate: candidate.lot_id == lot_b
+        )
+        self.assertTrue(line_b)
+        self.assertTrue(line_b.picked)
+        self.assertEqual(line_b.quantity, 1.0)
 
     def test_a2_lookup_failure_errors(self):
         """Scanning a lot of an unrelated product errors, no new lot bound."""
@@ -1572,7 +1589,11 @@ class TestStockBarcodesMrp(TransactionCase):
 
     def test_b3_restore_component_progress(self):
         """Switching away and back restores the half-scanned component line
-        (product / lot / qty / location / step) and consumes the stash."""
+        (product / qty / location / step) and consumes the stash.
+
+        A lot scan picks immediately now, so the in-progress state used here
+        is the tracked component whose lot has not been scanned yet.
+        """
         mo2 = self.MrpProduction.create({
             "product_id": self.finished_product.id,
             "product_qty": 1.0,
@@ -1582,12 +1603,11 @@ class TestStockBarcodesMrp(TransactionCase):
         })
         mo2.action_confirm()
         wiz = self.WizScanMrp.create({"production_id": self.production.id})
-        # Half-scanned component line (not confirmed)
+        # Half-scanned component line (product selected, lot still pending)
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
-        self.action_barcode_scanned(wiz, "LOT-COMP-001")
         wiz.product_qty = 2.0
-        self.assertEqual(wiz.step, 4)
+        self.assertEqual(wiz.step, 3)
         # Switch away -> stashed, screen cleared
         self.action_barcode_scanned(wiz, mo2.name)
         self.assertEqual(wiz.production_id, mo2)
@@ -1598,11 +1618,11 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.production_id, self.production)
         self.assertEqual(wiz.product_id, self.component_tracked)
         self.assertEqual(wiz.product_uom_id, self.component_tracked.uom_id)
-        self.assertEqual(wiz.lot_id, self.component_lot)
-        self.assertEqual(wiz.lot_name, "LOT-COMP-001")
+        self.assertFalse(wiz.lot_id)
+        self.assertFalse(wiz.lot_name)
         self.assertEqual(wiz.product_qty, 2.0)
         self.assertEqual(wiz.location_id, self.components_location)
-        self.assertEqual(wiz.step, 4)
+        self.assertEqual(wiz.step, 3)
         # Stash entry consumed by the restore
         self.assertNotIn(str(self.production.id), wiz.scan_progress_stash or {})
 
@@ -1661,7 +1681,10 @@ class TestStockBarcodesMrp(TransactionCase):
 
     def test_c2_guided_flow_step_messages(self):
         """Tracked-MO flow: the banner instruction follows step + context
-        (finished product at step 0, MO/location at 1, component at 3/4)."""
+        (finished product at step 0, MO/location at 1, component at 3/2)."""
+        # Manual-reservation setup: the finished-lot scan must not auto-fill
+        # the components, so the component lot scan below can pick a unit.
+        self.production_tracked.move_raw_ids._do_unreserve()
         wiz = self.WizScanMrp.create({
             "production_id": self.production_tracked.id,
         })
@@ -1687,15 +1710,21 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertEqual(wiz.step, 3)
         self.assertIn("lot/serial", wiz.message)
         self.assertIn(self.component_tracked.name, wiz.message)
-        # Lot scanned -> step 4 asks for the quantity
+        # Lot scanned -> one unit picked, back to the component step
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
-        self.assertEqual(wiz.step, 4)
-        self.assertIn("quantity", wiz.message)
-        self.assertIn(self.component_tracked.name, wiz.message)
+        self.assertEqual(wiz.step, 2)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("LOT-COMP-001", wiz.message)
+        self.assertIn("+1", wiz.message)
 
     def test_c2_untracked_shortcut_messages(self):
         """Untracked finished MO starts at step 1; untracked components jump
-        straight to the quantity step; confirming returns to step 2."""
+        straight to the quantity step; confirming returns to step 2.
+
+        NB: this MO has its component reserved (auto reservation), so the
+        scan keeps the qty-confirm flow — see the _unreserved tests below
+        for the manual-reservation "+1 per scan" behaviour.
+        """
         wiz = self.WizScanMrp.create({"production_id": self.production.id})
         self.assertEqual(wiz.step, 1)
         self.assertIn(self.production.name, wiz.message)
@@ -1712,6 +1741,77 @@ class TestStockBarcodesMrp(TransactionCase):
         wiz.action_confirm()
         self.assertEqual(wiz.step, 2)
         self.assertIn("component", wiz.message)
+
+    def _make_unreserved_mo(self):
+        """MO whose components are NOT reserved (manual reservation policy).
+
+        Scanning a quantity-tracked component is the only way to pick it,
+        so each scan must add one unit.
+        """
+        mo = self.MrpProduction.create({
+            "product_id": self.finished_product.id,
+            "product_qty": 1.0,
+            "bom_id": self.bom.id,
+            "location_src_id": self.components_location.id,
+            "location_dest_id": self.finished_location.id,
+        })
+        mo.action_confirm()
+        mo.move_raw_ids._do_unreserve()
+        return mo
+
+    def test_untracked_component_scan_adds_one_per_scan(self):
+        """Unreserved quantity-tracked component: +1 unit per scan.
+
+        Regression: the scan parked at step 4 and its Confirm SET the line
+        to a single unit, so repeated scans could never reach 2.
+        """
+        mo = self._make_unreserved_mo()
+        move = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_simple
+        )
+        self.assertFalse(move.move_line_ids)
+        wiz = self.WizScanMrp.create({"production_id": mo.id})
+        self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        self.assertEqual(
+            sum(line.quantity for line in move.move_line_ids if line.picked),
+            1.0,
+        )
+        self.assertEqual(wiz.step, 2)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("+1", wiz.message)
+        # Second scan accumulates instead of re-SETting to 1
+        self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        self.assertEqual(
+            sum(line.quantity for line in move.move_line_ids if line.picked),
+            2.0,
+        )
+        # Scanned row stays highlighted and no stale qty prompt remains
+        self.assertEqual(wiz.active_move_id, move)
+        self.assertFalse(wiz.product_qty)
+
+    def test_untracked_component_scan_stops_at_demand(self):
+        """The +1 scan shortcut keeps the over-consumption guard."""
+        mo = self._make_unreserved_mo()
+        move = mo.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_simple
+        )
+        wiz = self.WizScanMrp.create({"production_id": mo.id})
+        # BOM demand is 3 units, so three scans fill it exactly
+        for _index in range(3):
+            self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        self.assertEqual(
+            sum(line.quantity for line in move.move_line_ids if line.picked),
+            3.0,
+        )
+        # 4th scan exceeds the demand: no write, Force Consume offered
+        self.action_barcode_scanned(wiz, "PROD-COMP-S")
+        move.invalidate_recordset()
+        self.assertEqual(
+            sum(line.quantity for line in move.move_line_ids if line.picked),
+            3.0,
+        )
+        self.assertTrue(wiz.visible_force_done)
+        self.assertEqual(wiz.message_type, "more_match")
 
     def test_c2_restore_step_message(self):
         """After a switch away/back, the banner shows the restored step's
@@ -2295,11 +2395,23 @@ class TestStockBarcodesMrp(TransactionCase):
         # Lock to comp_c
         self.action_barcode_scanned(wiz, "PROD-COMP-C")
         self.assertEqual(wiz.product_id, comp_c)
-        # Scan the colliding SN → _scan_lot finds comp_c's lot directly
+        # Scan the colliding SN → _scan_lot finds comp_c's lot directly and
+        # picks a unit of it (the wizard context is cleared afterwards)
         self.action_barcode_scanned(wiz, self.COLLIDE_LOT)
-        self.assertEqual(wiz.lot_id.product_id, comp_c)
-        self.assertEqual(wiz.product_id, comp_c)
         self.assertNotEqual(wiz.message_type, "more_match")
+        lot_c = self.StockProductionLot.search([
+            ("name", "=", self.COLLIDE_LOT),
+            ("product_id", "=", comp_c.id),
+        ])
+        move_c = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == comp_c
+        )
+        line = move_c.move_line_ids.filtered(
+            lambda candidate: candidate.lot_id == lot_c
+        )
+        self.assertTrue(line)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
 
     def test_t4_collision_ambiguous_without_context(self):
         """Cross-product SN collision: product_id set to a product that
@@ -2332,21 +2444,37 @@ class TestStockBarcodesMrp(TransactionCase):
         )
         self.assertTrue(wiz.set_active_move(move_c.id))
         self.assertEqual(wiz.active_move_id, move_c)
-        # Scan collision SN → _scan_lot uses active_move's product → binds
+        # Scan collision SN → _scan_lot uses active_move's product → picks
+        # a unit of comp_c's lot
         self.action_barcode_scanned(wiz, self.COLLIDE_LOT)
-        self.assertEqual(wiz.product_id, comp_c)
-        self.assertEqual(wiz.lot_id.product_id, comp_c)
+        self.assertNotEqual(wiz.message_type, "more_match")
+        lot_c = self.StockProductionLot.search([
+            ("name", "=", self.COLLIDE_LOT),
+            ("product_id", "=", comp_c.id),
+        ])
+        line = move_c.move_line_ids.filtered(
+            lambda candidate: candidate.lot_id == lot_c
+        )
+        self.assertTrue(line)
+        self.assertTrue(line.picked)
 
     def test_t4_no_collision_normal_binding(self):
         """Regression: a single (non-colliding) lot binds normally even
-        with active_move_id unset."""
+        with active_move_id unset, and picks one unit on the spot."""
         wiz = self.WizScanMrp.create({"production_id": self.production.id})
         self.action_barcode_scanned(wiz, "LOC-COMP-001")
         self.action_barcode_scanned(wiz, "PROD-COMP-T")
         # LOT-COMP-001 is unique to component_tracked in this MO
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
-        self.assertEqual(wiz.lot_id, self.component_lot)
-        self.assertEqual(wiz.message_type, "info")
+        self.assertEqual(wiz.message_type, "success")
+        line = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_tracked
+        ).move_line_ids.filtered(
+            lambda candidate: candidate.lot_id == self.component_lot
+        )
+        self.assertTrue(line)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
 
     def test_t4_set_active_move_rejects_foreign_move(self):
         """set_active_move rejects a move that does not belong to the
@@ -3045,13 +3173,131 @@ class TestStockBarcodesMrp(TransactionCase):
         self.assertFalse(mo.lot_producing_ids)
 
     def test_t7_scan_component_lot_without_product(self):
-        """Lot-tracked component scanned with nothing selected -> qty step."""
+        """Lot-tracked component scanned with nothing selected picks 1."""
         wiz = self.WizScanMrp.create({"production_id": self.production.id})
         self.assertFalse(wiz.product_id)
         self.action_barcode_scanned(wiz, "LOT-COMP-001")
-        self.assertEqual(wiz.product_id, self.component_tracked)
-        self.assertEqual(wiz.lot_id, self.component_lot)
-        self.assertEqual(wiz.step, 4)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("LOT-COMP-001", wiz.message)
+        self.assertEqual(wiz.step, 2)
+        line = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_tracked
+        ).move_line_ids.filtered(lambda l: l.lot_id == self.component_lot)
+        self.assertTrue(line)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
+
+    def test_scan_lot_with_untracked_product_still_selected(self):
+        """A lot barcode resolves its tracked component even when an
+        untracked product is left selected from the previous scan.
+
+        Regression: _scan_lot bailed out on a tracking == 'none' product,
+        so the scan dead-ended in "Barcode not found" and the lot component
+        could not be picked at all.
+        """
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        # Leftover selection from a quantity-tracked component scan
+        wiz.product_id = self.component_simple
+        wiz.product_qty = 0.0
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
+        self.assertEqual(wiz.message_type, "success")
+        self.assertIn("LOT-COMP-001", wiz.message)
+        line = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_tracked
+        ).move_line_ids.filtered(lambda l: l.lot_id == self.component_lot)
+        self.assertTrue(line)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
+
+    def test_scan_lot_twice_accumulates_quantity(self):
+        """Scanning the same lot twice picks 2 units.
+
+        The SET target must include what was already picked for the lot;
+        otherwise the second scan would set the line back to 1.
+        """
+        wiz = self.WizScanMrp.create({"production_id": self.production.id})
+        self.action_barcode_scanned(wiz, "PROD-COMP-T")
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
+        self.assertEqual(wiz.message_type, "success")
+        self.assertEqual(wiz.step, 2)
+        move = self.production.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_tracked
+        )
+        self.assertEqual(
+            sum(
+                line.quantity
+                for line in move.move_line_ids
+                if line.picked and line.lot_id == self.component_lot
+            ),
+            1.0,
+        )
+        # Scanning the same lot again accumulates to 2
+        self.action_barcode_scanned(wiz, "LOT-COMP-001")
+        self.assertIn("2.0", wiz.message)
+        self.assertEqual(
+            sum(
+                line.quantity
+                for line in move.move_line_ids
+                if line.picked and line.lot_id == self.component_lot
+            ),
+            2.0,
+        )
+
+    def test_scan_component_lot_with_scanner_padding(self):
+        """Scanner padding must not break lot resolution.
+
+        Regression: the OWL RPC entry did not strip the barcode, so
+        "LOT-COMP-001\\n" was "not found" and fell through to the
+        new-finished-SN fallback, which answered with the already-bound
+        finished SN instead of picking the component lot.
+        """
+        self.production_tracked.move_raw_ids._do_unreserve()
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.action_barcode_scanned(wiz, "LOT-FIN-001")
+        self.assertTrue(wiz.production_id.lot_producing_ids)
+        res = wiz.process_barcode_and_dispatch("LOT-COMP-001\n")
+        state = res["state"]
+        self.assertEqual(state["message_type"], "success")
+        self.assertIn("LOT-COMP-001", state["message"])
+        line = self.production_tracked.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_tracked
+        ).move_line_ids.filtered(
+            lambda candidate: candidate.lot_id == self.component_lot
+        )
+        self.assertTrue(line)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
+
+    def test_unknown_barcode_with_bound_finished_sn_routes_to_component(self):
+        """A new barcode after the finished SN is bound is a component lot.
+
+        Regression: the fallback used to answer "MO already has SN ..., clear
+        it first" instead of picking the component lot/serial.
+        """
+        self.production_tracked.move_raw_ids._do_unreserve()
+        wiz = self.WizScanMrp.create({
+            "production_id": self.production_tracked.id,
+        })
+        self.action_barcode_scanned(wiz, "LOT-FIN-001")
+        self.assertTrue(wiz.production_id.lot_producing_ids)
+        self.action_barcode_scanned(wiz, "NEW-COMP-LOT-777")
+        state = wiz.get_scan_state()
+        self.assertNotEqual(state["message_type"], "error")
+        new_lot = self.StockProductionLot.search([
+            ("name", "=", "NEW-COMP-LOT-777"),
+            ("product_id", "=", self.component_tracked.id),
+        ])
+        self.assertTrue(new_lot)
+        line = self.production_tracked.move_raw_ids.filtered(
+            lambda m: m.product_id == self.component_tracked
+        ).move_line_ids.filtered(
+            lambda candidate: candidate.lot_id == new_lot
+        )
+        self.assertTrue(line)
+        self.assertTrue(line.picked)
+        self.assertEqual(line.quantity, 1.0)
 
     def test_t7_scan_foreign_sn_rejected(self):
         """A SN of a product outside this MO is rejected with a clear error."""

@@ -258,6 +258,12 @@ msgid "Component"
 msgstr ""
 
 #. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Component %(product)s +1 (picked: %(total)s)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__components_availability_state
 msgid "Component Availability"
 msgstr ""
@@ -595,6 +601,12 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot %(lot)s +1 (picked: %(total)s)"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Lot %(lot)s belongs to %(product)s, not to the finished product"
 msgstr ""
 
@@ -634,12 +646,6 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Lot: %s. Enter qty and confirm."
-msgstr ""
-
-#. module: stock_barcodes_mrp
-#. odoo-python
-#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "MO %(done)s done. Switched to MO %(next)s."
 msgstr ""
 
@@ -670,6 +676,13 @@ msgstr ""
 #. module: stock_barcodes_mrp
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "MO Details"
+msgstr ""
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"MO already has %(sn)s. Scan/click a component row, then scan its lot/serial."
 msgstr ""
 
 #. module: stock_barcodes_mrp
@@ -809,12 +822,6 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "N/A"
-msgstr ""
-
-#. module: stock_barcodes_mrp
-#. odoo-python
-#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "New lot: %s. Enter qty and confirm."
 msgstr ""
 
 #. module: stock_barcodes_mrp

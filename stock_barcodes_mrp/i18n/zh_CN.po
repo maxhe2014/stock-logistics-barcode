@@ -308,6 +308,12 @@ msgid "Component"
 msgstr "组件"
 
 #. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Component %(product)s +1 (picked: %(total)s)"
+msgstr "组件 %(product)s +1（已拣 %(total)s）"
+
+#. module: stock_barcodes_mrp
 #: model:ir.model.fields,field_description:stock_barcodes_mrp.field_wiz_stock_barcodes_mrp__components_availability_state
 msgid "Component Availability"
 msgstr "组件可用性"
@@ -646,6 +652,12 @@ msgstr "批次"
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid "Lot %(lot)s +1 (picked: %(total)s)"
+msgstr "批次 %(lot)s +1（已拣 %(total)s）"
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "Lot %(lot)s belongs to %(product)s, not to the finished product"
 msgstr "批次 %(lot)s 属于 %(product)s，不属于成品"
 
@@ -685,12 +697,6 @@ msgstr "批次/序列号"
 #. module: stock_barcodes_mrp
 #. odoo-python
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "Lot: %s. Enter qty and confirm."
-msgstr "批次：%s。请输入数量并确认。"
-
-#. module: stock_barcodes_mrp
-#. odoo-python
-#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "MO %(done)s done. Switched to MO %(next)s."
 msgstr "制造订单 %(done)s 已完成。已切换到制造订单 %(next)s。"
 
@@ -722,6 +728,13 @@ msgstr "制造订单 %(mo)s：请扫描源库位 %(location)s 或扫描组件"
 #: model_terms:ir.ui.view,arch_db:stock_barcodes_mrp.view_stock_barcodes_mrp_form
 msgid "MO Details"
 msgstr "制造订单详情"
+
+#. module: stock_barcodes_mrp
+#. odoo-python
+#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
+msgid ""
+"MO already has %(sn)s. Scan/click a component row, then scan its lot/serial."
+msgstr "制造订单已绑定 %(sn)s。请先点选/扫描组件行，再扫组件的批次/序列号。"
 
 #. module: stock_barcodes_mrp
 #. odoo-python
@@ -863,12 +876,6 @@ msgstr "我的工单"
 #: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
 msgid "N/A"
 msgstr "不适用"
-
-#. module: stock_barcodes_mrp
-#. odoo-python
-#: code:addons/stock_barcodes_mrp/wizard/stock_barcodes_mrp.py:0
-msgid "New lot: %s. Enter qty and confirm."
-msgstr "新批次：%s。请输入数量并确认。"
 
 #. module: stock_barcodes_mrp
 #. odoo-python
