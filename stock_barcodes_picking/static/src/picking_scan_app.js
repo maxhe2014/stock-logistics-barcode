@@ -108,6 +108,11 @@ export class PickingScanApp extends Component {
             expandedRowKey: false,
             splitDialogOpen: false,
             splitPackages: [],
+            // Unclaim-by-scan package chooser (quantity-tracked product
+            // picked in several packages).
+            unclaim_product_id: false,
+            unclaim_product_name: "",
+            unclaim_choices: [],
             editLine: false,
             picking_id: false,
             picking_name: "",
@@ -159,7 +164,22 @@ export class PickingScanApp extends Component {
             // Serial cards expanded state, keyed by row_key. Local UI only.
             // Empty map = every serial card starts collapsed.
             expandedSerialRows: {},
+            // Pull-to-refresh feedback: "idle" | "pulling" | "ready" |
+            // "refreshing" (also used by the topbar refresh button).
+            pullRefresh: "idle",
         });
+
+        // Pull-to-refresh gesture state (touch + mouse drag).
+        this._ptrActive = false;
+        this._ptrStartY = 0;
+        this._ptrStartX = 0;
+        this._ptrDistance = 0;
+        this._onPtrTouchStart = (ev) => this.onPtrTouchStart(ev);
+        this._onPtrTouchMove = (ev) => this.onPtrTouchMove(ev);
+        this._onPtrTouchEnd = () => this.onPtrTouchFinish();
+        this._onPtrMouseDown = (ev) => this.onPtrMouseDown(ev);
+        this._onPtrMouseMove = (ev) => this.onPtrMouseMove(ev);
+        this._onPtrMouseUp = () => this.onPtrTouchFinish();
 
         // Sound alert for scan errors. Only an error tone is used
         // (success is silent). Preloaded so the first error plays
@@ -209,9 +229,39 @@ export class PickingScanApp extends Component {
         // restored before loadState → _getActionParams reads it.
         onMounted(() => {
             window.addEventListener("popstate", this._onPopState, { capture: true });
+            // Pull-to-refresh is bound on the component root (the gesture
+            // may start on the list, the hint bar or any empty area) and
+            // directly in JS so touchmove is explicitly non-passive and
+            // can stop the browser's native overscroll while pulling.
+            const root = this.el;
+            if (root) {
+                root.addEventListener("touchstart", this._onPtrTouchStart, {
+                    passive: true,
+                });
+                root.addEventListener("touchmove", this._onPtrTouchMove, {
+                    passive: false,
+                });
+                root.addEventListener("touchend", this._onPtrTouchEnd);
+                root.addEventListener("touchcancel", this._onPtrTouchEnd);
+                root.addEventListener("mousedown", this._onPtrMouseDown);
+                // Mouse dragging (desktop / testing) continues outside the
+                // action root, so move/up are tracked on the window.
+                window.addEventListener("mousemove", this._onPtrMouseMove);
+                window.addEventListener("mouseup", this._onPtrMouseUp);
+            }
         });
         onWillUnmount(() => {
             window.removeEventListener("popstate", this._onPopState, { capture: true });
+            const root = this.el;
+            if (root) {
+                root.removeEventListener("touchstart", this._onPtrTouchStart);
+                root.removeEventListener("touchmove", this._onPtrTouchMove);
+                root.removeEventListener("touchend", this._onPtrTouchEnd);
+                root.removeEventListener("touchcancel", this._onPtrTouchEnd);
+                root.removeEventListener("mousedown", this._onPtrMouseDown);
+            }
+            window.removeEventListener("mousemove", this._onPtrMouseMove);
+            window.removeEventListener("mouseup", this._onPtrMouseUp);
             this._closePackageDialog?.();
         });
     }
@@ -228,6 +278,136 @@ export class PickingScanApp extends Component {
         );
         Object.assign(this.state, snapshot);
         this._enrichMoves();
+    }
+
+    // ---------- pull-to-refresh + topbar refresh button ----------
+
+    /**
+     * Topbar refresh button: re-read the transfer from the server (moves,
+     * packages, demand) without leaving the scan screen or losing the
+     * current selection.
+     */
+    async onRefreshPicking() {
+        if (this.state.scanning) {
+            return;
+        }
+        await this._runRefresh();
+    }
+
+    /** The scrollable product list (used for the "at top" check). */
+    _ptrScrollContainer() {
+        return this.el?.querySelector(".o_picking_scan_rows") || null;
+    }
+
+    /**
+     * Can a pull gesture start from this touch/drag?
+     *
+     * The list must be at its top, no scan/edit/dialog may run, and the
+     * gesture must not start on an interactive control (so tapping a
+     * button, input or link keeps its normal behaviour).
+     */
+    _ptrCanStart(target) {
+        const rows = this._ptrScrollContainer();
+        if (!rows || rows.scrollTop > 0) {
+            return false;
+        }
+        if (
+            this.state.scanning
+            || this.state.editLine
+            || this.state.splitDialogOpen
+            || this.state.visible_switch_selector
+            || this.state.unclaim_choices.length
+        ) {
+            return false;
+        }
+        return !target?.closest?.("button, a, input, textarea, select, .btn");
+    }
+
+    _ptrBegin(clientY, clientX) {
+        this._ptrActive = true;
+        this._ptrStartY = clientY;
+        this._ptrStartX = clientX;
+        this._ptrDistance = 0;
+    }
+
+    /**
+     * Track the drag. Returns true when the browser's native gesture
+     * (overscroll, text selection) must be blocked.
+     */
+    _ptrUpdate(clientY, clientX) {
+        if (!this._ptrActive) {
+            return false;
+        }
+        const dy = clientY - this._ptrStartY;
+        const dx = Math.abs(clientX - this._ptrStartX);
+        if (dy <= 0 || dx > Math.max(30, dy)) {
+            this._ptrActive = false;
+            this.state.pullRefresh = "idle";
+            return false;
+        }
+        // Rubber-band factor: the indicator tracks the drag but never
+        // reaches the full distance.
+        this._ptrDistance = Math.min(90, dy * 0.5);
+        this.state.pullRefresh = this._ptrDistance >= 55 ? "ready" : "pulling";
+        // Block native scrolling/selection as soon as the pull starts;
+        // waiting longer lets mobile browsers lock into a native gesture.
+        return this._ptrDistance > 2;
+    }
+
+    onPtrTouchStart(ev) {
+        if (ev.touches.length !== 1 || !this._ptrCanStart(ev.target)) {
+            this._ptrActive = false;
+            return;
+        }
+        this._ptrBegin(ev.touches[0].clientY, ev.touches[0].clientX);
+    }
+
+    onPtrTouchMove(ev) {
+        if (!this._ptrActive || ev.touches.length !== 1) {
+            return;
+        }
+        if (this._ptrUpdate(ev.touches[0].clientY, ev.touches[0].clientX)) {
+            ev.preventDefault();
+        }
+    }
+
+    onPtrMouseDown(ev) {
+        if (ev.button !== 0 || !this._ptrCanStart(ev.target)) {
+            this._ptrActive = false;
+            return;
+        }
+        this._ptrBegin(ev.clientY, ev.clientX);
+    }
+
+    onPtrMouseMove(ev) {
+        if (this._ptrUpdate(ev.clientY, ev.clientX)) {
+            ev.preventDefault();
+        }
+    }
+
+    /** Release: refresh when the pull passed the threshold. */
+    async onPtrTouchFinish() {
+        if (!this._ptrActive) {
+            return;
+        }
+        const trigger = this._ptrDistance >= 55;
+        this._ptrActive = false;
+        this._ptrDistance = 0;
+        if (!trigger) {
+            this.state.pullRefresh = "idle";
+            return;
+        }
+        await this._runRefresh();
+    }
+
+    /** Shared refresh with the "刷新中…" indicator. */
+    async _runRefresh() {
+        this.state.pullRefresh = "refreshing";
+        try {
+            await this._refreshState();
+        } finally {
+            this.state.pullRefresh = "idle";
+        }
     }
 
     /**
@@ -616,11 +796,13 @@ export class PickingScanApp extends Component {
         if (this.state.scanning || !this.wizId) {
             return;
         }
+        // Toggle: clicking the row that is already selected clears it.
+        const targetId = this.state.active_move_id === moveId ? false : moveId;
         try {
             const ok = await this.orm.call(
                 "wiz.stock.barcodes.picking",
                 "set_active_move",
-                [[this.wizId], moveId]
+                [[this.wizId], targetId]
             );
             if (ok) {
                 await this._refreshState();
@@ -1326,6 +1508,68 @@ export class PickingScanApp extends Component {
     onStartUnclaimScan() {
         this.state.moreMenuOpen = false;
         return this._setScanMode("unclaim_scan");
+    }
+
+    /**
+     * Package chooser of the unclaim / split flows: apply the operator's
+     * choice (remove one unit from the chosen package).
+     */
+    async onSelectUnclaimPackage(packageId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const method = this.state.scan_mode === "split_scan"
+                ? "action_split_unit"
+                : "action_unclaim_unit";
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                method,
+                [
+                    [this.wizId],
+                    this.state.unclaim_product_id,
+                    packageId || false,
+                ]
+            );
+            await this._handleActionResult(res, _t("Unclaim"));
+        } catch (err) {
+            this.notification.add(
+                _t("Unclaim failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /** Close the unclaim package chooser without writing anything. */
+    async onCancelUnclaim() {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_cancel_unclaim",
+                [[this.wizId]]
+            );
+            await this._refreshState();
+        } catch (err) {
+            this.notification.add(
+                _t("Unclaim failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
     }
 
     /** Enter one of the non-default scan modes. */

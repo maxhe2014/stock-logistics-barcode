@@ -162,6 +162,17 @@ class WizStockBarcodesPicking(models.TransientModel):
              "Cleared on picking switch or scanning a different product.",
     )
 
+    # --- Unclaim by scan: package chooser ---
+    unclaim_product_id = fields.Many2one(
+        comodel_name="product.product",
+        help="Quantity-tracked product whose picked units are spread over "
+             "several packages: the operator chooses the package to unclaim.",
+    )
+    unclaim_choices = fields.Json(
+        help="Package choices shown by the unclaim dialog: "
+             "[{package_id, package_name, quantity}, ...]",
+    )
+
     # --- Scan-first picking switching ---
     pending_switch_picking_ids = fields.Many2many(
         comodel_name="stock.picking",
@@ -396,7 +407,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if step_key == "location":
             return self.env._("Scan the source location of transfer %s", self.picking_id.name or "")
         if step_key == "product":
-            return self.env._("Scan a product of transfer %s", self.picking_id.name or "")
+            return self.env._("Please scan a product of transfer %s", self.picking_id.name or "")
         if step_key == "lot":
             if not target_product:
                 return self.env._("Scan a product barcode first")
@@ -970,6 +981,10 @@ class WizStockBarcodesPicking(models.TransientModel):
                 self.active_move_id.product_id.display_name or ""
                 if self.active_move_id else ""
             ),
+            # Package chooser of the unclaim-by-scan flow (quantity rows).
+            "unclaim_product_id": self.unclaim_product_id.id or False,
+            "unclaim_product_name": self.unclaim_product_id.display_name or "",
+            "unclaim_choices": self.unclaim_choices or [],
             "rows": self._get_scan_rows_v4(),
             "move_ids": moves,
             # Packaging config
@@ -1506,11 +1521,28 @@ class WizStockBarcodesPicking(models.TransientModel):
             )
             self.step = self._step_index("lot")
         else:
-            self._set_message(
-                "info",
-                self.env._("Product: %s. Enter qty and confirm.", product.name),
-            )
-            self.step = self._step_index("qty")
+            # Quantity-tracked product: one product scan picks one unit,
+            # exactly like the row's +1 button. The unit lands on the
+            # unpacked remainder of the active move (the pack flow binds
+            # it to a package afterwards) and the picking type's
+            # over-pick policy still decides whether it may be added.
+            move = self.active_move_id
+            target_qty = sum(
+                self._untracked_scope_lines(move, False).mapped("quantity")
+            ) + 1.0
+            self._set_untracked_move_qty(move, target_qty, False)
+            # Keep the product selected so the "Consume by demand"
+            # shortcut stays available, but clear the quantity: leaving
+            # 1.0 here would show a confirm button that SETs the line
+            # back to a single unit.
+            self.product_id = product
+            self.lot_id = False
+            self.lot_name = False
+            self.product_qty = 0.0
+            self.qty_available = 0.0
+            self.step = self._step_index("product")
+            self.visible_force_done = False
+            return True
         self._set_message_step()
         return True
 
@@ -1894,12 +1926,16 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("error", self.env._("Unknown scan mode."))
             return False
         self.scan_mode = mode
+        self.unclaim_product_id = False
+        self.unclaim_choices = []
         return True
 
     def action_exit_scan_mode(self):
         """Back to the normal picking mode, per transfer direction."""
         self.ensure_one()
         self.scan_mode = self._default_scan_mode()
+        self.unclaim_product_id = False
+        self.unclaim_choices = []
         return True
 
     def action_remove_package(self, package_id):
@@ -1953,6 +1989,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             [("barcode", "=", barcode)], limit=1
         )
         if product:
+            if product.tracking == "none" and mode == "unclaim_scan":
+                # One scan unclaims one unit; when those units live in
+                # several packages the operator picks the package first.
+                return self._unclaim_scanned_product(product)
+            if product.tracking == "none" and mode == "split_scan":
+                # One scan moves one unit out of its package (loose);
+                # a product spread over several packages asks which one.
+                return self._split_scanned_product(product)
             lines = self.env["stock.move.line"].search([
                 ("picking_id", "=", self.picking_id.id),
                 ("state", "not in", ("done", "cancel")),
@@ -2012,6 +2056,286 @@ class WizStockBarcodesPicking(models.TransientModel):
                 label=label,
             ),
         )
+        return True
+
+    def _get_unclaim_groups(self, product, require_package=False):
+        """Picked units of ``product`` grouped by destination package.
+
+        Returns one dict per package (ordered by the first picked line),
+        plus one for the unpacked remainder keyed by ``package_id``
+        False. Each dict is ``{package_id, package_name, quantity}``.
+        ``require_package`` skips the unpacked remainder, which is what
+        the split (remove from package) flow needs.
+        """
+        self.ensure_one()
+        lines = self.picking_id.move_ids.filtered(
+            lambda move: (
+                move.product_id == product
+                and move.state not in ("done", "cancel")
+            )
+        ).move_line_ids.filtered("picked").sorted(lambda line: line.id)
+        if require_package:
+            lines = lines.filtered("result_package_id")
+        groups = {}
+        for line in lines:
+            pkg_id = line.result_package_id.id or False
+            group = groups.get(pkg_id)
+            if not group:
+                group = {
+                    "package_id": pkg_id,
+                    "package_name": line.result_package_id.name or "",
+                    "quantity": 0.0,
+                }
+                groups[pkg_id] = group
+            group["quantity"] += line.quantity
+        return list(groups.values())
+
+    def _unclaim_one_unit(self, product, package_id=False):
+        """Remove one picked unit of ``product`` from one package.
+
+        The quantity is decremented (not the whole line reset) so a row
+        holding several units keeps the rest; the line is only unpicked
+        once nothing is left. Returns the written line, or an empty
+        recordset when the package holds no picked unit.
+        """
+        self.ensure_one()
+        lines = self.picking_id.move_ids.filtered(
+            lambda move: (
+                move.product_id == product
+                and move.state not in ("done", "cancel")
+            )
+        ).move_line_ids.filtered(
+            lambda line: (
+                line.picked
+                and (line.result_package_id.id or False) == (package_id or False)
+            )
+        ).sorted(lambda line: line.id)
+        if not lines:
+            return self.env["stock.move.line"]
+        line = lines[-1]
+        rounding = product.uom_id.rounding
+        remaining = line.quantity - 1.0
+        if float_compare(remaining, 0.0, precision_rounding=rounding) <= 0:
+            line.write({"quantity": 0.0, "picked": False})
+        else:
+            line.quantity = remaining
+        return line
+
+    def _unclaim_scanned_product(self, product):
+        """Unclaim one unit of a scanned quantity-tracked product.
+
+        One scan removes exactly one picked unit (the +1 shortcut in
+        reverse). When those units sit in several packages nothing is
+        written: the package chooser is filled instead, and
+        :meth:`action_unclaim_unit` applies the operator's choice.
+        """
+        self.ensure_one()
+        groups = self._get_unclaim_groups(product)
+        if not groups:
+            self._set_message(
+                "info",
+                self.env._(
+                    "%(label)s has no picked line to unclaim.",
+                    label=product.display_name,
+                ),
+            )
+            return True
+        if len(groups) == 1:
+            self._unclaim_one_unit(product, groups[0]["package_id"])
+            self.unclaim_product_id = False
+            self.unclaim_choices = []
+            self._set_message(
+                "success",
+                self.env._(
+                    "Unclaimed 1 unit of %(prod)s.",
+                    prod=product.display_name,
+                ),
+            )
+            return True
+        self.unclaim_product_id = product
+        self.unclaim_choices = groups
+        self._set_message(
+            "more_match",
+            self.env._(
+                "%(prod)s is picked in several packages. Choose the package "
+                "to unclaim.",
+                prod=product.display_name,
+            ),
+        )
+        return True
+
+    def action_unclaim_unit(self, product_id, package_id=False):
+        """Apply the package choice of the unclaim dialog."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        product = self.env["product.product"].browse(product_id)
+        if not product.exists():
+            self._set_message("error", self.env._("Product not found."))
+            return False
+        line = self._unclaim_one_unit(product, package_id or False)
+        self.unclaim_product_id = False
+        self.unclaim_choices = []
+        if not line:
+            self._set_message(
+                "info",
+                self.env._(
+                    "%(label)s has no picked line to unclaim.",
+                    label=product.display_name,
+                ),
+            )
+            return True
+        self._set_message(
+            "success",
+            self.env._(
+                "Unclaimed 1 unit of %(prod)s.",
+                prod=product.display_name,
+            ),
+        )
+        return True
+
+    def _split_one_unit(self, product, package_id=False):
+        """Move one picked unit of ``product`` out of one package.
+
+        The packed line keeps the rest of its quantity and a loose picked
+        line receives the split unit (created when none exists), so the
+        picked total is unchanged — only the package attachment moves.
+        """
+        self.ensure_one()
+        packed_lines = self.picking_id.move_ids.filtered(
+            lambda move: (
+                move.product_id == product
+                and move.state not in ("done", "cancel")
+            )
+        ).move_line_ids.filtered(
+            lambda line: (
+                line.picked
+                and (line.result_package_id.id or False) == (package_id or False)
+            )
+        ).sorted(lambda line: line.id)
+        if not packed_lines:
+            return self.env["stock.move.line"]
+        line = packed_lines[-1]
+        rounding = product.uom_id.rounding
+        remaining = line.quantity - 1.0
+        if float_compare(remaining, 0.0, precision_rounding=rounding) <= 0:
+            # The package held exactly one unit: keep the (now empty)
+            # line for the row but detach it from the package.
+            line.write({
+                "quantity": 0.0,
+                "picked": False,
+                "result_package_id": False,
+            })
+        else:
+            line.quantity = remaining
+        loose_line = line.move_id.move_line_ids.filtered(
+            lambda candidate: (
+                candidate.picked
+                and not candidate.result_package_id
+                and candidate.id != line.id
+                and candidate.location_id == line.location_id
+            )
+        )[:1]
+        if loose_line:
+            loose_line.quantity = loose_line.quantity + 1.0
+        else:
+            loose_line = self.env["stock.move.line"].create({
+                "move_id": line.move_id.id,
+                "picking_id": line.picking_id.id,
+                "product_id": product.id,
+                "product_uom_id": line.product_uom_id.id,
+                "location_id": line.location_id.id,
+                "location_dest_id": line.location_dest_id.id,
+                "quantity": 1.0,
+                "picked": True,
+                "result_package_id": False,
+            })
+        return loose_line
+
+    def _split_scanned_product(self, product):
+        """Split one unit of a scanned quantity-tracked product.
+
+        One scan moves exactly one picked unit out of its package. When
+        those units sit in several packages nothing is written: the
+        package chooser is filled instead, and
+        :meth:`action_split_unit` applies the operator's choice.
+        """
+        self.ensure_one()
+        groups = self._get_unclaim_groups(product, require_package=True)
+        if not groups:
+            self.unclaim_product_id = False
+            self.unclaim_choices = []
+            self._set_message(
+                "info",
+                self.env._(
+                    "%(label)s has no package to remove.",
+                    label=product.display_name,
+                ),
+            )
+            return True
+        if len(groups) == 1:
+            self._split_one_unit(product, groups[0]["package_id"])
+            self.unclaim_product_id = False
+            self.unclaim_choices = []
+            self._set_message(
+                "success",
+                self.env._(
+                    "Split 1 unit of %(prod)s out of its package.",
+                    prod=product.display_name,
+                ),
+            )
+            return True
+        self.unclaim_product_id = product
+        self.unclaim_choices = groups
+        self._set_message(
+            "more_match",
+            self.env._(
+                "%(prod)s is packed in several packages. Choose the package "
+                "to split from.",
+                prod=product.display_name,
+            ),
+        )
+        return True
+
+    def action_split_unit(self, product_id, package_id=False):
+        """Apply the package choice of the split (remove from pack) dialog."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        product = self.env["product.product"].browse(product_id)
+        if not product.exists():
+            self._set_message("error", self.env._("Product not found."))
+            return False
+        line = self._split_one_unit(product, package_id or False)
+        self.unclaim_product_id = False
+        self.unclaim_choices = []
+        if not line:
+            self._set_message(
+                "info",
+                self.env._(
+                    "%(label)s has no package to remove.",
+                    label=product.display_name,
+                ),
+            )
+            return True
+        self._set_message(
+            "success",
+            self.env._(
+                "Split 1 unit of %(prod)s out of its package.",
+                prod=product.display_name,
+            ),
+        )
+        return True
+
+    def action_cancel_unclaim(self):
+        """Close the unclaim/split package chooser without writing."""
+        self.ensure_one()
+        self.unclaim_product_id = False
+        self.unclaim_choices = []
+        if (self.scan_mode or "default") == "split_scan":
+            self._set_message("info", self.env._("Split cancelled."))
+        else:
+            self._set_message("info", self.env._("Unclaim cancelled."))
         return True
 
     def action_clear_pack_intent(self):
@@ -3380,6 +3704,11 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         if not self.picking_id:
             return False
+        if not move_id:
+            # Clicking the selected row again clears the selection (toggle).
+            self.active_move_id = False
+            self._set_message_step()
+            return True
         move = self.env["stock.move"].browse(move_id)
         if not move or move.picking_id != self.picking_id:
             return False

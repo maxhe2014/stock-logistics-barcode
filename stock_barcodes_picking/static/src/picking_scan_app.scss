@@ -77,6 +77,7 @@
         min-height: 34px;
     }
     .o_scan_src_btn,
+    .o_scan_refresh_btn,
     .o_scan_actions_btn,
     // Odoo 19 CogMenu 按钮结构：.o_cp_action_menus button.btn (不是 dropdown-toggle)
     .o_scan_topbar .o_cp_action_menus button,
@@ -157,11 +158,10 @@
         padding: 0 !important;
         margin: 0 !important;
     }
-    // 顶栏右侧占位，保持单号视觉居中（设计稿顶栏只有单号 + 进度）
-    .o_scan_topbar_spacer {
-        width: 30px;
-        height: 30px;
-        flex: 0 0 30px;
+    // 右上角刷新键：图标随按钮文字颜色（浅色黑、深色白）
+    .o_scan_refresh_btn i {
+        font-size: 15px;
+        line-height: 1;
     }
     // SVG icons inside the topbar buttons.
     .o_scan_src_icon {
@@ -400,6 +400,12 @@
         .o_scan_hint_text {
             flex: 1 1 auto;
             min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .o_scan_hint_line {
+            display: block;
         }
 
         &.alert-success {
@@ -1003,10 +1009,23 @@
     }
 
     // ---------- v4 product rows (values measured from the Pixso export) ----------
+    .o_scan_pull_indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 24px;
+        margin: 2px 10px 0;
+        font-size: 12px;
+        line-height: 24px;
+        color: var(--scan-text-2);
+    }
     .o_picking_scan_rows {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
+        // 下拉刷新时禁止浏览器原生回弹/整页下拉
+        overscroll-behavior-y: contain;
         // 与顶部/底部一致使用 10px 页边距（覆盖 .o_picking_scan_moves 的 12px padding）
         padding: 0;
         margin: 8px 10px 0;
@@ -1251,6 +1270,8 @@
         min-height: 26px;
         padding: 2px 0;
         border-radius: 4px;
+        // 设计稿：每个批次/序列号项次底部 1px 分隔线（#DED5CE，深色用主题框线色）
+        border-bottom: 1px solid var(--scan-frame);
     }
     .o_scan_lot_row.is-scanned {
         background: var(--scan-hl);

@@ -33,7 +33,18 @@
                         进度：<t t-out="state.total_done" />/<t t-out="state.total_demand" />
                     </div>
                 </div>
-                <div class="o_scan_topbar_spacer" aria-hidden="true" />
+                <button
+                    type="button"
+                    class="o_scan_refresh_btn"
+                    title="刷新单据"
+                    t-att-disabled="state.scanning or state.pullRefresh === 'refreshing' ? 'disabled' : ''"
+                    t-on-click="() => this.onRefreshPicking()"
+                >
+                    <i
+                        t-att-class="'fa fa-refresh' + (state.pullRefresh === 'refreshing' ? ' fa-spin' : '')"
+                        aria-hidden="true"
+                    />
+                </button>
             </div>
 
             <!-- Scan row: back + input(with barcode icon) + camera (design 23) -->
@@ -56,13 +67,13 @@
                         type="text"
                         class="o_picking_scan_input"
                         placeholder="扫码或输入条码..."
-                        t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
+                        t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
                         t-on-keydown="onManualScanEnter"
                     />
                     <button
                         type="button"
                         class="o_scan_cam_inline o_picking_scan_camera"
-                        t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add ? 'disabled' : ''"
+                        t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
                         t-on-click="onCameraScan"
                         aria-label="扫码"
                         title="扫码"
@@ -73,18 +84,21 @@
                 <CogMenu t-if="state.picking_id" t-props="cogMenuProps"/>
             </div>
 
-            <!-- Hint bar: status + active target + force-add offer -->
+            <!-- Hint bar: mode hint / status / active target, one line each -->
             <div t-if="state.message || state.active_move_product_name || state.last_unmatched_barcode || state.scan_mode !== 'default'"
                  t-att-class="'o_scan_hintbar ' + (state.message ? alertClass : '')">
-                <span class="o_scan_hint_text">
-                    <t t-if="state.message"><t t-out="state.message" /></t>
-                    <t t-if="state.message and state.scan_mode !== 'default' and state.mode_hint != state.message"> · </t>
-                    <t t-if="state.scan_mode !== 'default' and state.mode_hint != state.message"><t t-out="state.mode_hint" /></t>
-                    <t t-if="(state.message or (state.scan_mode !== 'default' and state.mode_hint != state.message)) and state.active_move_product_name"> · </t>
-                    <t t-if="state.active_move_product_name">
-                        Active: <t t-out="state.active_move_product_name" />
-                    </t>
-                </span>
+                <div class="o_scan_hint_text">
+                    <div
+                        class="o_scan_hint_line"
+                        t-if="state.scan_mode !== 'default' and state.mode_hint and state.mode_hint != state.message"
+                    ><t t-out="state.mode_hint" /></div>
+                    <div class="o_scan_hint_line" t-if="state.message">
+                        <t t-out="state.message" />
+                    </div>
+                    <div class="o_scan_hint_line" t-if="state.active_move_product_name">
+                        当前操作： <t t-out="state.active_move_product_name" />
+                    </div>
+                </div>
                 <button
                     t-if="state.last_unmatched_barcode"
                     type="button"
@@ -127,6 +141,21 @@
                     class="o_scan_confirm_btn"
                     t-on-click="() => this.onConfirmCrossOrder()"
                 >确认拣货</button>
+            </div>
+
+            <!-- Pull-to-refresh feedback (touch gesture on the list) -->
+            <div
+                class="o_scan_pull_indicator"
+                t-if="state.pullRefresh !== 'idle'"
+                t-att-data-state="state.pullRefresh"
+            >
+                <i
+                    t-att-class="'fa ' + (state.pullRefresh === 'refreshing' ? 'fa-spinner fa-spin' : 'fa-arrow-down')"
+                    aria-hidden="true"
+                />
+                <span t-if="state.pullRefresh === 'refreshing'">刷新中…</span>
+                <span t-elif="state.pullRefresh === 'ready'">松开刷新</span>
+                <span t-else="">下拉刷新</span>
             </div>
 
             <!-- Product rows (v4: one card per move, packages on the lot) -->
@@ -455,6 +484,39 @@
                         type="button"
                         class="o_scan_split_cancel"
                         t-on-click="() => this.onCloseSplitDialog()"
+                    >取消</button>
+                </div>
+            </div>
+            <!-- 取消拣货 / 拆包：该产品分布在多个包裹时，选择要操作的包裹 -->
+            <div class="o_scan_split_dialog" t-if="state.unclaim_choices.length">
+                <div class="o_scan_split_card">
+                    <div class="o_scan_split_title">
+                        <t t-if="state.scan_mode === 'split_scan'">拆包：</t>
+                        <t t-else="">取消拣货：</t>
+                        <t t-out="state.unclaim_product_name" />
+                    </div>
+                    <div class="o_scan_split_list">
+                        <button
+                            type="button"
+                            t-foreach="state.unclaim_choices"
+                            t-as="choice"
+                            t-key="choice.package_id or 'loose'"
+                            t-on-click="() => this.onSelectUnclaimPackage(choice.package_id)"
+                        >
+                            <span class="o_scan_split_name">
+                                <i class="fa fa-cube" />
+                                <t t-out="choice.package_name or '未装包'" />
+                            </span>
+                            <span class="o_scan_split_meta">
+                                <t t-out="state.scan_mode === 'split_scan' ? '已装' : '已拣'" />
+                                <t t-out="choice.quantity" />
+                            </span>
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        class="o_scan_split_cancel"
+                        t-on-click="() => this.onCancelUnclaim()"
                     >取消</button>
                 </div>
             </div>

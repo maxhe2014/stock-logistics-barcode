@@ -867,8 +867,8 @@ msgstr "请先扫描产品条码或点击产品行。"
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
-msgid "Scan a product of transfer %s"
-msgstr "扫描调拨单 %s 的产品"
+msgid "Please scan a product of transfer %s"
+msgstr "请扫描调拨单 %s 的产品"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
@@ -1781,6 +1781,52 @@ msgstr "%(label)s 没有可取消拣货的明细。"
 #, python-format
 msgid "Unclaimed %(count)s line(s) of %(label)s. Reservations kept."
 msgstr "已取消 %(label)s 的 %(count)s 行拣货，预留保留。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Unclaimed 1 unit of %(prod)s."
+msgstr "已取消 %(prod)s 的 1 件拣货。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "%(prod)s is picked in several packages. Choose the package to unclaim."
+msgstr "%(prod)s 分布在多个包裹中，请选择要取消拣货的包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Unclaim cancelled."
+msgstr "已取消本次取消拣货操作。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Product not found."
+msgstr "未找到产品。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Split 1 unit of %(prod)s out of its package."
+msgstr "已从包裹中拆出 1 件 %(prod)s。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "%(prod)s is packed in several packages. Choose the package to split from."
+msgstr "%(prod)s 分布在多个包裹中，请选择要拆包的包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Split cancelled."
+msgstr "已取消拆包操作。"
 
 #. module: stock_barcodes_picking
 #. odoo-javascript
