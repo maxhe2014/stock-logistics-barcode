@@ -630,6 +630,20 @@ export class PickingScanApp extends Component {
         }
     }
 
+    /** Open this transfer's picking form (top-bar document name link). */
+    onOpenPicking() {
+        if (!this.state.picking_id) {
+            return;
+        }
+        this.actionService.doAction({
+            res_model: "stock.picking",
+            res_id: this.state.picking_id,
+            views: [[false, "form"]],
+            type: "ir.actions.act_window",
+            target: "current",
+        });
+    }
+
     /** Jump to the source transfer form so the operator can use the
      *  native Odoo action menu (gear icon) — print, ZPL labels, scrap,
      *  cancel, etc. — all of which live on the form/header controller

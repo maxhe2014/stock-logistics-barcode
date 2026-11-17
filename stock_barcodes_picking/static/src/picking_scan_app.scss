@@ -182,6 +182,18 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    // 单据号超链接：保持设计稿黑色粗体，悬停加下划线提示可点击
+    .o_scan_doc_link {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+        &:hover,
+        &:focus-visible {
+            color: inherit;
+            text-decoration: underline;
+        }
+    }
     .o_scan_doc_progress {
         font-size: 12px;
         line-height: 18px;
