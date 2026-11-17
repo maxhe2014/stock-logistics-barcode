@@ -152,11 +152,42 @@
                                 <i class="fa fa-tag" />
                                 <span t-out="row.product_name" />
                             </div>
-                            <div class="o_scan_picked">
-                                <span class="o_scan_picked_label">已拣:</span>
-                                <b t-out="row.picked_qty" />
-                                <span class="o_scan_picked_uom" t-out="row.uom_name" />
+                            <div class="o_scan_side">
+                                <div class="o_scan_picked">
+                                    <span class="o_scan_picked_label">已拣:</span>
+                                    <b
+                                        t-att-class="this.isRowComplete(row) ? 'is-done' : ''"
+                                        t-out="row.picked_qty"
+                                    />
+                                    <span class="o_scan_picked_uom" t-out="row.uom_name" />
+                                </div>
+                                <!-- 数量追溯产品：已拣下方的 修改 / +N -->
+                                <div class="o_scan_qty_btns" t-if="row.tracking === 'none'">
+                                    <button
+                                        t-if="this.quantityEditLot(row)"
+                                        type="button"
+                                        class="o_scan_lot_edit_btn"
+                                        title="修改"
+                                        t-on-click.stop="() => this.onOpenLineEditor(this.quantityEditLot(row), row)"
+                                    >
+                                        <i class="fa fa-pencil" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="o_scan_lot_add"
+                                        title="增加一个单位"
+                                        t-on-click.stop="() => this.onAddMoveQuantity(row.move_id, null, row.package_id)"
+                                    >+1</button>
+                                </div>
                             </div>
+                        </div>
+                        <!-- 数量追溯产品：卡片上的包裹号 -->
+                        <div
+                            class="o_scan_qty_pkg"
+                            t-if="row.tracking === 'none' and this.quantityPackages(row)"
+                        >
+                            <i class="fa fa-cube" />
+                            <span t-out="this.quantityPackages(row)" />
                         </div>
                         <div class="o_scan_lots" t-if="row.tracking !== 'none'">
                             <t t-set="head" t-value="this.headerLot(row)" />
@@ -243,7 +274,7 @@
                                                 type="button"
                                                 class="o_scan_lot_add"
                                                 title="增加一个单位"
-                                                t-on-click.stop="() => this.onAddMoveQuantity(row.move_id, 1)"
+                                                t-on-click.stop="() => this.onPickReservedLot(row.move_id, lot.id)"
                                             >+1</button>
                                             <button
                                                 t-if="lot.picked and lot.line_ids and lot.line_ids.length"
@@ -277,7 +308,7 @@
                     <button
                         t-if="state.picking_id"
                         type="button"
-                        class="o_scan_key o_scan_more_btn"
+                        t-att-class="'o_scan_key o_scan_more_btn' + (state.moreMenuOpen ? ' is-open' : '')"
                         t-on-click="() => this.onToggleMoreMenu()"
                     >更多…</button>
                     <div class="o_scan_footer_actions_right">
@@ -379,7 +410,7 @@
                         <span>数量</span>
                         <input type="number" t-model="state.editLine.qty" />
                     </label>
-                    <label class="o_scan_edit_row">
+                    <label class="o_scan_edit_row" t-if="!state.editLine.qtyOnly">
                         <span>批次/序列号</span>
                         <input type="text" t-model="state.editLine.lotName" />
                     </label>
@@ -393,7 +424,7 @@
                     </label>
                     <div class="o_scan_edit_actions">
                         <button type="button" t-on-click="() => this.onCloseLineEditor()">取消</button>
-                        <button type="button" class="o_scan_edit_save" t-on-click="() => this.onSaveLineEditor()">保存</button>
+                        <button type="button" t-on-click="() => this.onSaveLineEditor()">保存</button>
                     </div>
                 </div>
             </div>

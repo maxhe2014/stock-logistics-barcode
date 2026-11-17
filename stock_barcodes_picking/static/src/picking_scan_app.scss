@@ -48,7 +48,7 @@
         --scan-text-2: #A4A5A6;
         --scan-row-bg: rgba(37, 77, 195, 0.25);
         --scan-fold-bg: rgba(37, 77, 195, 0.4);
-        --scan-hint-bg: #FFFFFF;
+        --scan-hint-bg: #D2D9EC;
         --scan-hint-fg: #254DC3;
         --scan-hint-border: transparent;
         --scan-hint-shadow: transparent;
@@ -348,6 +348,10 @@
         &:active:not(:disabled) {
             transform: none;
             box-shadow: none;
+        }
+        // 展开动作面板时文字变蓝
+        &.is-open {
+            color: var(--scan-green);
         }
     }
     .o_scan_key_primary {
@@ -1110,6 +1114,46 @@
         font-weight: 700;
         color: var(--scan-text);
         line-height: 1;
+        // 数量已拣齐：数字变蓝
+        &.is-done {
+            color: var(--scan-green);
+        }
+    }
+    // 右侧「已拣 + 操作」竖列（数量追溯产品）
+    .o_scan_side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 2px;
+        flex: 0 0 auto;
+    }
+    .o_scan_side .o_scan_picked {
+        align-self: auto;
+    }
+    .o_scan_qty_btns {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 22px;
+    }
+    // 卡片底部包裹号（数量追溯产品）
+    .o_scan_qty_pkg {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        color: var(--scan-text-2);
+        font-size: 10px;
+        line-height: 15px;
+        i {
+            font-size: 11px;
+            flex: 0 0 auto;
+        }
+        span {
+            min-width: 0;
+            word-break: break-all;
+        }
     }
     // ---------- lot dropdown（Pixso「序列号带下拉框」194:21129） ----------
     .o_scan_lots {
@@ -1384,10 +1428,6 @@
             font-size: 13px;
             background: var(--scan-page);
             color: var(--scan-text);
-        }
-        .o_scan_edit_save {
-            background: var(--scan-primary);
-            color: #fff;
         }
     }
     .o_scan_split_cancel {

@@ -471,6 +471,7 @@ export class PickingScanApp extends Component {
      *  picking (backend creates a new stock.move) → refresh state so the
      *  new card appears on the scan view. */
     onAddProduct() {
+        this.state.moreMenuOpen = false;
         this.dialogService.add(
             SelectCreateDialog,
             {
@@ -779,10 +780,12 @@ export class PickingScanApp extends Component {
     }
 
     /**
-     * Green ``+N`` button of a quantity card: fill the row up to its
-     * demand in one tap (``quantity`` is the row demand, SET semantics).
+     * ``+1`` button of a quantity row: add one unit to that row's picked
+     * total. ``packageId`` scopes it to the clicked row (a destination
+     * package, or the unpacked remainder) because a move with packed
+     * lines is split into several product rows like the official app.
      */
-    async onAddMoveQuantity(moveId, quantity = null) {
+    async onAddMoveQuantity(moveId, quantity = null, packageId = null) {
         if (this.state.scanning || !this.wizId) {
             return;
         }
@@ -791,7 +794,7 @@ export class PickingScanApp extends Component {
             const res = await this.orm.call(
                 "wiz.stock.barcodes.picking",
                 "action_add_move_quantity",
-                [[this.wizId], moveId, quantity]
+                [[this.wizId], moveId, quantity, packageId]
             );
             await this._handleActionResult(res, "Add quantity");
         } catch (err) {
@@ -1097,19 +1100,38 @@ export class PickingScanApp extends Component {
         );
     }
 
-    /** Open the row editor for one lot line (quantity/lot/packages). */
-    onOpenLineEditor(lot) {
+    /** Open the row editor for one lot line (quantity/lot/packages).
+     *
+     * Quantity-tracked rows aggregate every picked line of the product,
+     * so their editor works on the row total (`qtyOnly`) and has no lot
+     * field. Packages are still editable: a single shared name is
+     * pre-filled, and saving applies it to every picked line of the row.
+     */
+    onOpenLineEditor(lot, row = null) {
         const lineId = (lot.line_ids || [])[0] || false;
         if (!lineId) {
             return;
         }
+        const qtyOnly = Boolean(row && row.tracking === "none");
+        let packageFrom = lot.package_from || "";
+        let packageTo = lot.package_to || "";
+        if (qtyOnly) {
+            // The row may span several packages: only pre-fill the name
+            // when it is unambiguous, otherwise leave it blank (= keep).
+            const lots = row.lots || [];
+            const from = [...new Set(lots.map((l) => l.package_from).filter(Boolean))];
+            const to = [...new Set(lots.map((l) => l.package_to).filter(Boolean))];
+            packageFrom = from.length === 1 ? from[0] : "";
+            packageTo = to.length === 1 ? to[0] : "";
+        }
         this.state.editLine = {
             lineId: lineId,
-            qty: lot.quantity || 0,
-            lotName: lot.name || "",
-            packageFrom: lot.package_from || "",
-            packageTo: lot.package_to || "",
+            qty: qtyOnly ? row.picked_qty || 0 : lot.quantity || 0,
+            lotName: qtyOnly ? "" : lot.name || "",
+            packageFrom: packageFrom,
+            packageTo: packageTo,
             serial: false,
+            qtyOnly: qtyOnly,
         };
     }
 
@@ -1126,6 +1148,7 @@ export class PickingScanApp extends Component {
         const qty = Number.isNaN(parseFloat(edit.qty))
             ? null
             : parseFloat(edit.qty);
+        const qtyOnly = Boolean(edit.qtyOnly);
         this.state.scanning = true;
         try {
             const res = await this.orm.call(
@@ -1135,9 +1158,14 @@ export class PickingScanApp extends Component {
                     [this.wizId],
                     edit.lineId,
                     qty,
-                    edit.lotName || false,
-                    edit.packageFrom || false,
-                    edit.packageTo || false,
+                    // null (not false) leaves the field untouched; false
+                    // would clear the lot/package of the line.
+                    qtyOnly ? null : edit.lotName || false,
+                    // Aggregated rows keep their packages when the field
+                    // is left blank, so one empty field cannot wipe the
+                    // packages of every line of the row.
+                    edit.packageFrom || (qtyOnly ? null : false),
+                    edit.packageTo || (qtyOnly ? null : false),
                 ]
             );
             this.state.editLine = false;
@@ -1192,6 +1220,45 @@ export class PickingScanApp extends Component {
             }
         }
         return lots.find((lot) => lot.picked) || lots[0];
+    }
+
+    /**
+     * Quantity-tracked rows have no lot dropdown: expose the first picked
+     * line (for the pencil) and the package chip shown under the card.
+     */
+    quantityEditLot(row) {
+        const lots = row.lots || [];
+        return (
+            lots.find((lot) => lot.picked && lot.line_ids && lot.line_ids.length)
+            || lots.find((lot) => lot.line_ids && lot.line_ids.length)
+            || false
+        );
+    }
+
+    quantityPackages(row) {
+        const lots = row.lots || [];
+        const from = [...new Set(lots.map((lot) => lot.package_from).filter(Boolean))];
+        const to = [...new Set(lots.map((lot) => lot.package_to).filter(Boolean))];
+        if (from.length === 1 && to.length === 1 && from[0] !== to[0]) {
+            return `${from[0]} > ${to[0]}`;
+        }
+        const names = to.length ? to : from;
+        return names.join(" , ");
+    }
+
+    /** Has this row reached its demand? (tints the picked qty)
+     *
+     * Split rows carry their own share of the demand (a package row
+     * asks for what it holds, the remainder row for what is missing),
+     * so a row is complete on its own numbers.
+     */
+    isRowComplete(row) {
+        const picked = row.picked_qty || 0;
+        const demand = row.demand_qty || 0;
+        if (demand <= 0) {
+            return picked > 0;
+        }
+        return picked + 1e-6 >= demand;
     }
 
     /** Edit the quantity of one picked lot line. */
@@ -1529,6 +1596,7 @@ export class PickingScanApp extends Component {
         if (this.state.scanning || !this.wizId || this._closePackageDialog) {
             return;
         }
+        this.state.moreMenuOpen = false;
         this._closePackageDialog = this.dialogService.add(
             SelectCreateDialog,
             {

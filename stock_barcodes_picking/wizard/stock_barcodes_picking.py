@@ -206,52 +206,143 @@ class WizStockBarcodesPicking(models.TransientModel):
             demand = move.product_uom_qty
             if not demand:
                 demand = sum(lines.mapped("quantity"))
-            lots_by_key = {}
-            for line in lines:
-                key = (line.lot_id.id or False, line.picked)
-                entry = lots_by_key.get(key)
-                if not entry:
-                    entry = {
-                        "id": line.lot_id.id or False,
-                        "name": line.lot_id.name or line.lot_name or "",
-                        "picked": line.picked,
-                        "quantity": 0.0,
-                        "reserved_quantity": 0.0,
-                        "package_from": line.package_id.name or "",
-                        "package_to": line.result_package_id.name or "",
-                        "demand_qty": 0.0,
-                        "show_add": optional_scan and not line.picked,
-                        "line_ids": [],
-                    }
-                    lots_by_key[key] = entry
-                if line.picked:
-                    entry["quantity"] += line.quantity
-                else:
-                    entry["reserved_quantity"] += line.quantity
-                entry["demand_qty"] = (
-                    entry["quantity"] + entry["reserved_quantity"]
-                )
-                entry["line_ids"].append(line.id)
-                if not entry["package_from"] and line.package_id:
-                    entry["package_from"] = line.package_id.name
-                if not entry["package_to"] and line.result_package_id:
-                    entry["package_to"] = line.result_package_id.name
-            rows.append({
-                "row_key": str(move.id),
-                "move_id": move.id,
-                "product_id": move.product_id.id,
-                "product_name": move.product_id.display_name,
-                "tracking": move.product_id.tracking,
-                "location_name": move.location_id.display_name,
-                "location_dest_name": move.location_dest_id.display_name,
-                "demand_qty": demand,
-                "picked_qty": sum(picked_lines.mapped("quantity")),
-                "uom_name": move.product_uom.name,
-                "active": self.active_move_id.id == move.id,
-                "editable": True,
-                "lots": list(lots_by_key.values()),
-            })
+            if move.product_id.tracking == "none":
+                # Like the official barcode app: each destination package
+                # gets its own product row, plus a row for the unpacked
+                # remainder (still to pick / picked outside a package).
+                # The demand is split across those rows and always sums
+                # back to the document demand: packages are served in
+                # packing order with what they hold, the last one is
+                # capped by the demand left, and anything above that is
+                # an over-pick shown on the picked side only (10 units,
+                # 4 packed -> 4/4 and 0/6; 13 + 14 packed -> 13/13 and
+                # 14/7, never 14/14).
+                package_groups = {}
+                for line in picked_lines.filtered("result_package_id"):
+                    pkg_id = line.result_package_id.id
+                    package_groups.setdefault(
+                        pkg_id, self.env["stock.move.line"]
+                    )
+                    package_groups[pkg_id] |= line
+                if package_groups:
+                    remaining_demand = demand
+                    allocated = []
+                    for pkg_id, pkg_lines in package_groups.items():
+                        pkg_picked = sum(pkg_lines.mapped("quantity"))
+                        row_demand = min(
+                            pkg_picked, max(0.0, remaining_demand)
+                        )
+                        remaining_demand -= row_demand
+                        allocated.append((pkg_id, pkg_lines, row_demand))
+                    remainder_lines = lines.filtered(
+                        lambda line: not line.result_package_id
+                    )
+                    remainder_picked = sum(
+                        remainder_lines.filtered("picked").mapped("quantity")
+                    )
+                    remainder_demand = max(0.0, remaining_demand)
+                    if remainder_demand or remainder_picked:
+                        # Unpacked remainder first, like the official row
+                        # order (original line, then the packed lines).
+                        rows.append(self._build_scan_row(
+                            move,
+                            remainder_lines,
+                            remainder_demand,
+                            optional_scan,
+                            package_id=False,
+                            row_key=f"{move.id}_0",
+                        ))
+                    for pkg_id, pkg_lines, row_demand in allocated:
+                        rows.append(self._build_scan_row(
+                            move,
+                            pkg_lines,
+                            row_demand,
+                            optional_scan,
+                            package_id=pkg_id,
+                            row_key=f"{move.id}_{pkg_id}",
+                        ))
+                    continue
+            rows.append(self._build_scan_row(
+                move,
+                lines,
+                demand,
+                optional_scan,
+            ))
         return rows
+
+    def _build_scan_row(
+        self,
+        move,
+        lines,
+        demand,
+        optional_scan,
+        package_id=False,
+        row_key=None,
+    ):
+        """Build one product row for the v4 client action.
+
+        ``lines`` is the subset this row represents: all move lines for a
+        regular row, or one destination-package group / the unpacked
+        remainder when a non-tracked move is split across packages.
+        ``demand`` is the demand of this row (the move demand is split
+        across the package rows and the remainder row).
+        """
+        tracking = move.product_id.tracking
+        lots_by_key = {}
+        for line in lines:
+            if tracking != "none" and not line.lot_id and not line.picked:
+                # Reservation placeholder of a tracked product: the
+                # quantity is reserved but no lot/serial is assigned
+                # yet. It is not actionable in the scan view (there is
+                # no lot to pick, edit or show) and used to render a
+                # dead "未分配批次 / +1" row in the lot dropdown.
+                continue
+            key = (line.lot_id.id or False, line.picked)
+            entry = lots_by_key.get(key)
+            if not entry:
+                entry = {
+                    "id": line.lot_id.id or False,
+                    "name": line.lot_id.name or line.lot_name or "",
+                    "picked": line.picked,
+                    "quantity": 0.0,
+                    "reserved_quantity": 0.0,
+                    "package_from": line.package_id.name or "",
+                    "package_to": line.result_package_id.name or "",
+                    "demand_qty": 0.0,
+                    "show_add": optional_scan and not line.picked,
+                    "line_ids": [],
+                }
+                lots_by_key[key] = entry
+            if line.picked:
+                entry["quantity"] += line.quantity
+            else:
+                entry["reserved_quantity"] += line.quantity
+            entry["demand_qty"] = (
+                entry["quantity"] + entry["reserved_quantity"]
+            )
+            entry["line_ids"].append(line.id)
+            if not entry["package_from"] and line.package_id:
+                entry["package_from"] = line.package_id.name
+            if not entry["package_to"] and line.result_package_id:
+                entry["package_to"] = line.result_package_id.name
+        return {
+            "row_key": row_key or str(move.id),
+            "move_id": move.id,
+            "package_id": package_id or False,
+            "product_id": move.product_id.id,
+            "product_name": move.product_id.display_name,
+            "tracking": tracking,
+            "location_name": move.location_id.display_name,
+            "location_dest_name": move.location_dest_id.display_name,
+            "demand_qty": demand,
+            "picked_qty": sum(
+                line.quantity for line in lines if line.picked
+            ),
+            "uom_name": move.product_uom.name,
+            "active": self.active_move_id.id == move.id,
+            "editable": True,
+            "lots": list(lots_by_key.values()),
+        }
 
     def _get_scan_steps(self):
         """Current picking type's ordered scan steps.
@@ -2977,17 +3068,23 @@ class WizStockBarcodesPicking(models.TransientModel):
             )
         return result
 
-    def action_add_move_quantity(self, move_id, quantity=None):
-        """Fill a non-tracked move's quantity up to its demand.
+    def action_add_move_quantity(self, move_id, quantity=None, package_id=None):
+        """Add one unit to a non-tracked row's picked quantity.
 
         Available in both mandatory and optional policies — non-tracked
         products don't need a lot/serial scan, so the operator may
         always add quantity directly through this shortcut.
 
-        ``quantity`` is the *target* picked quantity (SET semantics, the
-        design's green ``+N`` button sends the row demand), so one tap
-        fills the row instead of adding one unit. Without it the legacy
-        +1 behaviour is kept.
+        A non-tracked move is displayed as one row per destination
+        package plus one row for the unpacked remainder (official
+        barcode behaviour), so ``package_id`` scopes the shortcut to the
+        clicked row: a package id targets that package's lines, ``False``
+        targets the unpacked remainder. ``None`` keeps the legacy
+        whole-move behaviour.
+
+        Without ``quantity`` one unit is added to the scoped total. An
+        explicit ``quantity`` keeps the legacy SET semantics (target
+        picked quantity).
 
         Tracked products use the per-lot +1 button inside reserved
         badges (optional policy only), handled by
@@ -3001,22 +3098,21 @@ class WizStockBarcodesPicking(models.TransientModel):
                 and candidate.product_id.tracking == "none"
             )
         )
-        if not move or not self.set_active_move(move.id):
+        if not move:
+            self._set_message(
+                "error",
+                self.env._("Cannot consume tracked product by demand; scan the lot"),
+            )
             return False
-        # Base must only cover UNPACKED picked lines: _process_stock_move_line
-        # SETs the target onto the unpacked line while packed lines stay
-        # untouched — including them here would add the packed qty on top.
-        picked_qty = sum(
-            line.quantity
-            for line in move.move_line_ids
-            if line.picked and not line.result_package_id
-        )
-        target_qty = (
-            picked_qty + 1.0
-            if quantity is None
-            else float(quantity)
-        )
-        return self.action_consume_with_qty(target_qty)
+        if not self.set_active_move(move.id):
+            return False
+        if quantity is None:
+            target_qty = sum(
+                self._untracked_scope_lines(move, package_id).mapped("quantity")
+            ) + 1.0
+        else:
+            target_qty = float(quantity)
+        return self._set_untracked_move_qty(move, target_qty, package_id)
 
     def action_validate_picking(self):
         """Validate the current picking (finalize the transfer).
@@ -3513,6 +3609,118 @@ class WizStockBarcodesPicking(models.TransientModel):
         )
         return True
 
+    def _untracked_scope_lines(self, move, package_id=None):
+        """Return the unscoped picked lines of a non-tracked row.
+
+        ``package_id=None`` keeps the legacy whole-move scope. A package
+        id targets the lines packed into that package, ``False`` targets
+        the unpacked remainder row (official barcode row split).
+        """
+        picked_lines = move.move_line_ids.filtered("picked")
+        if package_id is None:
+            return picked_lines
+        return picked_lines.filtered(
+            lambda line: (line.result_package_id.id or False) == package_id
+        )
+
+    def _set_untracked_move_qty(self, move, qty, package_id=None):
+        """SET the total picked quantity of one non-tracked row.
+
+        The quantity rows of the scan view show one aggregate "picked"
+        figure each (whole move, one destination package, or the
+        unpacked remainder), so both the pencil editor and the ``+1``
+        shortcut work on that row total. The difference between the
+        requested value and the current total is applied to the scoped
+        picked lines instead of replacing only the first line —
+        otherwise editing an aggregated row silently lost the quantity
+        held by the other lines/packages.
+
+        Entering 0 clears the scoped picked lines (``quantity = 0`` with
+        ``picked = False``) but keeps them, so the product row stays
+        visible in the scan view.
+        """
+        self.ensure_one()
+        qty = float(qty) if qty else 0.0
+        if qty < 0:
+            self._set_message("error", self.env._("Quantity must be positive"))
+            return False
+        product = move.product_id
+        rounding = product.uom_id.rounding
+        picked_lines = self._untracked_scope_lines(
+            move, package_id
+        ).sorted(lambda line: line.id)
+        if not picked_lines:
+            if qty <= 0:
+                return True
+            if package_id:
+                # A package row always has picked lines; an empty list
+                # here means the row is stale (e.g. the package was
+                # removed meanwhile).
+                self._set_message(
+                    "error", self.env._("Package line not found")
+                )
+                return False
+            # Unpacked remainder row: let the regular consume flow create
+            # the line (it also honours the source/destination locations
+            # and the current package intent). The consume flow works on
+            # the active move, which may be another row when the editor
+            # is opened directly.
+            if not self.set_active_move(move.id):
+                return False
+            return bool(self.action_consume_with_qty(qty))
+        scope_ids = set(picked_lines.ids)
+        moves = self.picking_id.move_ids.filtered(
+            lambda candidate: (
+                candidate.product_id == product
+                and candidate.state != "cancel"
+            )
+        )
+        total_demand = sum(candidate.product_uom_qty for candidate in moves)
+        other_picked_qty = sum(
+            line.quantity
+            for line in moves.move_line_ids
+            if line.picked and line.id not in scope_ids
+        )
+        max_quantity = total_demand - other_picked_qty
+        if float_compare(qty, max_quantity, precision_rounding=rounding) > 0:
+            policy = self._get_excess_qty_policy()
+            if policy == "forbid":
+                self._set_message(
+                    "error",
+                    self.env._(
+                        "Quantity exceeds demand (max: %(max)s). "
+                        "Over-picking is forbidden for this operation type.",
+                        max=max_quantity,
+                    ),
+                )
+                return False
+            if policy == "warn":
+                self._set_message(
+                    "more_match",
+                    self.env._("Quantity exceeds demand (max: %s)", max_quantity),
+                )
+                return False
+        delta = qty - sum(picked_lines.mapped("quantity"))
+        if delta > 0:
+            last_line = picked_lines[-1]
+            last_line.quantity = last_line.quantity + delta
+        elif delta < 0:
+            remaining = -delta
+            for line in reversed(picked_lines):
+                take = min(line.quantity, remaining)
+                line.quantity = line.quantity - take
+                remaining -= take
+                if float_is_zero(line.quantity, precision_rounding=rounding):
+                    line.quantity = 0.0
+                    line.picked = False
+                if remaining <= 0:
+                    break
+        self._set_message(
+            "success",
+            self.env._("Consumed: %(prod)s x%(qty)s", prod=product.name, qty=qty),
+        )
+        return True
+
     def action_edit_move_line(
         self,
         line_id,
@@ -3527,6 +3735,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         through the standalone quantity editor so the excess policy stays
         in force; lot and package names are resolved (or created when the
         operation type allows it) before writing.
+
+        Non-tracked products have no lot: their quantity rows are split
+        per destination package (plus the unpacked remainder), so the
+        requested value and the package names are applied to the lines
+        of the clicked row only.
         """
         self.ensure_one()
         line = self.env["stock.move.line"].browse(line_id)
@@ -3537,8 +3750,24 @@ class WizStockBarcodesPicking(models.TransientModel):
         ):
             self._set_message("error", self.env._("Line not found."))
             return False
+        # Row scope of a non-tracked move (package id, or False for the
+        # unpacked remainder). Computed before the quantity edit, which
+        # may unpick some of the scoped lines.
+        row_package_id = line.result_package_id.id or False
+        package_targets = line
+        if line.product_id.tracking == "none":
+            scoped_lines = self._untracked_scope_lines(
+                line.move_id, row_package_id
+            )
+            if scoped_lines:
+                package_targets = scoped_lines
         if qty is not None:
-            handled = self.action_edit_move_line_qty(line.id, qty)
+            if line.product_id.tracking == "none":
+                handled = self._set_untracked_move_qty(
+                    line.move_id, qty, row_package_id
+                )
+            else:
+                handled = self.action_edit_move_line_qty(line.id, qty)
             if not handled:
                 return False
             line = self.env["stock.move.line"].browse(line_id)
@@ -3566,6 +3795,9 @@ class WizStockBarcodesPicking(models.TransientModel):
                         ),
                     )
                     return False
+        # Package names typed in the row editor apply to the lines of the
+        # clicked row only (that package's lines, or the unpacked
+        # remainder) — see package_targets above.
         for field_name, package_value in (
             ("package_id", package_name),
             ("result_package_id", result_package_name),
@@ -3573,7 +3805,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             if package_value is None:
                 continue
             if not package_value:
-                line.write({field_name: False})
+                package_targets.write({field_name: False})
                 continue
             package = self.env["stock.package"].search([
                 ("name", "=", package_value),
@@ -3582,7 +3814,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 package = self.env["stock.package"].create(
                     {"name": package_value}
                 )
-            line.write({field_name: package.id})
+            package_targets.write({field_name: package.id})
         self._set_message("success", self.env._("Line updated."))
         return True
 
