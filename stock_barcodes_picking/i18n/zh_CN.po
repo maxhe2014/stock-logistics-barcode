@@ -768,6 +768,20 @@ msgstr "数量超过需求（最大：%s）"
 #. module: stock_barcodes_picking
 #. odoo-python
 #: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Quantity exceeds demand (max: %s). Confirm to force."
+msgstr "数量超过需求（最大：%s），确认后可强制拣货。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Product %(product)s is not in transfer %(picking)s. Confirm adding 1 unit and picking it."
+msgstr "产品 %(product)s 不在单据 %(picking)s 中，确认添加 1 件并拣货？"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
 msgid "Quantity must be positive"
 msgstr "数量必须为正数"
 

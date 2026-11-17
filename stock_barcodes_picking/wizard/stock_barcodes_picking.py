@@ -172,6 +172,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         help="Package choices shown by the unclaim dialog: "
              "[{package_id, package_name, quantity}, ...]",
     )
+    # --- Over-demand row add: pending confirmation ---
+    pending_add = fields.Json(
+        help="Row quantity add blocked by the 'warn' over-pick policy: "
+             "{move_id, qty, package_id}. The footer force button applies it.",
+    )
 
     # --- Scan-first picking switching ---
     pending_switch_picking_ids = fields.Many2many(
@@ -1106,6 +1111,9 @@ class WizStockBarcodesPicking(models.TransientModel):
         """
         if not barcode:
             return
+        # A new scan supersedes any pending over-demand confirmation.
+        self.pending_add = False
+        self.visible_force_done = False
         # While the candidate-picking selector is open, only picking-name
         # scans are allowed. Blocking product/lot scans here prevents an
         # ambiguous picking scan from silently writing into the current
@@ -1484,11 +1492,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             lambda m: m.product_id == product and m.state != "cancel"
         )
         if not component_moves:
-            self._set_message(
-                "error",
-                self.env._("Product %(name)s is not part of this transfer", **{"name": product.name}),
-            )
-            return True
+            return self._scan_outside_product(product)
         self.product_id = product
         # Keep the row highlight in sync with the scanned product so the
         # operator can keep scanning the same product without re-clicking.
@@ -1541,9 +1545,61 @@ class WizStockBarcodesPicking(models.TransientModel):
             self.product_qty = 0.0
             self.qty_available = 0.0
             self.step = self._step_index("product")
-            self.visible_force_done = False
+            # visible_force_done is intentionally left as set by the
+            # over-pick policy: a 'warn' block must keep its force button.
             return True
         self._set_message_step()
+        return True
+
+    def _scan_outside_product(self, product):
+        """Handle a scanned product that is not part of the transfer.
+
+        Quantity-tracked products follow the picking type's
+        ``barcode_new_product_policy``:
+          - ``allow``: add one unit immediately (new move, picked);
+          - ``warn``: preview it and wait for the footer confirmation;
+          - ``forbid``: keep the explicit "not part of this transfer" error.
+        Tracked products still require a lot/serial scan to know what is
+        being received, so they always keep the error here.
+        """
+        self.ensure_one()
+        if product.tracking != "none":
+            self._set_message(
+                "error",
+                self.env._(
+                    "Product %(name)s is not part of this transfer",
+                    name=product.name,
+                ),
+            )
+            return True
+        if self._get_new_product_policy() == "forbid":
+            self._set_message(
+                "error",
+                self.env._(
+                    "Product %(name)s is not part of this transfer",
+                    name=product.name,
+                ),
+            )
+            return True
+        self.product_id = product
+        self.product_uom_id = product.uom_id
+        self.lot_id = False
+        self.lot_name = False
+        self.product_qty = 1.0
+        self.active_move_id = False
+        if self._get_new_product_policy() == "warn":
+            self.visible_force_add = True
+            self._set_message(
+                "more_match",
+                self.env._(
+                    "Product %(product)s is not in transfer %(picking)s. "
+                    "Confirm adding 1 unit and picking it.",
+                    product=product.name,
+                    picking=self.picking_id.name,
+                ),
+            )
+            return True
+        self.action_force_add(product_id=product.id)
         return True
 
     def _scan_lot(self, barcode):
@@ -1928,6 +1984,8 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.scan_mode = mode
         self.unclaim_product_id = False
         self.unclaim_choices = []
+        self.pending_add = False
+        self.visible_force_done = False
         return True
 
     def action_exit_scan_mode(self):
@@ -1936,6 +1994,8 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.scan_mode = self._default_scan_mode()
         self.unclaim_product_id = False
         self.unclaim_choices = []
+        self.pending_add = False
+        self.visible_force_done = False
         return True
 
     def action_remove_package(self, package_id):
@@ -2007,6 +2067,9 @@ class WizStockBarcodesPicking(models.TransientModel):
             [("name", "=", barcode)], limit=1
         )
         if lot:
+            if mode == "unclaim_scan" and lot.product_id.tracking == "lot":
+                # Scanning a batch cancels one unit (serial stays 1/line).
+                return self._unclaim_scanned_lot(lot)
             lines = self.env["stock.move.line"].search([
                 ("picking_id", "=", self.picking_id.id),
                 ("state", "not in", ("done", "cancel")),
@@ -2161,6 +2224,47 @@ class WizStockBarcodesPicking(models.TransientModel):
                 "to unclaim.",
                 prod=product.display_name,
             ),
+        )
+        return True
+
+    def _unclaim_scanned_lot(self, lot):
+        """Cancel one unit of a scanned batch (lot).
+
+        Scanning a lot identifies the batch; the operator asked for a
+        per-scan decrement, so one unit is removed from the batch's picked
+        lines instead of unpicking the whole line. Serial numbers are
+        1 unit per line and keep the whole-line path.
+        """
+        self.ensure_one()
+        lines = self.picking_id.move_ids.filtered(
+            lambda move: (
+                move.product_id == lot.product_id
+                and move.state not in ("done", "cancel")
+            )
+        ).move_line_ids.filtered(
+            lambda line: line.picked and line.lot_id == lot
+        ).sorted(lambda line: line.id)
+        if not lines:
+            self._set_message(
+                "info",
+                self.env._(
+                    "%(label)s has no picked line to unclaim.",
+                    label=lot.name,
+                ),
+            )
+            return True
+        line = lines[-1]
+        remaining = line.quantity - 1.0
+        if float_compare(
+            remaining, 0.0,
+            precision_rounding=lot.product_id.uom_id.rounding,
+        ) <= 0:
+            line.write({"quantity": 0.0, "picked": False})
+        else:
+            line.quantity = remaining
+        self._set_message(
+            "success",
+            self.env._("Unclaimed 1 unit of %(prod)s.", prod=lot.name),
         )
         return True
 
@@ -2644,6 +2748,9 @@ class WizStockBarcodesPicking(models.TransientModel):
                 "error", self.env._("No product addition is awaiting confirmation.")
             )
             return False
+        if self.product_id and self.product_id.tracking == "none":
+            # Quantity-tracked outside product: add one unit and pick it.
+            return self.action_force_add(product_id=self.product_id.id)
         return self._confirm_new_product_lot()
 
     def action_cancel_new_product(self):
@@ -3300,15 +3407,46 @@ class WizStockBarcodesPicking(models.TransientModel):
 
         Refused when the operation type forbids over-picking, so a stale
         button or a direct RPC call cannot bypass the policy.
+
+        Two pending flows land here:
+          - a row quantity add blocked by the 'warn' policy
+            (``pending_add``): re-apply the exact row target with force;
+          - the legacy scan flow (``visible_force_done`` without
+            ``pending_add``): confirm the scanned quantity.
         """
+        self.ensure_one()
         if self._get_excess_qty_policy() == "forbid":
             self._set_message(
                 "error",
                 self.env._("Over-picking is forbidden for this operation type."),
             )
             self.visible_force_done = False
+            self.pending_add = False
             return False
+        if self.pending_add:
+            return self._apply_pending_add()
         return self.with_context(force_create_move=True).action_confirm()
+
+    def _apply_pending_add(self):
+        """Apply the row quantity add blocked by the 'warn' policy."""
+        self.ensure_one()
+        pending = self.pending_add or {}
+        self.pending_add = False
+        self.visible_force_done = False
+        move = self.picking_id.move_ids.filtered(
+            lambda candidate: candidate.id == pending.get("move_id")
+        )
+        if not move:
+            self._set_message("error", self.env._("Line not found."))
+            return False
+        if not self.set_active_move(move.id):
+            return False
+        return self._set_untracked_move_qty(
+            move,
+            float(pending.get("qty") or 0.0),
+            pending.get("package_id") or False,
+            force=True,
+        )
 
     def action_consume_by_demand(self):
         """One-click consume the full demand of the active/non-tracked
@@ -3777,6 +3915,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("error", self.env._("Quantity must be positive"))
             return False
         move = self._create_picking_move(product, self.product_qty)
+        added_qty = self.product_qty
         # Set product context so _process_stock_move_line finds the move
         self.product_id = product
         self.product_uom_id = self.product_uom_id or product.uom_id
@@ -3785,11 +3924,12 @@ class WizStockBarcodesPicking(models.TransientModel):
         if move_dic:
             self.visible_force_add = False
             # _clean_values calls _set_message_step which overwrites
-            # custom messages, so set success AFTER it.
+            # custom messages, so set success AFTER it. It also resets
+            # product_qty, hence the captured ``added_qty``.
             self._clean_values()
             self._set_message(
                 "success",
-                self.env._("Added & picked: %(prod)s x%(qty)s", **{"prod": product.name, "qty": self.product_qty}),
+                self.env._("Added & picked: %(prod)s x%(qty)s", **{"prod": product.name, "qty": added_qty}),
             )
             return move_dic
         return False
@@ -3952,7 +4092,7 @@ class WizStockBarcodesPicking(models.TransientModel):
             lambda line: (line.result_package_id.id or False) == package_id
         )
 
-    def _set_untracked_move_qty(self, move, qty, package_id=None):
+    def _set_untracked_move_qty(self, move, qty, package_id=None, force=False):
         """SET the total picked quantity of one non-tracked row.
 
         The quantity rows of the scan view show one aggregate "picked"
@@ -4023,10 +4163,22 @@ class WizStockBarcodesPicking(models.TransientModel):
                     ),
                 )
                 return False
-            if policy == "warn":
+            if policy == "warn" and not force:
+                # Remember the blocked target so the footer force button
+                # can apply it once the operator confirms. 'forbid' above
+                # is never bypassed, even with force.
+                self.pending_add = {
+                    "move_id": move.id,
+                    "qty": qty,
+                    "package_id": package_id or False,
+                }
+                self.visible_force_done = True
                 self._set_message(
                     "more_match",
-                    self.env._("Quantity exceeds demand (max: %s)", max_quantity),
+                    self.env._(
+                        "Quantity exceeds demand (max: %s). Confirm to force.",
+                        max_quantity,
+                    ),
                 )
                 return False
         delta = qty - sum(picked_lines.mapped("quantity"))
@@ -4402,5 +4554,6 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.qty_available = 0.0
         self.visible_force_done = False
         self.visible_force_add = False
+        self.pending_add = False
         self.step = self._step_index("product")
         self._set_message_step()

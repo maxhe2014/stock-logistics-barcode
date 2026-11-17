@@ -378,10 +378,13 @@
     .o_scan_hintbar {
         margin: 6px 10px 0;    // 上方与扫码行 gap:5px，左右对齐按钮 padding
         min-height: 28px;
+        // 内容多（多行/换行）时按内容增高，不被列表/页面挤压
+        flex: 0 0 auto;
         box-sizing: border-box;
         border: 1px solid var(--scan-hint-border);
         border-radius: 6px;
-        padding: 3px 10px;
+        // 上下留出与行高匹配的填充（3 行及以上不贴边）
+        padding: 6px 10px;
         background-color: var(--scan-hint-bg);
         color: var(--scan-hint-fg);
         font-size: 12px;
