@@ -104,6 +104,11 @@ export class PickingScanApp extends Component {
         this.state = useState({
             message: "",
             message_type: "info",
+            moreMenuOpen: false,
+            expandedRowKey: false,
+            splitDialogOpen: false,
+            splitPackages: [],
+            editLine: false,
             picking_id: false,
             picking_name: "",
             picking_state: "",
@@ -145,6 +150,8 @@ export class PickingScanApp extends Component {
             draftReservedLotQty: "",
             // Composite row_key:lot_id kept highlighted until the next scan.
             recentScanLotKey: "",
+            // 每行最后一次扫码的批次 id（收起时头部优先显示它）
+            lastScannedLotByRow: {},
             // Package rename inline editor (AutoComplete with existing names)
             editingPackageMoveId: false,
             editingPackageId: false,
@@ -178,9 +185,12 @@ export class PickingScanApp extends Component {
             if (!container) {
                 return;
             }
-            const lotKey = `${target.rowKey}:${target.lotId}`;
+            // v4 rows are keyed by move id; the wizard's move row_key is a
+            // composite (id_package_location), so translate before lookup.
+            const rowKey = target.moveId ? String(target.moveId) : target.rowKey;
+            const lotKey = `${rowKey}:${target.lotId}`;
             const el = container.querySelector(`[data-scan-lot="${lotKey}"]`)
-                || container.querySelector(`[data-scan-row="${target.rowKey}"]`);
+                || container.querySelector(`[data-scan-row="${rowKey}"]`);
             if (!el) {
                 return;
             }
@@ -331,13 +341,22 @@ export class PickingScanApp extends Component {
                 mv.pickedLots = mv.pickedLots.filter((lot) => lot.id !== scannedLot.id);
                 mv.pickedLots.push(scannedLot);
                 mv.latest_lot_id = scannedLot.id;
-                scannedTarget = { rowKey: mv.row_key, lotId: scannedLot.id };
+                scannedTarget = {
+                    rowKey: mv.row_key,
+                    moveId: mv.id,
+                    lotId: scannedLot.id,
+                };
                 break;
             }
             if (scannedTarget) {
                 this._pendingScanTarget = scannedTarget;
                 // 高亮一直保留，直到下一次扫描把它清掉 / 换成新的行。
-                this.state.recentScanLotKey = `${scannedTarget.rowKey}:${scannedTarget.lotId}`;
+                // v4 模板以 move id 作为行键（state.rows[].row_key）。
+                this.state.recentScanLotKey = `${scannedTarget.moveId}:${scannedTarget.lotId}`;
+                this.state.lastScannedLotByRow = {
+                    ...this.state.lastScannedLotByRow,
+                    [String(scannedTarget.moveId)]: scannedTarget.lotId,
+                };
             }
             // Remember the barcode when it was not found, so the
             // operator can force-add it. Clear on any other outcome.
@@ -1055,6 +1074,311 @@ export class PickingScanApp extends Component {
             "action_put_in_pack",
             _t("Put in Pack")
         );
+    }
+
+    /**
+     * Toggle the one-shot pack intent: the next package scan binds the
+     * unpacked picked lines instead of picking the package as a whole.
+     */
+    onSetPackIntent() {
+        return this._callAction(
+            "action_set_pack_intent",
+            _t("Pack intent")
+        );
+    }
+
+    /**
+     * Confirm picking a serial whose reservation lives in another transfer.
+     */
+    onConfirmCrossOrder() {
+        return this._callAction(
+            "action_confirm_cross_order_pick",
+            _t("Confirm cross-order pick")
+        );
+    }
+
+    /** Open the row editor for one lot line (quantity/lot/packages). */
+    onOpenLineEditor(lot) {
+        const lineId = (lot.line_ids || [])[0] || false;
+        if (!lineId) {
+            return;
+        }
+        this.state.editLine = {
+            lineId: lineId,
+            qty: lot.quantity || 0,
+            lotName: lot.name || "",
+            packageFrom: lot.package_from || "",
+            packageTo: lot.package_to || "",
+            serial: false,
+        };
+    }
+
+    onCloseLineEditor() {
+        this.state.editLine = false;
+    }
+
+    /** Save the row editor through action_edit_move_line. */
+    async onSaveLineEditor() {
+        const edit = this.state.editLine;
+        if (!edit || !edit.lineId || this.state.scanning || !this.wizId) {
+            return;
+        }
+        const qty = Number.isNaN(parseFloat(edit.qty))
+            ? null
+            : parseFloat(edit.qty);
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_edit_move_line",
+                [
+                    [this.wizId],
+                    edit.lineId,
+                    qty,
+                    edit.lotName || false,
+                    edit.packageFrom || false,
+                    edit.packageTo || false,
+                ]
+            );
+            this.state.editLine = false;
+            await this._handleActionResult(res, _t("Edit line"));
+        } catch (err) {
+            this.notification.add(
+                _t("Edit line failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /** Collapse/expand the lot list of a product row. */
+    onToggleRowLots(rowKey) {
+        this.state.expandedRowKey =
+            this.state.expandedRowKey === rowKey ? false : rowKey;
+    }
+
+    /** Is the lot dropdown of this row expanded? */
+    isRowExpanded(row) {
+        return this.state.expandedRowKey === row.row_key;
+    }
+
+    /**
+     * Lot shown in the collapsed header: the last lot scanned for this row,
+     * falling back to the last scanned lot globally, then a picked lot, then
+     * the first one.
+     */
+    headerLot(row) {
+        const lots = row.lots || [];
+        if (!lots.length) {
+            return false;
+        }
+        const lastId = this.state.lastScannedLotByRow[row.row_key];
+        if (lastId) {
+            const hit = lots.find((lot) => lot.id === lastId);
+            if (hit) {
+                return hit;
+            }
+        }
+        const recentKey = this.state.recentScanLotKey;
+        if (recentKey && recentKey.startsWith(`${row.row_key}:`)) {
+            const lotId = Number(recentKey.slice(row.row_key.length + 1));
+            const hit = lots.find((lot) => lot.id === lotId);
+            if (hit) {
+                return hit;
+            }
+        }
+        return lots.find((lot) => lot.picked) || lots[0];
+    }
+
+    /** Edit the quantity of one picked lot line. */
+    async onEditLotQtyV4(lineId, currentQty) {
+        if (this.state.scanning || !this.wizId || !lineId) {
+            return;
+        }
+        const value = window.prompt(_t("Quantity"), currentQty || 0);
+        if (value === null) {
+            return;
+        }
+        const qty = parseFloat(value);
+        if (Number.isNaN(qty) || qty <= 0) {
+            this.notification.add(_t("Please enter a quantity"), {
+                type: "danger",
+            });
+            this._playAlert();
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_edit_move_line_qty",
+                [[this.wizId], lineId, qty]
+            );
+            await this._handleActionResult(res, _t("Edit quantity"));
+        } catch (err) {
+            this.notification.add(
+                _t("Edit quantity failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /** Translation helper for templates (QWeb has no global _t). */
+    tr(text) {
+        return _t(text);
+    }
+
+    /** Toggle the "more" action sheet (design: 更多…). */
+    onToggleMoreMenu() {
+        this.state.moreMenuOpen = !this.state.moreMenuOpen;
+    }
+
+    /** Back to the direction default picking mode. */
+    onExitScanMode() {
+        this.state.moreMenuOpen = false;
+        return this._callAction(
+            "action_exit_scan_mode",
+            _t("Return to picking mode")
+        );
+    }
+
+    onStartSplitScan() {
+        this.state.moreMenuOpen = false;
+        return this._setScanMode("split_scan");
+    }
+
+    onStartUnclaimScan() {
+        this.state.moreMenuOpen = false;
+        return this._setScanMode("unclaim_scan");
+    }
+
+    /** Enter one of the non-default scan modes. */
+    async _setScanMode(mode) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_set_scan_mode",
+                [[this.wizId], mode]
+            );
+            await this._handleActionResult(res, _t("Scan mode"));
+        } catch (err) {
+            this.notification.add(
+                _t("Scan mode failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
+    }
+
+    /** Split dialog: list the packages used by this transfer. */
+    async onOpenSplitDialog() {
+        this.state.moreMenuOpen = false;
+        if (!this.wizId) {
+            return;
+        }
+        try {
+            this.state.splitPackages = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "get_picking_packages",
+                [[this.wizId]]
+            );
+            this.state.splitDialogOpen = true;
+        } catch (err) {
+            this.notification.add(
+                _t("Could not load packages: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+        }
+    }
+
+    onCloseSplitDialog() {
+        this.state.splitDialogOpen = false;
+        this.state.splitPackages = [];
+    }
+
+    /** Split dialog: drop the chosen package from every line. */
+    async onConfirmRemovePackage(packageId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        if (!window.confirm(
+            _t("Remove this package from every line of the transfer?")
+        )) {
+            return;
+        }
+        this.state.splitDialogOpen = false;
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_remove_package",
+                [[this.wizId], packageId]
+            );
+            await this._handleActionResult(res, _t("Remove package"));
+        } catch (err) {
+            this.notification.add(
+                _t("Remove package failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+            this.state.splitPackages = [];
+        }
+    }
+
+    /**
+     * Undo a whole-package scan: the package lines go back to not picked.
+     */
+    async onUndoPackageScan(packageId) {
+        if (this.state.scanning || !this.wizId) {
+            return;
+        }
+        if (!window.confirm(
+            _t("Undo this package scan? Its lines go back to not picked.")
+        )) {
+            return;
+        }
+        this.state.scanning = true;
+        try {
+            const res = await this.orm.call(
+                "wiz.stock.barcodes.picking",
+                "action_undo_package_scan",
+                [[this.wizId], packageId]
+            );
+            await this._handleActionResult(res, "Undo package scan");
+        } catch (err) {
+            this.notification.add(
+                _t("Undo failed: %(err)s", {
+                    err: err?.message || String(err),
+                }),
+                { type: "danger" }
+            );
+            this._playAlert();
+        } finally {
+            this.state.scanning = false;
+        }
     }
 
     /**

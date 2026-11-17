@@ -3,20 +3,66 @@
 // (driven by the web_dark_mode module / user preference, not the OS).
 
 .o_picking_scan_app {
-    --scan-page: #0B0B0B;
-    --scan-card: #424346;
+    --scan-page: #161D20;
+    --scan-card: #48525C;
+    --scan-frame: #3B4543;
     --scan-text: #FFFFFF;
-    --scan-text-2: #FFFFFF;
-    // 信息框：深色下非错误框先铺 #404144，再叠青/绿
-    --scan-hint-bg: #38555B;
-    --scan-hint-fg: #FFFFFF;
-    --scan-hint-shadow: rgba(22, 163, 181, 0.3);
-    --scan-ok-bg: #66B883;
-    --scan-ok-fg: #FFFFFF;
-    --scan-ok-border: rgba(133, 250, 158, 0.8);
+    --scan-text-2: #A4A5A6;
+    --scan-row-bg: rgba(37, 77, 195, 0.25);
+    --scan-fold-bg: rgba(37, 77, 195, 0.4);
+    --scan-hint-bg: #FFFFFF;
+    --scan-hint-fg: #254DC3;
+    --scan-hint-border: transparent;
+    --scan-hint-shadow: transparent;
+    --scan-ok-bg: #66E7B0;
+    --scan-ok-fg: #000000;
+    --scan-ok-border: transparent;
+    --scan-danger-bg: #F0315B;
+    --scan-danger-fg: #FFFFFF;
+    --scan-key-bg: #161D20;
+    --scan-key-fg: #FFFFFF;
+    --scan-key-shadow: #0B0F11;
+    --scan-key-light: #2A3339;
+    --scan-group: #161D20;
+    --scan-lot-bg: #404144;
+    --scan-green: #4C7BD9;
+    --scan-purple: #8E82B5;
+    --scan-hl: rgba(76, 123, 217, 0.5);
+
+    // 抬头图标：暗色下反白（返回/源单据），齿轮换白色版本
+    .o_scan_back_icon:not(.o_scan_icon_pressed),
+    .o_scan_src_icon {
+        filter: invert(1);
+    }
+    .o_scan_topbar .o_cp_action_menus button,
+    .o_scan_scanrow .o_cp_action_menus button,
+    .o_scan_topbar .o_cp_action_menus button:hover,
+    .o_scan_scanrow .o_cp_action_menus button:hover,
+    .o_scan_topbar .o_cp_action_menus button:focus,
+    .o_scan_scanrow .o_cp_action_menus button:focus,
+    .o_scan_topbar .o_cp_action_menus button:focus-visible,
+    .o_scan_scanrow .o_cp_action_menus button:focus-visible,
+    .o_scan_topbar .o_cp_action_menus button.show,
+    .o_scan_scanrow .o_cp_action_menus button.show {
+        background-image: url('/stock_barcodes_picking/static/src/img/top_gear_light.svg') !important;
+    }
+
+    // 产品名称卡：未选中白色、选中蓝色（与「新拟态」组件一致）
+    .o_scan_prod_box {
+        color: #FFFFFF;
+        i {
+            color: #FFFFFF;
+        }
+    }
+    .o_scan_row.is-selected .o_scan_prod_box {
+        color: #8FA6E8;
+        i {
+            color: #8FA6E8;
+        }
+    }
 
     .o_scan_card.is-selected > .o_scan_card_head {
-        background: #404144;
-        box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.9) inset;
+        background: #3F4A54;
+        box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.6) inset;
     }
 }

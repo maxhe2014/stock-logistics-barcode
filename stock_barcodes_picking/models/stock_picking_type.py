@@ -94,3 +94,23 @@ class PickingType(models.Model):
              "before the transfer can be validated. (Requires 'After a Group "
              "of Products' or 'After Each Product'.)",
     )
+
+    barcode_cross_order_policy = fields.Selection(
+        string="Cross-Transfer Serial Policy",
+        selection=[
+            ("forbid", "Forbid"),
+            ("warn", "Warn and Require Confirmation"),
+            ("allow", "Allow"),
+        ],
+        default="warn",
+        required=True,
+        help="What scanning does when the scanned serial number is still "
+             "reserved by another transfer:\n"
+             "- Forbid: reject the scan (strictest, prevents double "
+             "shipping).\n"
+             "- Warn and Require Confirmation: show which transfer holds "
+             "the reservation and pick it only after the operator confirms; "
+             "confirming releases that transfer's reservation, like Odoo "
+             "core does on validation.\n"
+             "- Allow: pick it without asking (closest to native Odoo).",
+    )

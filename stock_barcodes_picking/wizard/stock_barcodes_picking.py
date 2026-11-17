@@ -105,6 +105,35 @@ class WizStockBarcodesPicking(models.TransientModel):
         string="Force Add",
         help="Show the 'Force Add' button to move a product not in the picking",
     )
+    cross_order_pending = fields.Boolean(
+        help="A serial scan was blocked because another transfer still "
+             "reserves it; the operator may confirm to pick it anyway.",
+    )
+    scan_mode = fields.Selection(
+        selection=[
+            ("default", "Pick"),
+            ("pack", "Pack into package"),
+            ("split_scan", "Remove package by scanning"),
+            ("unclaim_scan", "Unclaim by scanning"),
+        ],
+        default="default",
+        help="What a scan means right now. 'default' picks products (a "
+             "package barcode picks the whole package), 'pack' binds scanned "
+             "products to a package, 'split_scan' removes the package from "
+             "the scanned product/package, 'unclaim_scan' sets the scanned "
+             "lines back to not picked. Empty (NULL) is treated as "
+             "'default': packages are optional and transfers without any "
+             "package must keep working.",
+    )
+    package_scan_intent = fields.Selection(
+        selection=[
+            ("take", "Whole package"),
+            ("pack", "Pack into package"),
+        ],
+        compute="_compute_package_scan_intent",
+        help="Compatibility mirror of scan_mode kept for the pre-v4 client "
+             "action: 'pack' while scan_mode is 'pack', 'take' otherwise.",
+    )
     qty_available = fields.Float(
         string="Available", digits="Product Unit of Measure", readonly=True,
     )
@@ -149,6 +178,81 @@ class WizStockBarcodesPicking(models.TransientModel):
     )
 
     # --- Scan steps ---
+    def _get_scan_rows_v4(self):
+        """Row model for the v4 client action: one row per move.
+
+        Each lot carries its own package chip (source > destination),
+        which is what the new design shows under the lot selector.
+        Kept alongside move_ids so the previous client action still
+        renders while the frontend is migrated.
+        """
+        self.ensure_one()
+        picking = self.picking_id
+        if not picking:
+            return []
+        optional_scan = (
+            picking.picking_type_id.barcode_lot_scan_policy == "optional"
+        )
+        rows = []
+        for move in picking.move_ids.filtered(
+            lambda m: m.state not in ("done", "cancel")
+        ):
+            lines = move.move_line_ids.sorted(lambda l: l.id)
+            if not lines and not move.product_uom_qty:
+                # Placeholder move with neither demand nor lines: nothing
+                # to show or scan, skip it.
+                continue
+            picked_lines = lines.filtered("picked")
+            demand = move.product_uom_qty
+            if not demand:
+                demand = sum(lines.mapped("quantity"))
+            lots_by_key = {}
+            for line in lines:
+                key = (line.lot_id.id or False, line.picked)
+                entry = lots_by_key.get(key)
+                if not entry:
+                    entry = {
+                        "id": line.lot_id.id or False,
+                        "name": line.lot_id.name or line.lot_name or "",
+                        "picked": line.picked,
+                        "quantity": 0.0,
+                        "reserved_quantity": 0.0,
+                        "package_from": line.package_id.name or "",
+                        "package_to": line.result_package_id.name or "",
+                        "demand_qty": 0.0,
+                        "show_add": optional_scan and not line.picked,
+                        "line_ids": [],
+                    }
+                    lots_by_key[key] = entry
+                if line.picked:
+                    entry["quantity"] += line.quantity
+                else:
+                    entry["reserved_quantity"] += line.quantity
+                entry["demand_qty"] = (
+                    entry["quantity"] + entry["reserved_quantity"]
+                )
+                entry["line_ids"].append(line.id)
+                if not entry["package_from"] and line.package_id:
+                    entry["package_from"] = line.package_id.name
+                if not entry["package_to"] and line.result_package_id:
+                    entry["package_to"] = line.result_package_id.name
+            rows.append({
+                "row_key": str(move.id),
+                "move_id": move.id,
+                "product_id": move.product_id.id,
+                "product_name": move.product_id.display_name,
+                "tracking": move.product_id.tracking,
+                "location_name": move.location_id.display_name,
+                "location_dest_name": move.location_dest_id.display_name,
+                "demand_qty": demand,
+                "picked_qty": sum(picked_lines.mapped("quantity")),
+                "uom_name": move.product_uom.name,
+                "active": self.active_move_id.id == move.id,
+                "editable": True,
+                "lots": list(lots_by_key.values()),
+            })
+        return rows
+
     def _get_scan_steps(self):
         """Current picking type's ordered scan steps.
 
@@ -239,7 +343,13 @@ class WizStockBarcodesPicking(models.TransientModel):
             moves = rec.picking_id.move_ids.filtered(
                 lambda m: m.state not in ("done", "cancel")
             )
-            rec.total_demand = sum(m.product_uom_qty for m in moves)
+            demand = sum(m.product_uom_qty for m in moves)
+            if not demand:
+                # Package-driven transfers carry the quantity on the move
+                # lines (product_uom_qty stays 0), otherwise the progress
+                # would read 0/0 and the operator sees no target.
+                demand = sum(moves.move_line_ids.mapped("quantity"))
+            rec.total_demand = demand
             # One read of the picking's lines (instead of one per move)
             # keeps this cheap on large transfers.
             active_move_ids = set(moves.ids)
@@ -266,6 +376,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         if not self.picking_id:
             self.step = 0
             return
+        self.scan_mode = self._default_scan_mode()
         if self.barcode_scan_source_location:
             self.step = self._step_index("location")
             # location_id stays False — the operator MUST scan the source
@@ -393,6 +504,8 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.active_move_id = False
         self.visible_force_done = False
         self.visible_force_add = False
+        self.scan_mode = self._default_scan_mode()
+        self.cross_order_pending = False
         self.barcode = False
         self.res_model_id = self.env.ref("stock.model_stock_picking").id
         self.res_id = new_picking.id
@@ -435,8 +548,6 @@ class WizStockBarcodesPicking(models.TransientModel):
         self.invalidate_recordset()
         picking = self.picking_id
         picking.invalidate_recordset()
-        # 直接 print 到 stderr（不依赖 logging 配置），确保能在日志里看到
-        print(f"[SCAN_STATE] wiz={self.id} picking={picking.name}({picking.id}) picking.move_ids={len(picking.move_ids)}", flush=True)
         # Step labels are built here (not as a class attribute) so _() is
         # evaluated at request time under the correct lang context. Unknown
         # keys fall back to the raw key string (no default label) so a
@@ -535,8 +646,13 @@ class WizStockBarcodesPicking(models.TransientModel):
             tracking = product_info_by_id.get(
                 mv.product_id.id, ("", "none")
             )[1]
-            for l in picked_lines:
-                pkg_id = l.result_package_id.id or False
+            grouped_lines = move_lines.filtered(
+                lambda l: l.picked or l.package_id or l.result_package_id
+            ).sorted(key=lambda l: l.id)
+            for l in grouped_lines:
+                pkg_id = (
+                    l.result_package_id.id or l.package_id.id or False
+                )
                 pkg_name = package_name_by_id.get(pkg_id, "")
                 # Serial-tracked moves stay on ONE card per package: each
                 # serial row shows its own 从/至 inside the card body
@@ -560,10 +676,14 @@ class WizStockBarcodesPicking(models.TransientModel):
             # row for what is still outside any package (nothing picked yet),
             # so the operator sees the remainder as its own row instead of
             # losing it behind the package rows.
+            has_unpacked = any(
+                not (l.package_id or l.result_package_id) for l in move_lines
+            )
             if (
                 has_packaged
                 and not any(not k[0] for k in package_groups)
                 and picked_total < mv.product_uom_qty
+                and has_unpacked
             ):
                 package_groups[(False, "", default_loc_id, default_loc_name)] = []
             packed_picked = sum(
@@ -577,14 +697,18 @@ class WizStockBarcodesPicking(models.TransientModel):
                 for l in lines:
                     if not l.lot_id:
                         continue
-                    lot_key = (l.lot_id.id, True)
+                    lot_key = (l.lot_id.id, l.picked)
                     if lot_key not in lots_by_key:
                         lots_by_key[lot_key] = {
                             "id": l.lot_id.id,
-                            "key": "%s_picked" % l.lot_id.id,
+                            "key": "%s_%s" % (
+                                l.lot_id.id,
+                                "picked" if l.picked else "reserved",
+                            ),
                             "name": lot_name_by_id.get(l.lot_id.id, ""),
-                            "picked": True,
+                            "picked": l.picked,
                             "picked_quantity": 0.0,
+                            "reserved_quantity": 0.0,
                             # Per-lot 从/至: shown inside the serial row when
                             # one card mixes serials from different locations.
                             "location_name": location_name_by_id.get(
@@ -600,7 +724,10 @@ class WizStockBarcodesPicking(models.TransientModel):
                             # first line matching move + lot.
                             "lines": [],
                         }
-                    lots_by_key[lot_key]["picked_quantity"] += l.quantity
+                    if l.picked:
+                        lots_by_key[lot_key]["picked_quantity"] += l.quantity
+                    else:
+                        lots_by_key[lot_key]["reserved_quantity"] += l.quantity
                     lots_by_key[lot_key]["lines"].append({
                         "id": l.id,
                         "quantity": l.quantity,
@@ -615,6 +742,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 if show_reserved and not pkg_id:
                     reserved_lines = move_lines.filtered(
                         lambda l: not l.picked and l.lot_id
+                        and not (l.package_id or l.result_package_id)
                     ).sorted(key=lambda l: l.id)
                     for l in reserved_lines:
                         lot_key = (l.lot_id.id, False)
@@ -642,11 +770,12 @@ class WizStockBarcodesPicking(models.TransientModel):
                     l.lot_id.id for l in lines if l.lot_id
                 ]
                 show_package_label = bool(pkg_name) or (not pkg_id and has_packaged)
-                group_qty = sum(l.quantity for l in lines)
+                group_total = sum(l.quantity for l in lines)
+                group_qty = sum(l.quantity for l in lines if l.picked)
                 # Row-level demand: a package row shows the quantity it
                 # holds, the unpacked row shows the demand not packaged yet.
                 demand_qty = (
-                    group_qty if pkg_id
+                    group_total if pkg_id
                     else max(mv.product_uom_qty - packed_picked, 0.0)
                 )
                 # Row-level 至：take the first line's destination, falling
@@ -661,6 +790,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 # True when the serials inside this card come from / go to
                 # more than one location — then each serial row shows its own
                 # 从/至 and the card header hides the location line.
+                row_picked = bool(lines) and all(l.picked for l in lines)
                 lots_multi_location = len({
                     (lot.get("location_name", ""), lot.get("location_dest_name", ""))
                     for lot in lots
@@ -680,7 +810,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                         mv.product_id.id, ("", "none", "")
                     )[2],
                     "quantity": group_qty,
-                    "picked": picked_all,
+                    "picked": row_picked,
                     "tracking": product_info_by_id.get(
                         mv.product_id.id, ("", "none")
                     )[1],
@@ -735,6 +865,10 @@ class WizStockBarcodesPicking(models.TransientModel):
             "total_done": self.total_done or 0.0,
             "visible_force_done": bool(self.visible_force_done),
             "visible_force_add": bool(self.visible_force_add),
+            "scan_mode": self.scan_mode or "default",
+            "mode_hint": self._get_mode_hint(),
+            "package_scan_intent": self.package_scan_intent or "take",
+            "cross_order_pending": bool(self.cross_order_pending),
             "visible_switch_selector": bool(self.visible_switch_selector),
             "pending_switch_pickings": [
                 {"id": p.id, "name": p.name}
@@ -745,6 +879,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                 self.active_move_id.product_id.display_name or ""
                 if self.active_move_id else ""
             ),
+            "rows": self._get_scan_rows_v4(),
             "move_ids": moves,
             # Packaging config
             "show_put_in_pack": self.env.user.has_group("stock.group_tracking_lot"),
@@ -882,6 +1017,17 @@ class WizStockBarcodesPicking(models.TransientModel):
                 self.env._(
                     "Confirm or cancel adding the current product before "
                     "scanning another barcode."
+                ),
+            )
+            return True
+        mode = self.scan_mode or "default"
+        if mode in ("split_scan", "unclaim_scan"):
+            if self._scan_in_mode(barcode, mode):
+                return True
+            self._set_message(
+                "error",
+                self.env._(
+                    "Scan a product, lot/serial number or package in this mode."
                 ),
             )
             return True
@@ -1375,6 +1521,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         silently creating a lot that would only fail at validation time.
         """
         self.ensure_one()
+        # A package name must never be swallowed as a new lot: the package
+        # scanner runs after this one, so let the barcode fall through.
+        if self._is_package_barcode(barcode):
+            return False
         if not self.product_id and self.active_move_id:
             self.product_id = self.active_move_id.product_id
             self.product_uom_id = self.product_id.uom_id
@@ -1439,21 +1589,508 @@ class WizStockBarcodesPicking(models.TransientModel):
         self._confirm_scanned_lot()
         return True
 
-    def _scan_package(self, barcode):
-        """Scan a package barcode and bind unpacked picked lines to it.
+    def _find_package_by_barcode(self, barcode):
+        """Return the stock.package whose name equals ``barcode``, if any."""
+        if not barcode:
+            return self.env["stock.package"]
+        return self.env["stock.package"].search(
+            [("name", "=", barcode)], limit=1
+        )
 
-        Returns False (let other scanners try) when the barcode does
-        not match any ``stock.package`` name.
+    def _is_package_barcode(self, barcode):
+        """True when ``barcode`` is an existing package name.
+
+        Used by the lot scanner so a package name is never swallowed as a
+        new lot; the package scanner runs after it and must see the code.
+        """
+        return bool(self._find_package_by_barcode(barcode))
+
+    def _scan_package(self, barcode):
+        """Scan a package barcode: whole-package pick, or pack if intended.
+
+        The meaning is explicit, never guessed: by default a scanned
+        package is picked as a whole; after the operator pressed "Pack"
+        the very same scan binds the unpacked picked lines to it. Returns
+        False (let other scanners try) when no package matches.
         """
         self.ensure_one()
         if not self.picking_id:
             return False
-        package = self.env["stock.package"].search(
-            [("name", "=", barcode)], limit=1
-        )
+        package = self._find_package_by_barcode(barcode)
         if not package:
             return False
-        return self._bind_to_package(package)
+        if (self.scan_mode or "default") == "pack":
+            handled = self._bind_to_package(package)
+            if handled:
+                # Deliveries treat "pack" as a one-shot command; receipts
+                # keep packing package after package, so both fall back to
+                # the direction default instead of a hard-coded value.
+                self.scan_mode = self._default_scan_mode()
+            return handled
+        return self._process_package_scan(package)
+
+    def _process_package_scan(self, package):
+        """Pick every unpicked line of this transfer that sits in ``package``.
+
+        Whole-package pick: quantity and package assignment stay as they
+        are, only ``picked`` flips to True. Over-picking follows the
+        operation type policy and never writes when the policy forbids it.
+        """
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        lines = self.env["stock.move.line"].search([
+            ("picking_id", "=", self.picking_id.id),
+            ("state", "not in", ("done", "cancel")),
+            ("picked", "=", False),
+            "|",
+            ("package_id", "=", package.id),
+            ("result_package_id", "=", package.id),
+        ])
+        if not lines:
+            return self._report_package_scan_empty(package)
+        # A line whose source package contradicts the scanned one is data
+        # corruption: skip it instead of silently repointing the package.
+        inconsistent = lines.filtered(
+            lambda line: line.package_id and line.package_id != package
+        )
+        lines -= inconsistent
+        if not lines:
+            return self._report_package_scan_empty(package)
+        if self._package_scan_exceeds_demand(lines):
+            policy = self._get_excess_qty_policy()
+            forced = bool(self.env.context.get("force_package_scan"))
+            if policy == "forbid" or (policy == "warn" and not forced):
+                self._set_message(
+                    "error" if policy == "forbid" else "more_match",
+                    self.env._(
+                        "Package %(pkg)s exceeds the remaining demand of "
+                        "this transfer.",
+                        pkg=package.name,
+                    ),
+                )
+                return True
+        lines.write({"picked": True, "result_package_id": package.id})
+        # Only fill the source package when the line has none: a different
+        # value means the goods were not physically in the scanned package.
+        lines.filtered(lambda line: not line.package_id).write({
+            "package_id": package.id,
+        })
+        self._set_message(
+            "success",
+            self.env._(
+                "Package %(pkg)s: %(count)s line(s) picked.",
+                pkg=package.name,
+                count=len(lines),
+            ),
+        )
+        return True
+
+    def _package_scan_exceeds_demand(self, lines):
+        """True when ``lines`` would push any move past its demand."""
+        self.ensure_one()
+        for move in lines.move_id:
+            if move.product_uom_qty <= 0:
+                # No demand to compare against (package-only transfer).
+                continue
+            move_lines = lines.filtered(lambda line: line.move_id == move)
+            picked_elsewhere = sum(
+                move.move_line_ids.filtered(lambda l: l.picked).mapped("quantity")
+            )
+            remaining = move.product_uom_qty - picked_elsewhere
+            package_qty = sum(move_lines.mapped("quantity"))
+            if float_compare(
+                package_qty,
+                remaining,
+                precision_rounding=move.product_id.uom_id.rounding,
+            ) > 0:
+                return True
+        return False
+
+    def _report_package_scan_empty(self, package):
+        """Explain why a package scan produced nothing, then stop."""
+        other_lines = self.env["stock.move.line"].search_count([
+            ("state", "not in", ("done", "cancel")),
+            "|",
+            ("package_id", "=", package.id),
+            ("result_package_id", "=", package.id),
+        ])
+        if not package.quant_ids and not other_lines:
+            self._set_message(
+                "error",
+                self.env._("Package %(pkg)s is empty.", pkg=package.name),
+            )
+        else:
+            self._set_message(
+                "error",
+                self.env._(
+                    "Package %(pkg)s holds no product for this transfer. "
+                    "Press 'Pack' to put products into it.",
+                    pkg=package.name,
+                ),
+            )
+        return True
+
+    def get_picking_packages(self):
+        """Packages used by this transfer, for the split dialog."""
+        self.ensure_one()
+        if not self.picking_id:
+            return []
+        lines = self.env["stock.move.line"].search([
+            ("picking_id", "=", self.picking_id.id),
+            ("state", "not in", ("done", "cancel")),
+            ("result_package_id", "!=", False),
+        ])
+        packages = {}
+        for line in lines:
+            package = line.result_package_id
+            entry = packages.setdefault(package.id, {
+                "id": package.id,
+                "name": package.name,
+                "line_count": 0,
+                "quantity": 0.0,
+            })
+            entry["line_count"] += 1
+            entry["quantity"] += line.quantity
+        return sorted(packages.values(), key=lambda item: item["name"])
+
+    def action_set_pack_intent(self):
+        """Toggle the one-shot 'pack into package' intent."""
+        self.ensure_one()
+        if not self.picking_id:
+            self._set_message("error", self.env._("No transfer selected"))
+            return False
+        if (self.scan_mode or "default") == "pack":
+            self.scan_mode = "default"
+            self._set_message(
+                "info",
+                self.env._(
+                    "Pack cancelled: scanning a package picks it as a whole."
+                ),
+            )
+        else:
+            self.scan_mode = "pack"
+            self._set_message(
+                "info",
+                self.env._("Pack intent: scan or select the target package."),
+            )
+        return True
+
+    def _get_mode_hint(self):
+        """Operator-facing description of the current scan mode."""
+        self.ensure_one()
+        return {
+            "default": self.env._(
+                "Scan a package to pick the whole package."
+            ),
+            "pack": self.env._(
+                "Packing: scan or select the target package."
+            ),
+            "split_scan": self.env._(
+                "Removing package: scan a product, lot/serial or package."
+            ),
+            "unclaim_scan": self.env._(
+                "Unclaiming: scan a product, lot/serial or package. "
+                "Reservations are kept."
+            ),
+        }.get(self.scan_mode or "default", "")
+
+    def action_set_scan_mode(self, mode):
+        """Switch the scan semantics (default/pack/split_scan/unclaim_scan)."""
+        self.ensure_one()
+        valid = [key for key, _label in self._fields["scan_mode"].selection]
+        if mode not in valid:
+            self._set_message("error", self.env._("Unknown scan mode."))
+            return False
+        self.scan_mode = mode
+        return True
+
+    def action_exit_scan_mode(self):
+        """Back to the normal picking mode, per transfer direction."""
+        self.ensure_one()
+        self.scan_mode = self._default_scan_mode()
+        return True
+
+    def action_remove_package(self, package_id):
+        """Split dialog: drop one package from every line of this transfer."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        package = self.env["stock.package"].browse(package_id)
+        if not package.exists():
+            self._set_message("error", self.env._("Package not found."))
+            return False
+        lines = self.env["stock.move.line"].search([
+            ("picking_id", "=", self.picking_id.id),
+            ("state", "not in", ("done", "cancel")),
+            ("result_package_id", "=", package.id),
+        ])
+        if not lines:
+            self._set_message(
+                "info",
+                self.env._(
+                    "Package %(pkg)s is not used by this transfer.",
+                    pkg=package.name,
+                ),
+            )
+            return True
+        lines.write({"result_package_id": False})
+        self._set_message(
+            "success",
+            self.env._(
+                "Package %(pkg)s removed from %(count)s line(s).",
+                pkg=package.name,
+                count=len(lines),
+            ),
+        )
+        return True
+
+    def _scan_in_mode(self, barcode, mode):
+        """Apply split_scan / unclaim_scan to whatever the barcode matches."""
+        self.ensure_one()
+        package = self._find_package_by_barcode(barcode)
+        if package:
+            lines = self.env["stock.move.line"].search([
+                ("picking_id", "=", self.picking_id.id),
+                ("state", "not in", ("done", "cancel")),
+                "|",
+                ("package_id", "=", package.id),
+                ("result_package_id", "=", package.id),
+            ])
+            return self._apply_mode_to_lines(lines, mode, package.name)
+        product = self.env["product.product"].search(
+            [("barcode", "=", barcode)], limit=1
+        )
+        if product:
+            lines = self.env["stock.move.line"].search([
+                ("picking_id", "=", self.picking_id.id),
+                ("state", "not in", ("done", "cancel")),
+                ("product_id", "=", product.id),
+            ])
+            return self._apply_mode_to_lines(lines, mode, product.display_name)
+        lot = self.env["stock.lot"].search(
+            [("name", "=", barcode)], limit=1
+        )
+        if lot:
+            lines = self.env["stock.move.line"].search([
+                ("picking_id", "=", self.picking_id.id),
+                ("state", "not in", ("done", "cancel")),
+                ("lot_id", "=", lot.id),
+            ])
+            return self._apply_mode_to_lines(lines, mode, lot.name)
+        return False
+
+    def _apply_mode_to_lines(self, lines, mode, label):
+        """Write the mode change on the matching lines and report it."""
+        self.ensure_one()
+        if mode == "split_scan":
+            lines = lines.filtered("result_package_id")
+            if not lines:
+                self._set_message(
+                    "info",
+                    self.env._(
+                        "%(label)s has no package to remove.", label=label
+                    ),
+                )
+                return True
+            lines.write({"result_package_id": False})
+            self._set_message(
+                "success",
+                self.env._(
+                    "Package removed from %(count)s line(s) of %(label)s.",
+                    count=len(lines),
+                    label=label,
+                ),
+            )
+            return True
+        lines = lines.filtered("picked")
+        if not lines:
+            self._set_message(
+                "info",
+                self.env._(
+                    "%(label)s has no picked line to unclaim.", label=label
+                ),
+            )
+            return True
+        lines.write({"picked": False})
+        self._set_message(
+            "success",
+            self.env._(
+                "Unclaimed %(count)s line(s) of %(label)s. Reservations kept.",
+                count=len(lines),
+                label=label,
+            ),
+        )
+        return True
+
+    def action_clear_pack_intent(self):
+        """Drop the pack intent without scanning anything."""
+        self.ensure_one()
+        self.scan_mode = "default"
+        return True
+
+    def action_confirm_cross_order_pick(self):
+        """Pick the serial anyway, releasing the other transfer's reservation.
+
+        Confirming mirrors native Odoo: core frees the other transfer's
+        reservation while validating this line.
+        """
+        self.ensure_one()
+        if not self.cross_order_pending:
+            self._set_message(
+                "error", self.env._("Nothing to confirm for this scan.")
+            )
+            return False
+        self.cross_order_pending = False
+        # The operator scanned only the serial (no product scan), so the
+        # wizard product may still be empty and the demand check would
+        # compare against 0. Derive both from the scanned lot.
+        if self.lot_id:
+            self.product_id = self.lot_id.product_id.id
+            self.lot_name = self.lot_id.name
+            if not self.product_qty or self.product_qty <= 0:
+                self.product_qty = 1.0
+        lot_quants = self._compute_qty_available()
+        forced = self.with_context(force_cross_order=True)
+        in_transfer = self.picking_id.move_ids.filtered(
+            lambda move: move.product_id == self.product_id
+            and move.state != "cancel"
+        )
+        if in_transfer:
+            return forced.action_confirm(lot_quants=lot_quants)
+        return forced._confirm_new_product_lot(lot_quants=lot_quants)
+
+    def action_split_package(
+        self,
+        package_id,
+        line_ids,
+        dest_mode="new",
+        dest_package_id=False,
+        dest_package_name=False,
+    ):
+        """Split whole lines out of a package (R1-R4 of the v3 design).
+
+        The lines stop going into ``package`` and start going into the
+        destination package (or loose). Only ``result_package_id`` moves:
+        the source quant/package is reconciled by core at validation, so
+        nothing physical is rewritten here. Picked lines are reset so the
+        operator re-scans them under the new package.
+
+        :param dest_mode: "new" (create), "loose" (no package) or
+            "existing" (``dest_package_id``).
+        """
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        package = self.env["stock.package"].browse(package_id)
+        if not package.exists():
+            self._set_message("error", self.env._("Package not found."))
+            return False
+        lines = self.env["stock.move.line"].browse(line_ids).exists()
+        if not lines:
+            self._set_message(
+                "error", self.env._("Select at least one line to split.")
+            )
+            return False
+        # R1: never touch another transfer's goods.
+        if lines.filtered(lambda line: line.picking_id != self.picking_id):
+            self._set_message(
+                "error",
+                self.env._(
+                    "Only products of this transfer can be split out of a "
+                    "package."
+                ),
+            )
+            return False
+        in_package = lines.filtered(
+            lambda line: package in (line.package_id | line.result_package_id)
+        )
+        if not in_package:
+            self._set_message(
+                "error",
+                self.env._(
+                    "None of the selected lines is in package %(pkg)s.",
+                    pkg=package.name,
+                ),
+            )
+            return False
+        # R2: destination.
+        if dest_mode == "existing":
+            dest = self.env["stock.package"].browse(dest_package_id)
+            if not dest.exists():
+                self._set_message(
+                    "error", self.env._("Destination package not found.")
+                )
+                return False
+        elif dest_mode == "new":
+            name = dest_package_name or self.env._(
+                "SPLIT-%(pkg)s", pkg=package.name
+            )
+            dest = self.env["stock.package"].create({"name": name})
+        else:
+            dest = self.env["stock.package"]
+        # R4: split lines go back to "not picked" so they are re-scanned.
+        reset_picked = in_package.filtered("picked")
+        in_package.write({
+            "result_package_id": dest.id or False,
+            "picked": False,
+        })
+        # R3: report when the source package no longer holds this
+        # transfer's lines.
+        # "Empty" means: this transfer no longer ships anything through
+        # the package. Source provenance (package_id) is left untouched.
+        remaining = self.env["stock.move.line"].search([
+            ("picking_id", "=", self.picking_id.id),
+            ("state", "not in", ("done", "cancel")),
+            ("result_package_id", "=", package.id),
+        ])
+        dest_label = dest.name if dest else self.env._("loose products")
+        self._set_message(
+            "success",
+            self.env._(
+                "Split %(count)s line(s) from %(pkg)s to %(dest)s."
+                "%(empty)s%(picked)s",
+                count=len(in_package),
+                pkg=package.name,
+                dest=dest_label,
+                empty=self.env._(" Package %(pkg)s is now empty.", pkg=package.name)
+                if not remaining
+                else "",
+                picked=self.env._(" %(count)s line(s) reset to not picked.",
+                                  count=len(reset_picked))
+                if reset_picked
+                else "",
+            ),
+        )
+        return True
+
+    def action_undo_package_scan(self, package_id):
+        """Undo a whole-package pick: picked back to False, package cleared."""
+        self.ensure_one()
+        if not self._check_selector_resolved():
+            return False
+        lines = self.env["stock.move.line"].search([
+            ("picking_id", "=", self.picking_id.id),
+            ("state", "not in", ("done", "cancel")),
+            ("picked", "=", True),
+            "|",
+            ("package_id", "=", package_id),
+            ("result_package_id", "=", package_id),
+        ])
+        if not lines:
+            self._set_message(
+                "info", self.env._("Nothing to undo in this package.")
+            )
+            return True
+        lines.write({"picked": False, "result_package_id": False})
+        self._set_message(
+            "info",
+            self.env._(
+                "Package scan undone: %(count)s line(s).", count=len(lines)
+            ),
+        )
+        return True
+
 
     def _bind_to_package(self, package):
         """Bind all picked-but-unpacked move lines to ``package``."""
@@ -1507,7 +2144,9 @@ class WizStockBarcodesPicking(models.TransientModel):
         lot_quants = self._compute_qty_available()
         error = self._get_lot_pick_error(lot, quants=lot_quants)
         if error:
-            self._set_message("error", error)
+            self._set_message(
+                "more_match" if self.cross_order_pending else "error", error
+            )
             return True
         if self._get_new_product_policy() == "warn":
             # Only wizard state is written before confirmation. The stock
@@ -1556,7 +2195,9 @@ class WizStockBarcodesPicking(models.TransientModel):
             return False
         error = self._get_lot_pick_error(lot, quants=lot_quants)
         if error:
-            self._set_message("error", error)
+            self._set_message(
+                "more_match" if self.cross_order_pending else "error", error
+            )
             return False
         result = self.with_context(
             allow_new_product_lot=True
@@ -1819,11 +2460,27 @@ class WizStockBarcodesPicking(models.TransientModel):
                 ("state", "not in", ("done", "cancel")),
             ])
             if other_lines:
+                pickings = ", ".join(other_lines.picking_id.mapped("name"))
+                policy = self._get_cross_order_policy()
+                forced = bool(self.env.context.get("force_cross_order"))
+                if policy == "allow" or (policy == "warn" and forced):
+                    self.cross_order_pending = False
+                    return False
+                if policy == "warn":
+                    self.cross_order_pending = True
+                    return self.env._(
+                        "Serial number %(sn)s is still reserved by another "
+                        "transfer (%(pickings)s). Confirm to pick it anyway: "
+                        "its reservation there will be released.",
+                        sn=lot.name,
+                        pickings=pickings,
+                    )
+                self.cross_order_pending = False
                 return self.env._(
                     "Serial number %(sn)s is reserved by another transfer "
                     "(%(pickings)s) and cannot be picked again.",
                     sn=lot.name,
-                    pickings=", ".join(other_lines.picking_id.mapped("name")),
+                    pickings=pickings,
                 )
         return False
 
@@ -1919,7 +2576,9 @@ class WizStockBarcodesPicking(models.TransientModel):
         ):
             error = self._get_lot_pick_error(self.lot_id, quants=lot_quants)
             if error:
-                self._set_message("error", error)
+                self._set_message(
+                    "more_match" if self.cross_order_pending else "error", error
+                )
                 return False
 
         # A serial can only be picked once per transfer. Without this the
@@ -1995,6 +2654,36 @@ class WizStockBarcodesPicking(models.TransientModel):
             if line.picked and line.product_id == product
         )
         return max(0.0, picked - demand)
+
+    def _default_scan_mode(self):
+        """Pick the scan mode that fits the transfer direction.
+
+        Receipts (incoming) build packages while scanning: the operator
+        scans the products first, then puts them into a package, so the
+        default mode there is "pack". Deliveries and internal transfers
+        move goods that are already packed, so they start in "default"
+        (a package barcode picks the whole package).
+        """
+        self.ensure_one()
+        if self.picking_id and self.picking_id.picking_type_code == "incoming":
+            return "pack"
+        return "default"
+
+    @api.depends("scan_mode")
+    def _compute_package_scan_intent(self):
+        """Mirror scan_mode for the pre-v4 client action."""
+        for rec in self:
+            rec.package_scan_intent = (
+                "pack" if rec.scan_mode == "pack" else "take"
+            )
+
+    def _get_cross_order_policy(self):
+        """Return how a serial reserved by another transfer is handled."""
+        self.ensure_one()
+        return (
+            self.picking_id.picking_type_id.barcode_cross_order_policy
+            or "warn"
+        )
 
     def _get_excess_qty_policy(self):
         """Return the over-picking policy of the transfer's operation type.
@@ -2356,6 +3045,7 @@ class WizStockBarcodesPicking(models.TransientModel):
                       "before validation.")
                 )
                 return False
+        self._normalize_zero_demand(picking)
         result = picking.button_validate()
         if isinstance(result, dict):
             # Crash-guard only: core _action_generate_backorder_wizard
@@ -2369,6 +3059,25 @@ class WizStockBarcodesPicking(models.TransientModel):
             return result
         # result is True (picking validated) or None/False (already done)
         return result
+
+    def _normalize_zero_demand(self, picking):
+        """Give package-only moves a demand before validating.
+
+        Transfers created from packages carry the quantity on their move
+        lines while the move demand stays 0. Core's backorder check skips
+        zero-demand moves, so validating such a transfer would silently
+        complete and drop every unpicked line. Mirroring the line quantity
+        into the demand lets core compute the shortage and ask for the
+        backorder the operation type is configured for.
+        """
+        self.ensure_one()
+        for move in picking.move_ids.filtered(
+            lambda m: m.state not in ("done", "cancel")
+            and not m.product_uom_qty
+        ):
+            quantity = sum(move.move_line_ids.mapped("quantity"))
+            if quantity:
+                move.product_uom_qty = quantity
 
     def switch_to_backorder_if_any(self):
         """After validating a picking that generated a backorder, switch
@@ -2802,6 +3511,79 @@ class WizStockBarcodesPicking(models.TransientModel):
                 qty=qty,
             ),
         )
+        return True
+
+    def action_edit_move_line(
+        self,
+        line_id,
+        qty=None,
+        lot_name=None,
+        package_name=None,
+        result_package_name=None,
+    ):
+        """Row editor: change quantity, lot/serial and packages of a line.
+
+        Only lines of the current transfer can be edited. Quantity goes
+        through the standalone quantity editor so the excess policy stays
+        in force; lot and package names are resolved (or created when the
+        operation type allows it) before writing.
+        """
+        self.ensure_one()
+        line = self.env["stock.move.line"].browse(line_id)
+        if (
+            not line.exists()
+            or line.picking_id != self.picking_id
+            or line.state in ("done", "cancel")
+        ):
+            self._set_message("error", self.env._("Line not found."))
+            return False
+        if qty is not None:
+            handled = self.action_edit_move_line_qty(line.id, qty)
+            if not handled:
+                return False
+            line = self.env["stock.move.line"].browse(line_id)
+        if lot_name is not None:
+            current = line.lot_id.name or line.lot_name or ""
+            if lot_name and lot_name != current:
+                lot = self.env["stock.lot"].search([
+                    ("name", "=", lot_name),
+                    ("product_id", "=", line.product_id.id),
+                ], limit=1)
+                if lot:
+                    line.write({"lot_id": lot.id, "lot_name": lot.name})
+                elif self.picking_id.picking_type_id.use_create_lots:
+                    lot = self.env["stock.lot"].create({
+                        "name": lot_name,
+                        "product_id": line.product_id.id,
+                        "company_id": line.company_id.id,
+                    })
+                    line.write({"lot_id": lot.id, "lot_name": lot.name})
+                else:
+                    self._set_message(
+                        "error",
+                        self.env._(
+                            "This operation type does not allow creating new lots.",
+                        ),
+                    )
+                    return False
+        for field_name, package_value in (
+            ("package_id", package_name),
+            ("result_package_id", result_package_name),
+        ):
+            if package_value is None:
+                continue
+            if not package_value:
+                line.write({field_name: False})
+                continue
+            package = self.env["stock.package"].search([
+                ("name", "=", package_value),
+            ], limit=1)
+            if not package:
+                package = self.env["stock.package"].create(
+                    {"name": package_value}
+                )
+            line.write({field_name: package.id})
+        self._set_message("success", self.env._("Line updated."))
         return True
 
     def action_edit_package_qty(self, move_id, package_id, qty, force=False):

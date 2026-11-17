@@ -1487,3 +1487,316 @@ msgstr ""
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 msgid "选择或创建产品"
 msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "New Package"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pack"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Packing…"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Choose…"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Confirm Pick"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pack the picked products into a package: scan or choose one"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Choose an existing package"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Undo package scan (lines go back to not picked)"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Undo this package scan? Its lines go back to not picked."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#, python-format
+msgid "Undo failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pack intent"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Confirm cross-order pick"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_cross_order_policy
+msgid "Cross-Transfer Serial Policy"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__package_scan_intent__take
+msgid "Whole package"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__package_scan_intent__pack
+msgid "Pack into package"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s: %(count)s line(s) picked."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s is empty."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s holds no product for this transfer. Press 'Pack' to put products into it."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Pack cancelled: scanning a package picks it as a whole."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Pack intent: scan or select the target package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Only products of this transfer can be split out of a package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "None of the selected lines is in package %(pkg)s."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Destination package not found."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Select at least one line to split."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package scan undone: %(count)s line(s)."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Nothing to undo in this package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Nothing to confirm for this scan."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Serial number %(sn)s is still reserved by another transfer (%(pickings)s). Confirm to pick it anyway: its reservation there will be released."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__scan_mode
+msgid "Scan Mode"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__scan_mode__default
+msgid "Pick"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__scan_mode__split_scan
+msgid "Remove package by scanning"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__scan_mode__unclaim_scan
+msgid "Unclaim by scanning"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Scan a package to pick the whole package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Packing: scan or select the target package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Removing package: scan a product, lot/serial or package."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Unclaiming: scan a product, lot/serial or package. Reservations are kept."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Unknown scan mode."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Scan a product, lot/serial number or package in this mode."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s is not used by this transfer."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s removed from %(count)s line(s)."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "%(label)s has no package to remove."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package removed from %(count)s line(s) of %(label)s."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "%(label)s has no picked line to unclaim."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Unclaimed %(count)s line(s) of %(label)s. Reservations kept."
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Return to picking mode"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Scan mode"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Scan mode failed: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Could not load packages: %(err)s"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove this package from every line of the transfer?"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove package"
+msgstr ""
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove package failed: %(err)s"
+msgstr ""
+

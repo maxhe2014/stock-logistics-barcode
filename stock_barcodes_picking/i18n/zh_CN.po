@@ -1511,3 +1511,315 @@ msgstr "产品已添加到调拔单 — 扫码即可拣货。"
 #: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
 msgid "选择或创建产品"
 msgstr "选择或创建产品"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "New Package"
+msgstr "新建包裹"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pack"
+msgstr "装包"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Packing…"
+msgstr "装包中…"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Choose…"
+msgstr "选包"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Confirm Pick"
+msgstr "确认拣货"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pack the picked products into a package: scan or choose one"
+msgstr "把已拣产品装入包裹：扫码或选择包裹"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Choose an existing package"
+msgstr "选择已有包裹"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Undo package scan (lines go back to not picked)"
+msgstr "撤销整包拣货（明细恢复为未拣）"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Undo this package scan? Its lines go back to not picked."
+msgstr "撤销本次整包拣货？相关明细将恢复为未拣。"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+#, python-format
+msgid "Undo failed: %(err)s"
+msgstr "撤销失败：%(err)s"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Pack intent"
+msgstr "装包意图"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Confirm cross-order pick"
+msgstr "确认跨单拣货"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_stock_picking_type__barcode_cross_order_policy
+msgid "Cross-Transfer Serial Policy"
+msgstr "跨单序列号占用策略"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__package_scan_intent__take
+msgid "Whole package"
+msgstr "整包拣货"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__package_scan_intent__pack
+msgid "Pack into package"
+msgstr "装入包裹"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s: %(count)s line(s) picked."
+msgstr "包裹 %(pkg)s：已拣 %(count)s 行。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s is empty."
+msgstr "包裹 %(pkg)s 是空的。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s holds no product for this transfer. Press 'Pack' to put products into it."
+msgstr "包裹 %(pkg)s 没有本单的产品。如需装包请点「装包」。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Pack cancelled: scanning a package picks it as a whole."
+msgstr "已取消装包：扫描包裹将整包拣货。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Pack intent: scan or select the target package."
+msgstr "装包中：扫描或选择目标包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Only products of this transfer can be split out of a package."
+msgstr "只能拆分本单的产品。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "None of the selected lines is in package %(pkg)s."
+msgstr "所选明细都不在包裹 %(pkg)s 中。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Destination package not found."
+msgstr "目标包裹不存在。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Select at least one line to split."
+msgstr "请至少选择一行要拆出的明细。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package scan undone: %(count)s line(s)."
+msgstr "已撤销整包拣货：%(count)s 行。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Nothing to undo in this package."
+msgstr "该包裹没有可撤销的拣货。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Nothing to confirm for this scan."
+msgstr "当前没有待确认的操作。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Serial number %(sn)s is still reserved by another transfer (%(pickings)s). Confirm to pick it anyway: its reservation there will be released."
+msgstr "序列号 %(sn)s 仍被其他单据（%(pickings)s）预留。确认后可拣，对方的预留将被释放。"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields,field_description:stock_barcodes_picking.field_wiz_stock_barcodes_picking__scan_mode
+msgid "Scan Mode"
+msgstr "扫码模式"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__scan_mode__default
+msgid "Pick"
+msgstr "拣货模式"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__scan_mode__split_scan
+msgid "Remove package by scanning"
+msgstr "扫描拆包模式"
+
+#. module: stock_barcodes_picking
+#: model:ir.model.fields.selection,name:stock_barcodes_picking.selection__wiz_stock_barcodes_picking__scan_mode__unclaim_scan
+msgid "Unclaim by scanning"
+msgstr "取消拣货模式"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Scan a package to pick the whole package."
+msgstr "扫描包裹即可整包拣货。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Packing: scan or select the target package."
+msgstr "装包中：扫描或选择目标包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Removing package: scan a product, lot/serial or package."
+msgstr "拆包中：扫描产品、批次/序列号或包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Unclaiming: scan a product, lot/serial or package. Reservations are kept."
+msgstr "取消拣货中：扫描产品、批次/序列号或包裹。预留保留。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Unknown scan mode."
+msgstr "未知的扫码模式。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+msgid "Scan a product, lot/serial number or package in this mode."
+msgstr "此模式下请扫描产品、批次/序列号或包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s is not used by this transfer."
+msgstr "包裹 %(pkg)s 未被本单使用。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package %(pkg)s removed from %(count)s line(s)."
+msgstr "已从 %(count)s 行移除包裹 %(pkg)s。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "%(label)s has no package to remove."
+msgstr "%(label)s 没有可移除的包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Package removed from %(count)s line(s) of %(label)s."
+msgstr "已从 %(label)s 的 %(count)s 行移除包裹。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "%(label)s has no picked line to unclaim."
+msgstr "%(label)s 没有可取消拣货的明细。"
+
+#. module: stock_barcodes_picking
+#. odoo-python
+#: code:addons/stock_barcodes_picking/wizard/stock_barcodes_picking.py:0
+#, python-format
+msgid "Unclaimed %(count)s line(s) of %(label)s. Reservations kept."
+msgstr "已取消 %(label)s 的 %(count)s 行拣货，预留保留。"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Return to picking mode"
+msgstr "返回拣货模式"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Scan mode"
+msgstr "扫码模式"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Scan mode failed: %(err)s"
+msgstr "扫码模式切换失败：%(err)s"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Could not load packages: %(err)s"
+msgstr "无法加载包裹：%(err)s"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove this package from every line of the transfer?"
+msgstr "从本单所有行移除此包裹？"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove package"
+msgstr "移除包裹"
+
+#. module: stock_barcodes_picking
+#. odoo-javascript
+#: code:addons/stock_barcodes_picking/static/src/picking_scan_app.esm.js:0
+msgid "Remove package failed: %(err)s"
+msgstr "移除包裹失败：%(err)s"

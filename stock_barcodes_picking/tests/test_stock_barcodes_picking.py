@@ -39,6 +39,10 @@ class TestStockBarcodesPicking(TransactionCase):
         # type must allow it (use_create_lots). Without this the scan
         # flow rejects unknown barcodes with "does not exist".
         cls.picking_type.use_create_lots = True
+        # The outgoing type is shared with the live database; a manual
+        # change in the UI (e.g. switching to optional lot scanning) must
+        # not make the suite depend on that drift.
+        cls.picking_type.barcode_lot_scan_policy = "mandatory"
 
         # Product without tracking
         cls.product_simple = cls.Product.create({
@@ -818,8 +822,16 @@ class TestStockBarcodesPicking(TransactionCase):
         rows = [
             m for m in wiz.get_scan_state()["move_ids"] if m["id"] == move.id
         ]
-        self.assertEqual(len(rows), 2)
+        # Demand (20) exceeds what is packed (9), so get_scan_state also
+        # emits the unpicked remainder as its own "unpacked" row (see the
+        # remainder branch: picked_total < product_uom_qty). Expect three:
+        # PKG-LOT-1, PKG-LOT-2 and the empty remainder row.
+        self.assertEqual(len(rows), 3)
         rows_by_package = {row["package_name"]: row for row in rows}
+        remainder = rows_by_package[""]
+        self.assertEqual(remainder["quantity"], 0.0)
+        self.assertEqual(remainder["demand_qty"], 11.0)
+        self.assertFalse(remainder["lots"])
         self.assertEqual(rows_by_package["PKG-LOT-1"]["quantity"], 5.0)
         self.assertEqual(rows_by_package["PKG-LOT-2"]["quantity"], 4.0)
         self.assertEqual(
@@ -1528,6 +1540,7 @@ class TestStockBarcodesPicking(TransactionCase):
 
     def test_scan_serial_reserved_by_other_transfer_rejected(self):
         """A serial reserved by another transfer is rejected at scan time."""
+        self.picking_type.barcode_cross_order_policy = "forbid"
         product = self._create_serial_product(
             "Serial Reserved", "PROD-SN-RESERVED"
         )
@@ -1739,6 +1752,7 @@ class TestStockBarcodesPicking(TransactionCase):
 
     def test_new_product_allow_rejects_serial_reserved_elsewhere(self):
         """An outside serial reserved by another transfer is not added."""
+        self.picking_type.barcode_cross_order_policy = "forbid"
         product, lot, picking, wiz = self._prepare_outside_serial_scan("allow")
         other_picking = self._create_out_picking(product)
         self.assertTrue(other_picking.move_line_ids.filtered(lambda l: l.lot_id == lot))
@@ -2320,3 +2334,693 @@ class TestStockBarcodesPicking(TransactionCase):
         )
         self.assertEqual(packed_line.quantity, 3.0)
 
+
+    # --- Whole-package scan, explicit intent (PACKAGE_SCAN_MODES v3) ---
+
+    def _prepare_package_lines(self, quantities=(2.0, 3.0), qty=5.0,
+                               picked=False, name="PKG-TEST-1"):
+        """Outgoing transfer with lot lines already sitting in a package."""
+        picking = self._create_picking(self.product_lot, qty=qty)
+        lot = self._create_lot(self.product_lot, "TR-PKG-%s" % name)
+        package = self.env["stock.package"].create({"name": name})
+        lines = self.env["stock.move.line"]
+        for quantity in quantities:
+            lines |= self._create_picked_lot_line(
+                picking, lot, quantity, package=package, picked=picked
+            )
+        return picking, lot, package, lines
+
+    def test_scan_package_picks_whole_package(self):
+        """A package scan with the default intent picks every line in it."""
+        picking, _lot, package, lines = self._prepare_package_lines()
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertEqual(wiz.package_scan_intent, "take")
+        for line in lines:
+            self.assertTrue(line.picked)
+        self.assertEqual(sum(lines.mapped("quantity")), 5.0)
+
+    def test_scan_package_keeps_quantity_and_package(self):
+        """Whole-package pick never rewrites quantity nor loses the package."""
+        picking, _lot, package, lines = self._prepare_package_lines(
+            quantities=(2.0, 3.0)
+        )
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(sorted(lines.mapped("quantity")), [2.0, 3.0])
+        self.assertEqual(lines.mapped("result_package_id"), package)
+        # Source package is filled when the line had none.
+        self.assertEqual(lines.mapped("package_id"), package)
+
+    def test_scan_package_ignores_lines_of_other_transfers(self):
+        """Only the current transfer's lines are picked."""
+        picking, _lot, package, lines = self._prepare_package_lines()
+        other = self._create_picking(self.product_lot, qty=4.0)
+        other_lot = self._create_lot(self.product_lot, "TR-PKG-OTHER")
+        other_line = self._create_picked_lot_line(
+            other, other_lot, 4.0, package=package, picked=False
+        )
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertTrue(all(line.picked for line in lines))
+        self.assertFalse(other_line.picked)
+
+    def test_scan_package_empty_reports_error(self):
+        """An empty package is refused, nothing is written."""
+        picking = self._create_picking(self.product_lot, qty=5.0)
+        package = self.env["stock.package"].create({"name": "PKG-EMPTY-1"})
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn("empty", wiz.message.lower())
+
+    def test_scan_package_excess_forbid_writes_nothing(self):
+        """Forbid policy rejects the whole package before any write."""
+        self.picking_type.barcode_excess_qty_policy = "forbid"
+        picking, _lot, package, lines = self._prepare_package_lines(
+            quantities=(2.0, 4.0), qty=5.0
+        )
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertFalse(any(lines.mapped("picked")))
+
+    def test_scan_package_excess_allow_picks_all(self):
+        """Allow policy picks the over-quantity too."""
+        self.picking_type.barcode_excess_qty_policy = "allow"
+        picking, _lot, package, lines = self._prepare_package_lines(
+            quantities=(2.0, 4.0), qty=5.0
+        )
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertTrue(all(line.picked for line in lines))
+
+    def test_scan_package_excess_warn_needs_force(self):
+        """Warn policy blocks first; forcing it then picks the package."""
+        self.picking_type.barcode_excess_qty_policy = "warn"
+        picking, _lot, package, lines = self._prepare_package_lines(
+            quantities=(2.0, 4.0), qty=5.0
+        )
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertFalse(any(lines.mapped("picked")))
+        wiz.with_context(force_package_scan=True)._process_package_scan(package)
+        self.assertTrue(all(line.picked for line in lines))
+
+    def test_pack_intent_binds_lines_then_resets(self):
+        """Pressing Pack turns the next package scan into a pack action."""
+        picking = self._create_picking(self.product_lot, qty=5.0)
+        lot = self._create_lot(self.product_lot, "TR-PKG-PACK")
+        package = self.env["stock.package"].create({"name": "PKG-PACK-1"})
+        line = self._create_picked_lot_line(picking, lot, 3.0, picked=True)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        self.assertTrue(wiz.action_set_pack_intent())
+        self.assertEqual(wiz.package_scan_intent, "pack")
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(line.result_package_id, package)
+        self.assertEqual(wiz.package_scan_intent, "take")
+
+    def test_pack_intent_survives_product_scan(self):
+        """Scanning a product does not consume the pack intent."""
+        picking = self._create_picking(self.product_lot, qty=5.0)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.action_set_pack_intent()
+        wiz.on_barcode_scanned(self.product_lot.barcode)
+        self.assertEqual(wiz.package_scan_intent, "pack")
+
+    def test_pack_intent_toggles_off(self):
+        """Pressing Pack twice restores the whole-package semantics."""
+        picking = self._create_picking(self.product_lot, qty=5.0)
+        wiz = self._create_wiz(picking)
+        wiz.action_set_pack_intent()
+        wiz.action_set_pack_intent()
+        self.assertEqual(wiz.package_scan_intent, "take")
+
+    def test_pack_intent_resets_on_transfer_switch(self):
+        """Switching transfers drops a pending pack intent."""
+        first = self._create_picking(self.product_lot, qty=2.0)
+        second = self._create_picking(self.product_lot, qty=2.0)
+        wiz = self._create_wiz(first)
+        wiz.action_set_pack_intent()
+        wiz.on_barcode_scanned(second.name)
+        self.assertEqual(wiz.package_scan_intent, "take")
+
+    def test_undo_package_scan_resets_picked(self):
+        """Undoing a whole-package pick clears picked and the package."""
+        picking, _lot, package, lines = self._prepare_package_lines(
+            picked=True
+        )
+        wiz = self._create_wiz(picking)
+        self.assertTrue(wiz.action_undo_package_scan(package.id))
+        self.assertFalse(any(lines.mapped("picked")))
+        self.assertFalse(any(lines.mapped("result_package_id")))
+
+    def test_undo_package_scan_without_lines_is_info(self):
+        """Undoing a package with nothing picked is a harmless no-op."""
+        picking = self._create_picking(self.product_lot, qty=2.0)
+        package = self.env["stock.package"].create({"name": "PKG-UNDO-0"})
+        wiz = self._create_wiz(picking)
+        self.assertTrue(wiz.action_undo_package_scan(package.id))
+        self.assertEqual(wiz.message_type, "info")
+
+    # --- Cross-transfer serial policy (D-A: warn by default) ---
+
+    def _prepare_cross_order_serial(self, policy, name="SN-CROSS-001"):
+        """Serial reserved by one transfer, being scanned into another."""
+        self.picking_type.barcode_cross_order_policy = policy
+        product = self._create_serial_product(
+            "Cross Serial %s" % name, "PROD-%s" % name
+        )
+        lot = self._create_lot(product, name)
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot
+        )
+        holder = self._create_picking(product, qty=1.0)
+        target = self._create_picking(product, qty=1.0)
+        wiz = self._create_wiz(target)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(product.barcode)
+        return product, lot, holder, target, wiz
+
+    def test_cross_order_forbid_blocks_serial(self):
+        """forbid rejects a serial still reserved by another transfer."""
+        product, lot, holder, target, wiz = self._prepare_cross_order_serial(
+            "forbid"
+        )
+        wiz.on_barcode_scanned(lot.name)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertIn(holder.name, wiz.message)
+        self.assertFalse(target.move_line_ids.filtered("picked"))
+
+    def test_cross_order_allow_picks_serial(self):
+        """allow mirrors native behaviour: the serial is picked."""
+        product, lot, holder, target, wiz = self._prepare_cross_order_serial(
+            "allow"
+        )
+        wiz.on_barcode_scanned(lot.name)
+        picked = target.move_line_ids.filtered("picked")
+        self.assertTrue(picked)
+        self.assertEqual(picked.lot_id, lot)
+        self.assertFalse(wiz.cross_order_pending)
+
+    def test_cross_order_warn_needs_confirmation(self):
+        """warn blocks, then confirmation picks the serial."""
+        product, lot, holder, target, wiz = self._prepare_cross_order_serial(
+            "warn"
+        )
+        wiz.on_barcode_scanned(lot.name)
+        self.assertEqual(wiz.message_type, "more_match")
+        self.assertTrue(wiz.cross_order_pending)
+        self.assertFalse(target.move_line_ids.filtered("picked"))
+        self.assertTrue(wiz.action_confirm_cross_order_pick())
+        self.assertTrue(target.move_line_ids.filtered("picked"))
+        self.assertFalse(wiz.cross_order_pending)
+
+    def test_cross_order_warn_forced_scan_skips_confirmation(self):
+        """An explicit force context picks without asking."""
+        product, lot, holder, target, wiz = self._prepare_cross_order_serial(
+            "warn"
+        )
+        wiz.with_context(force_cross_order=True).on_barcode_scanned(lot.name)
+        picked = target.move_line_ids.filtered("picked")
+        self.assertTrue(picked)
+        self.assertEqual(picked.lot_id, lot)
+        self.assertFalse(wiz.cross_order_pending)
+
+    # --- Split package (P2, R1-R4) ---
+
+    def _prepare_split_package(self, quantities=(1.0, 1.0, 1.0), picked=True,
+                               name="PKG-SPLIT-SRC"):
+        picking = self._create_picking(self.product_lot, qty=sum(quantities))
+        lot = self._create_lot(self.product_lot, "TR-%s" % name)
+        package = self.env["stock.package"].create({"name": name})
+        lines = self.env["stock.move.line"]
+        for quantity in quantities:
+            lines |= self._create_picked_lot_line(
+                picking, lot, quantity, package=package, picked=picked
+            )
+        wiz = self._create_wiz(picking)
+        return picking, lot, package, lines, wiz
+
+    def test_split_package_to_new_package(self):
+        """Selected lines move to a freshly created package."""
+        picking, lot, package, lines, wiz = self._prepare_split_package()
+        moved = lines[:2]
+        self.assertTrue(wiz.action_split_package(
+            package.id, moved.ids, dest_mode="new",
+            dest_package_name="PKG-SPLIT-NEW",
+        ))
+        dest = self.env["stock.package"].search(
+            [("name", "=", "PKG-SPLIT-NEW")], limit=1
+        )
+        self.assertEqual(moved.mapped("result_package_id"), dest)
+        self.assertEqual(lines[2].result_package_id, package)
+        self.assertEqual(wiz.message_type, "success")
+
+    def test_split_package_to_loose(self):
+        """Loose destination clears result_package_id."""
+        picking, lot, package, lines, wiz = self._prepare_split_package()
+        self.assertTrue(wiz.action_split_package(
+            package.id, lines[:1].ids, dest_mode="loose"
+        ))
+        self.assertFalse(lines[0].result_package_id)
+
+    def test_split_package_to_existing_package(self):
+        """An existing package can be the destination."""
+        picking, lot, package, lines, wiz = self._prepare_split_package()
+        dest = self.env["stock.package"].create({"name": "PKG-SPLIT-DEST"})
+        self.assertTrue(wiz.action_split_package(
+            package.id, lines[:2].ids, dest_mode="existing",
+            dest_package_id=dest.id,
+        ))
+        self.assertEqual(lines[:2].mapped("result_package_id"), dest)
+
+    def test_split_package_resets_picked(self):
+        """Split lines are reset so they must be re-scanned."""
+        picking, lot, package, lines, wiz = self._prepare_split_package(
+            picked=True
+        )
+        moved = lines[:1]
+        wiz.action_split_package(
+            package.id, moved.ids, dest_mode="loose"
+        )
+        self.assertFalse(moved.picked)
+        self.assertIn("not picked", wiz.message)
+
+    def test_split_package_rejects_foreign_lines(self):
+        """Lines of another transfer are never touched (R1)."""
+        picking, lot, package, lines, wiz = self._prepare_split_package()
+        other = self._create_picking(self.product_lot, qty=1.0)
+        other_lot = self._create_lot(self.product_lot, "TR-PKG-FOREIGN")
+        other_line = self._create_picked_lot_line(
+            other, other_lot, 1.0, package=package, picked=True
+        )
+        self.assertTrue(wiz.action_split_package(
+            package.id, other_line.ids, dest_mode="loose"
+        ) is False)
+        self.assertEqual(wiz.message_type, "error")
+        self.assertEqual(other_line.result_package_id, package)
+        self.assertTrue(other_line.picked)
+
+    def test_split_package_rejects_lines_outside_package(self):
+        """A line that is not in the scanned package is refused."""
+        picking, lot, package, lines, wiz = self._prepare_split_package()
+        outside = self._create_picked_lot_line(picking, lot, 1.0, picked=True)
+        self.assertFalse(wiz.action_split_package(
+            package.id, outside.ids, dest_mode="loose"
+        ))
+        self.assertEqual(wiz.message_type, "error")
+
+    def test_split_package_reports_emptied_source(self):
+        """Splitting every line tells the operator the source is empty."""
+        picking, lot, package, lines, wiz = self._prepare_split_package()
+        self.assertTrue(wiz.action_split_package(
+            package.id, lines.ids, dest_mode="loose"
+        ))
+        self.assertIn("now empty", wiz.message)
+
+    # --- State contract consumed by the OWL client action ---
+
+    def test_scan_state_exposes_package_scan_intent(self):
+        """The client action reads package_scan_intent from the state."""
+        picking = self._create_picking(self.product_lot, qty=2.0)
+        wiz = self._create_wiz(picking)
+        self.assertEqual(wiz.get_scan_state()["package_scan_intent"], "take")
+        wiz.action_set_pack_intent()
+        self.assertEqual(wiz.get_scan_state()["package_scan_intent"], "pack")
+
+    def test_scan_state_exposes_cross_order_pending(self):
+        """The client action shows the confirm button from this flag."""
+        product, lot, holder, target, wiz = self._prepare_cross_order_serial(
+            "warn"
+        )
+        wiz.on_barcode_scanned(lot.name)
+        self.assertTrue(wiz.get_scan_state()["cross_order_pending"])
+
+    def test_pack_intent_requires_transfer(self):
+        """Toggling the intent without a transfer is an error, not a crash."""
+        wiz = self.Wiz.create({})
+        self.assertFalse(wiz.action_set_pack_intent())
+        self.assertEqual(wiz.message_type, "error")
+
+    # --- Optional packages: no package / packages disabled ---
+
+    def test_wizard_create_without_picking_succeeds(self):
+        """A wizard can be created without a transfer nor package intent."""
+        wiz = self.Wiz.create({})
+        self.assertEqual(wiz.package_scan_intent, "take")
+        self.assertFalse(wiz.picking_id)
+
+    def test_package_scan_intent_null_means_take(self):
+        """NULL intent (legacy row) behaves as the whole-package default."""
+        picking = self._create_picking(self.product_lot, qty=2.0)
+        wiz = self._create_wiz(picking)
+        wiz.write({"scan_mode": False})
+        self.assertEqual(wiz.get_scan_state()["package_scan_intent"], "take")
+        # The null value must not break the pack toggle either.
+        self.assertTrue(wiz.action_set_pack_intent())
+        self.assertEqual(wiz.package_scan_intent, "pack")
+
+    def test_scan_package_with_intent_null_takes_package(self):
+        """A legacy NULL intent still picks the package as a whole."""
+        picking, _lot, package, lines = self._prepare_package_lines(
+            name="PKG-NULL-INTENT"
+        )
+        wiz = self._create_wiz(picking)
+        wiz.write({"scan_mode": False})
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertTrue(all(line.picked for line in lines))
+
+    def test_action_barcode_scan_opens_client_action(self):
+        """The real entry point must create a wizard without a required error."""
+        picking = self._create_picking(self.product_lot, qty=1.0)
+        action = picking.action_barcode_scan()
+        self.assertEqual(action["tag"], "stock_barcodes_picking.PickingScanApp")
+        wiz = self.Wiz.browse(action["params"]["wiz_id"])
+        self.assertTrue(wiz.exists())
+        self.assertEqual(wiz.package_scan_intent, "take")
+
+    def test_action_open_scan_wizard_scan_first_mode(self):
+        """List/kanban entry with no selection creates a transfer-less wizard."""
+        first = self._create_picking(self.product_lot, qty=1.0)
+        second = self._create_picking(self.product_lot, qty=1.0)
+        action = (first | second).action_open_scan_wizard()
+        wiz = self.Wiz.browse(action["params"]["wiz_id"])
+        self.assertTrue(wiz.exists())
+        self.assertFalse(wiz.picking_id)
+        self.assertEqual(wiz.package_scan_intent, "take")
+
+    # --- Scan semantics follow the transfer direction ---
+
+    def test_incoming_defaults_to_pack_intent(self):
+        """Receipts build packages: the default intent is packing."""
+        picking = self._create_in_picking(self.product_lot, qty=3.0)
+        wiz = self._create_wiz(picking)
+        self.assertEqual(wiz.picking_type_code, "incoming")
+        self.assertEqual(wiz.package_scan_intent, "pack")
+
+    def test_outgoing_defaults_to_take_intent(self):
+        """Deliveries move packed goods: the default intent is whole-package."""
+        picking = self._create_picking(self.product_lot, qty=3.0)
+        wiz = self._create_wiz(picking)
+        self.assertEqual(wiz.picking_type_code, "outgoing")
+        self.assertEqual(wiz.package_scan_intent, "take")
+
+    def test_switch_to_receipt_sets_pack_intent(self):
+        """Switching to a receipt flips the default to packing."""
+        outgoing = self._create_picking(self.product_lot, qty=1.0)
+        receipt = self._create_in_picking(self.product_lot, qty=1.0)
+        wiz = self._create_wiz(outgoing)
+        self.assertEqual(wiz.package_scan_intent, "take")
+        wiz.on_barcode_scanned(receipt.name)
+        self.assertEqual(wiz.picking_id, receipt)
+        self.assertEqual(wiz.package_scan_intent, "pack")
+
+    def test_scan_package_on_receipt_packs_lines(self):
+        """On a receipt, scanning a package binds the scanned products to it."""
+        picking = self._create_in_picking(self.product_lot, qty=2.0)
+        lot = self._create_lot(self.product_lot, "TR-RECEIPT-PACK")
+        package = self.env["stock.package"].create({"name": "PKG-RECEIPT-1"})
+        line = self._create_picked_lot_line(picking, lot, 2.0, picked=True)
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(package.name)
+        self.assertEqual(line.result_package_id, package)
+        # Packing is the normal loop on receipts: the intent must stay.
+        self.assertEqual(wiz.package_scan_intent, "pack")
+
+    # --- Package-only transfers (demand 0, goods already packed) ---
+
+    def _prepare_package_only_picking(self):
+        """Internal-like transfer whose quantity lives on packed lines only."""
+        picking = self._create_picking(self.product_lot, qty=5.0)
+        picking.move_ids.write({"product_uom_qty": 0.0})
+        picking.move_line_ids.unlink()
+        lot = self._create_lot(self.product_lot, "TR-PKGONLY")
+        pkg_a = self.env["stock.package"].create({"name": "PKG-ONLY-A"})
+        pkg_b = self.env["stock.package"].create({"name": "PKG-ONLY-B"})
+        line_a = self._create_picked_lot_line(
+            picking, lot, 2.0, package=pkg_a, picked=False
+        )
+        line_b = self._create_picked_lot_line(
+            picking, lot, 3.0, package=pkg_b, picked=False
+        )
+        return picking, lot, pkg_a, pkg_b, line_a, line_b
+
+    def test_scan_state_shows_packages_for_reserved_lines(self):
+        """Packed-but-unpicked lines expose their package rows."""
+        picking, lot, pkg_a, pkg_b, line_a, line_b = (
+            self._prepare_package_only_picking()
+        )
+        wiz = self._create_wiz(picking)
+        state = wiz.get_scan_state()
+        rows = [m for m in state["move_ids"] if m["id"] == picking.move_ids.id]
+        names = {row["package_name"] for row in rows}
+        self.assertEqual(names, {"PKG-ONLY-A", "PKG-ONLY-B"})
+        self.assertEqual(state["total_demand"], 5.0)
+        for row in rows:
+            self.assertFalse(row["picked"])
+            self.assertEqual(row["quantity"], 0.0)
+        by_name = {row["package_name"]: row for row in rows}
+        self.assertEqual(by_name["PKG-ONLY-A"]["demand_qty"], 2.0)
+        self.assertEqual(by_name["PKG-ONLY-B"]["demand_qty"], 3.0)
+
+    def test_scan_package_picks_without_demand(self):
+        """A zero-demand transfer still lets the package be scanned."""
+        picking, lot, pkg_a, pkg_b, line_a, line_b = (
+            self._prepare_package_only_picking()
+        )
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(pkg_a.name)
+        self.assertEqual(wiz.message_type, "success")
+        self.assertTrue(line_a.picked)
+        self.assertFalse(line_b.picked)
+        self.assertEqual(wiz.total_demand, 5.0)
+
+    def test_validate_zero_demand_asks_backorder(self):
+        """A partially scanned package-only transfer must offer a backorder."""
+        picking, lot, pkg_a, pkg_b, line_a, line_b = (
+            self._prepare_package_only_picking()
+        )
+        self.picking_type.create_backorder = "ask"
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(pkg_a.name)
+        result = wiz.action_validate_picking()
+        self.assertIsInstance(result, dict)
+        self.assertEqual(picking.move_ids.product_uom_qty, 5.0)
+
+    def test_validate_zero_demand_full_pick_validates(self):
+        """Scanning every package validates without a backorder prompt."""
+        picking, lot, pkg_a, pkg_b, line_a, line_b = (
+            self._prepare_package_only_picking()
+        )
+        self.picking_type.create_backorder = "ask"
+        wiz = self._create_wiz(picking)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(pkg_a.name)
+        wiz.on_barcode_scanned(pkg_b.name)
+        result = wiz.action_validate_picking()
+        self.assertNotIsInstance(result, dict)
+        self.assertEqual(picking.state, "done")
+
+    # --- scan_mode: four scan semantics (v4.2) ---
+
+    def _prepare_split_scan_picking(self, name="PKG-SPLITSCAN"):
+        picking = self._create_picking(self.product_lot, qty=2.0)
+        lot = self._create_lot(self.product_lot, "TR-%s" % name)
+        package = self.env["stock.package"].create({"name": name})
+        lines = self.env["stock.move.line"]
+        for _i in range(2):
+            lines |= self._create_picked_lot_line(
+                picking, lot, 1.0, package=package, picked=True
+            )
+        wiz = self._create_wiz(picking)
+        return picking, lot, package, lines, wiz
+
+    def test_scan_mode_defaults_by_direction(self):
+        """Receipts pack by default; deliveries and transfers pick."""
+        outgoing = self._create_picking(self.product_lot, qty=1.0)
+        self.assertEqual(self._create_wiz(outgoing).scan_mode, "default")
+        receipt = self._create_in_picking(self.product_lot, qty=1.0)
+        self.assertEqual(self._create_wiz(receipt).scan_mode, "pack")
+
+    def test_scan_mode_switch_and_exit(self):
+        """Modes can be entered and left; unknown modes are rejected."""
+        picking = self._create_picking(self.product_lot, qty=1.0)
+        wiz = self._create_wiz(picking)
+        self.assertTrue(wiz.action_set_scan_mode("unclaim_scan"))
+        self.assertEqual(wiz.scan_mode, "unclaim_scan")
+        self.assertTrue(wiz.action_exit_scan_mode())
+        self.assertEqual(wiz.scan_mode, "default")
+        self.assertFalse(wiz.action_set_scan_mode("bogus"))
+        self.assertEqual(wiz.message_type, "error")
+
+    def test_split_scan_by_product_removes_package(self):
+        """Scanning a product removes its package without touching picked."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking()
+        wiz.action_set_scan_mode("split_scan")
+        wiz.on_barcode_scanned(lot.name)
+        self.assertFalse(any(lines.mapped("result_package_id")))
+        self.assertTrue(all(lines.mapped("picked")))
+        self.assertEqual(wiz.message_type, "success")
+        self.assertEqual(wiz.scan_mode, "split_scan")
+
+    def test_split_scan_by_package_removes_all_lines(self):
+        """Scanning the package removes it from every line of the transfer."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-SPLITSCAN-PKG"
+        )
+        wiz.action_set_scan_mode("split_scan")
+        wiz.on_barcode_scanned(package.name)
+        self.assertFalse(any(lines.mapped("result_package_id")))
+
+    def test_split_scan_without_package_is_info(self):
+        """A line that holds no package reports it instead of failing."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-SPLITSCAN-NONE"
+        )
+        lines.write({"result_package_id": False})
+        wiz.action_set_scan_mode("split_scan")
+        wiz.on_barcode_scanned(lot.name)
+        self.assertEqual(wiz.message_type, "info")
+
+    def test_unclaim_scan_keeps_lines_and_reservations(self):
+        """Unclaiming only flips picked; the lines stay on the transfer."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-UNCLAIM"
+        )
+        wiz.action_set_scan_mode("unclaim_scan")
+        wiz.on_barcode_scanned(lot.name)
+        self.assertFalse(any(lines.mapped("picked")))
+        self.assertEqual(picking.move_line_ids & lines, lines)
+        self.assertEqual(wiz.scan_mode, "unclaim_scan")
+
+    def test_unclaim_scan_without_picked_is_info(self):
+        """Nothing picked to unclaim reports info."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-UNCLAIM-0"
+        )
+        lines.write({"picked": False})
+        wiz.action_set_scan_mode("unclaim_scan")
+        wiz.on_barcode_scanned(lot.name)
+        self.assertEqual(wiz.message_type, "info")
+
+    def test_remove_package_clears_every_line(self):
+        """The split dialog drops the package from all of the transfer's lines."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-REMOVE"
+        )
+        self.assertTrue(wiz.action_remove_package(package.id))
+        self.assertFalse(any(lines.mapped("result_package_id")))
+        self.assertEqual(wiz.message_type, "success")
+
+    def test_remove_package_not_used_is_info(self):
+        picking = self._create_picking(self.product_lot, qty=1.0)
+        package = self.env["stock.package"].create({"name": "PKG-REMOVE-0"})
+        wiz = self._create_wiz(picking)
+        self.assertTrue(wiz.action_remove_package(package.id))
+        self.assertEqual(wiz.message_type, "info")
+
+    def test_package_scan_intent_mirrors_scan_mode(self):
+        """The legacy field still reflects the new mode for the old client."""
+        picking = self._create_picking(self.product_lot, qty=1.0)
+        wiz = self._create_wiz(picking)
+        self.assertEqual(wiz.package_scan_intent, "take")
+        wiz.action_set_scan_mode("pack")
+        self.assertEqual(wiz.package_scan_intent, "pack")
+        wiz.action_set_scan_mode("split_scan")
+        self.assertEqual(wiz.package_scan_intent, "take")
+
+    def test_scan_state_exposes_scan_mode_and_hint(self):
+        picking = self._create_picking(self.product_lot, qty=1.0)
+        wiz = self._create_wiz(picking)
+        state = wiz.get_scan_state()
+        self.assertEqual(state["scan_mode"], "default")
+        self.assertTrue(state["mode_hint"])
+        wiz.action_set_scan_mode("pack")
+        self.assertEqual(wiz.get_scan_state()["scan_mode"], "pack")
+
+    def test_get_picking_packages_lists_result_packages(self):
+        """The split dialog sees the transfer's result packages."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-LIST"
+        )
+        packages = wiz.get_picking_packages()
+        self.assertEqual(len(packages), 1)
+        self.assertEqual(packages[0]["name"], "PKG-LIST")
+        self.assertEqual(packages[0]["line_count"], 2)
+        self.assertEqual(packages[0]["quantity"], 2.0)
+
+    # --- row editor (v4 line dialog) ---
+
+    def test_edit_move_line_changes_lot(self):
+        """The row editor can swap the lot of a picked line."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-EDIT-LOT"
+        )
+        new_lot = self._create_lot(self.product_lot, "TR-EDIT-LOT-NEW")
+        self.assertTrue(
+            wiz.action_edit_move_line(lines[0].id, lot_name=new_lot.name)
+        )
+        self.assertEqual(lines[0].lot_id, new_lot)
+        self.assertEqual(wiz.message_type, "success")
+
+    def test_edit_move_line_sets_result_package(self):
+        """The row editor can move a line into another result package."""
+        picking, lot, package, lines, wiz = self._prepare_split_scan_picking(
+            "PKG-EDIT-PKG"
+        )
+        self.assertTrue(
+            wiz.action_edit_move_line(
+                lines[0].id, result_package_name="PKG-EDIT-TARGET"
+            )
+        )
+        self.assertEqual(lines[0].result_package_id.name, "PKG-EDIT-TARGET")
+
+    def test_edit_move_line_rejects_foreign_line(self):
+        """Lines of another transfer cannot be edited."""
+        picking_a, lot_a, pkg_a, lines_a, wiz_a = (
+            self._prepare_split_scan_picking("PKG-EDIT-A")
+        )
+        picking_b, lot_b, pkg_b, lines_b, wiz_b = (
+            self._prepare_split_scan_picking("PKG-EDIT-B")
+        )
+        self.assertFalse(
+            wiz_a.action_edit_move_line(lines_b[0].id, qty=1.0)
+        )
+        self.assertEqual(wiz_a.message_type, "error")
+
+    def test_cross_order_confirm_without_product_scan(self):
+        """Confirming a serial scanned without a product scan still picks it."""
+        self.picking_type.barcode_cross_order_policy = "warn"
+        product = self._create_serial_product("Cross Conf", "PROD-CROSS-CONF")
+        lot = self._create_lot(product, "SN-CROSS-CONF")
+        self.StockQuant._update_available_quantity(
+            product, self.stock_location, 1.0, lot_id=lot
+        )
+        holder = self._create_picking(product, qty=1.0)
+        target = self._create_picking(product, qty=1.0)
+        wiz = self._create_wiz(target)
+        wiz.on_barcode_scanned(self.stock_location.barcode)
+        wiz.on_barcode_scanned(lot.name)
+        self.assertTrue(wiz.cross_order_pending)
+        self.assertTrue(wiz.action_confirm_cross_order_pick())
+        picked = target.move_line_ids.filtered(
+            lambda l: l.lot_id == lot and l.picked
+        )
+        self.assertTrue(picked)

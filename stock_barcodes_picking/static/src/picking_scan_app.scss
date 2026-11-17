@@ -5,45 +5,65 @@
 
 // 命中高亮保持到下一次扫描（由 JS 的 recentScanLotKey 控制，不自动消失）
 .o_picking_scan_app {
-    --scan-page: #E5E5E5;
-    --scan-card: #FFFFFF;
-    --scan-frame: #BBBFC6;
+    --scan-page: #F2E9E2;
+    --scan-card: #FDF7F4;
+    --scan-frame: #DED5CE;
     --scan-text: #000000;
     --scan-text-2: #74787B;
-    --scan-row-bg: rgba(22, 163, 181, 0.2);
-    --scan-fold-bg: rgba(22, 163, 181, 0.4);
-    // 信息框（设计 3）：浅色 = 青/绿半透明叠在白底上的合成色
-    --scan-hint-bg: #D0EDF0;
-    --scan-hint-fg: #0F3A4A;
-    --scan-hint-border: rgba(22, 163, 181, 0.4);
-    --scan-hint-shadow: rgba(22, 163, 181, 0.2);
-    --scan-ok-bg: #A3F5BF;
-    --scan-ok-fg: #404144;
-    --scan-ok-border: rgba(133, 250, 158, 1);
-    --scan-ok-shadow: rgba(82, 197, 107, 0.7);
-    --scan-key-bg: #BBBFC6;
+    --scan-row-bg: rgba(37, 77, 195, 0.12);
+    --scan-fold-bg: rgba(37, 77, 195, 0.22);
+    // 信息框：米色卡片底 + 蓝色文字（新拟态）
+    --scan-hint-bg: #D2D9EC;
+    --scan-hint-fg: #254DC3;
+    --scan-hint-border: transparent;
+    --scan-hint-shadow: transparent;
+    --scan-ok-bg: #66E7B0;
+    --scan-ok-fg: #000000;
+    --scan-ok-border: transparent;
+    --scan-ok-shadow: transparent;
+    --scan-danger-bg: #F0315B;
+    --scan-danger-fg: #FFFFFF;
+    // 硅胶风格（新拟态）：按钮与页面同色，靠左上高光 + 右下暗影形成凸起
+    --scan-key-bg: #F2E9E2;
     --scan-key-fg: #000000;
-    --scan-key-shadow: #74787B;
-    --scan-green: #27A844;
+    --scan-key-shadow: #DED5CE;
+    --scan-key-light: #FDF7F4;
+    --scan-group: #F2E9E2;
+    --scan-lot-bg: #FDF7F4;
+    --scan-green: #254DC3;
     --scan-purple: #8174AA;
-    --scan-hl: rgba(133, 250, 158, 0.6);
+    --scan-hl: rgba(37, 77, 195, 0.28);
 
     background: var(--scan-page);
     color: var(--scan-text);
-    overflow-y: auto;
+    overflow: hidden;
 
     &[data-theme="dark"] {
-        --scan-page: #0B0B0B;
-        --scan-card: #424346;
+        --scan-page: #161D20;
+        --scan-card: #48525C;
+        --scan-frame: #3B4543;
+        --scan-group: #161D20;
+        --scan-lot-bg: #404144;
         --scan-text: #FFFFFF;
-        --scan-text-2: #FFFFFF;
-        // 信息框：深色下非错误框先铺 #404144，再叠青/绿
-        --scan-hint-bg: #38555B;
-        --scan-hint-fg: #FFFFFF;
-        --scan-hint-shadow: rgba(22, 163, 181, 0.3);
-        --scan-ok-bg: #66B883;
-        --scan-ok-fg: #FFFFFF;
-        --scan-ok-border: rgba(133, 250, 158, 0.8);
+        --scan-text-2: #A4A5A6;
+        --scan-row-bg: rgba(37, 77, 195, 0.25);
+        --scan-fold-bg: rgba(37, 77, 195, 0.4);
+        --scan-hint-bg: #FFFFFF;
+        --scan-hint-fg: #254DC3;
+        --scan-hint-border: transparent;
+        --scan-hint-shadow: transparent;
+        --scan-ok-bg: #66E7B0;
+        --scan-ok-fg: #000000;
+        --scan-ok-border: transparent;
+        --scan-danger-bg: #F0315B;
+        --scan-danger-fg: #FFFFFF;
+        --scan-key-bg: #48525C;
+        --scan-key-fg: #FFFFFF;
+        --scan-key-shadow: #2A3339;
+        --scan-key-light: #5A656F;
+        --scan-green: #4C7BD9;
+        --scan-purple: #8E82B5;
+        --scan-hl: rgba(76, 123, 217, 0.5);
     }
 
     // ---------- top: source btn + doc name + progress + actions ----------
@@ -59,10 +79,11 @@
     .o_scan_src_btn,
     .o_scan_actions_btn,
     // Odoo 19 CogMenu 按钮结构：.o_cp_action_menus button.btn (不是 dropdown-toggle)
-    .o_scan_topbar .o_cp_action_menus button {
+    .o_scan_topbar .o_cp_action_menus button,
+    .o_scan_scanrow .o_cp_action_menus button {
         border: 0 !important;
-        width: 40px;
-        height: 33px;
+        width: 30px;
+        height: 30px;
         border-radius: 4px;
         background: var(--scan-key-bg);
         color: var(--scan-key-fg);
@@ -72,30 +93,75 @@
         cursor: pointer;
         flex-shrink: 0;
         padding: 0;
-        box-shadow: 0 1.5px 0 0 var(--scan-key-shadow);
+        // 新拟态：右下暗影 + 左上高光
+        box-shadow: 2px 2px 4px 4px var(--scan-key-shadow),
+            -2px -2px 4px 4px var(--scan-key-light);
         &:hover {
             background: var(--scan-key-bg);
             color: var(--scan-key-fg);
-            filter: brightness(0.95);
         }
+        // 按下：内凹更紧，并切换蓝色图标
+        &:active:not(:disabled) {
+            box-shadow: inset 2px 2px 2px 2px var(--scan-key-shadow),
+                inset -2px -2px 2px 2px var(--scan-key-light);
+        }
+    }
+    // 齿轮按下变蓝（CogMenu 按钮用背景图）
+    .o_scan_topbar .o_cp_action_menus button:active,
+    .o_scan_scanrow .o_cp_action_menus button:active {
+        background-image: url('/stock_barcodes_picking/static/src/img/top_gear_blue.svg');
     }
     // CogMenu 里的 FontAwesome fa-cog 隐藏，换成设计稿 gear SVG
     .o_scan_topbar .o_cp_action_menus button > i.fa-cog,
-    .o_scan_topbar .o_cp_action_menus button > i {
+    .o_scan_topbar .o_cp_action_menus button > i,
+    .o_scan_scanrow .o_cp_action_menus button > i.fa-cog,
+    .o_scan_scanrow .o_cp_action_menus button > i {
         display: none;
     }
-    .o_scan_topbar .o_cp_action_menus button {
+    .o_scan_topbar .o_cp_action_menus button,
+    .o_scan_scanrow .o_cp_action_menus button {
         background-image: url('/stock_barcodes_picking/static/src/img/top_gear.svg');
         background-repeat: no-repeat;
         background-position: center;
-        background-size: 18.5px 19px;
+        background-size: 19.68px 18.57px;
+    }
+    // Bootstrap 在 hover / :active / .show / :focus 时会重置 background（导致齿轮消失或平铺），这里锁死
+    .o_scan_topbar .o_cp_action_menus button:hover,
+    .o_scan_topbar .o_cp_action_menus button:focus,
+    .o_scan_topbar .o_cp_action_menus button:focus-visible,
+    .o_scan_topbar .o_cp_action_menus button:active,
+    .o_scan_topbar .o_cp_action_menus button.show,
+    .o_scan_scanrow .o_cp_action_menus button:hover,
+    .o_scan_scanrow .o_cp_action_menus button:focus,
+    .o_scan_scanrow .o_cp_action_menus button:focus-visible,
+    .o_scan_scanrow .o_cp_action_menus button:active,
+    .o_scan_scanrow .o_cp_action_menus button.show {
+        background-color: var(--scan-key-bg) !important;
+        background-image: url('/stock_barcodes_picking/static/src/img/top_gear.svg') !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-size: 19.68px 18.57px !important;
+        border: 0 !important;
+    }
+    // 按下时只换蓝色齿轮，其余外观不变
+    .o_scan_topbar .o_cp_action_menus button:active,
+    .o_scan_scanrow .o_cp_action_menus button:active {
+        background-image: url('/stock_barcodes_picking/static/src/img/top_gear_blue.svg') !important;
     }
     // 去掉 Odoo CogMenu 可能带的下拉箭头 caret
     .o_scan_topbar .o_cp_action_menus,
-    .o_scan_topbar .o_cp_action_menus .lh-1 {
+    .o_scan_topbar .o_cp_action_menus .lh-1,
+    .o_scan_scanrow .o_cp_action_menus,
+    .o_scan_scanrow .o_cp_action_menus .lh-1 {
         gap: 0 !important;
         padding: 0 !important;
         margin: 0 !important;
+    }
+    // 顶栏右侧占位，保持单号视觉居中（设计稿顶栏只有单号 + 进度）
+    .o_scan_topbar_spacer {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
     }
     // SVG icons inside the topbar buttons.
     .o_scan_src_icon {
@@ -125,28 +191,30 @@
     // ---------- scan row ----------
     .o_scan_scanrow {
         display: flex;
+        align-items: center;
         gap: 5px;
         padding: 0 10px;
         margin-top: 2px;       // 与顶栏的微小间距
 
-        // 扫码输入框容器：stroke-wrapper 样式（白底 + 1px 灰边）
+        // 扫码输入框：白底、无边框、圆角 8（硅胶风格画板 241×30 / r8）
         .o_scan_input_wrap {
             flex: 1 1 0%;      // 全宽自适应，min-width:0 让 flex item 可压缩
             min-width: 0;
-            height: 33px;
-            border: 1px solid var(--scan-frame);
-            border-radius: 4px;
+            height: 30px;
+            border: 0;
+            border-radius: 8px;
             background: #FFFFFF;
-            padding: 0 10px;
+            padding: 0 4px 0 10px;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
 
             .o_scan_barcode_icon {
-                width: 19.65px;
-                height: 16.49px;
+                width: 17px;
+                height: 14.27px;
                 flex-shrink: 0;
                 display: block;
+                opacity: 0.45;
             }
 
             .o_picking_scan_input {
@@ -157,64 +225,129 @@
                 background: transparent;
                 height: 100%;
                 padding: 0;
-                font-size: 18px;
+                font-size: 15px;
                 color: #000000;
                 &::placeholder {
-                    color: var(--scan-frame);
+                    color: #DED5CE;
+                }
+            }
+
+            // 相机按钮内嵌在输入框里（设计稿：灰色图标，无独立按钮底）
+            .o_scan_cam_inline {
+                width: 28px;
+                height: 26px;
+                flex: 0 0 28px;
+                border: 0;
+                background: transparent;
+                box-shadow: none;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+
+                &:disabled {
+                    opacity: 0.45;
                 }
             }
         }
     }
 
-    // 返回/相机按钮里的 SVG 图标（与 MRP 扫码页保持同一套设计稿图标；
-    // 图标保留 40×33 原始坐标系，按钮内等宽居中）
+    // 返回/相机按钮里的 SVG 图标（已裁掉 SVG 画布留白，按真实字形尺寸渲染）
     .o_scan_back_icon {
-        width: 40px;
-        height: 33px;
+        width: 19.18px;
+        height: 16.78px;
         display: block;
     }
     .o_scan_camera_icon {
-        width: 40px;
-        height: 33px;
+        width: 20px;
+        height: 18.57px;
         display: block;
+        opacity: 0.55;
     }
 
-    // key-style button (camera / back / footer actions)
+    // key-style button (footer actions)：硅胶风格 26px 高
     .o_scan_key {
-        height: 34.5px;
+        height: 26px;
         min-width: 40px;
+        font-size: 12px;
         // Never shrink below the label: on narrow screens the footer wraps
         // instead of squeezing the button (text used to spill outside).
         flex-shrink: 0;
     }
-    // 返回键与右侧相机按钮等宽（40px，设计稿 23），纯图标
+    // 返回键与相机键等宽（30px），纯图标
     .o_picking_scan_back,
     .o_picking_scan_camera {
-        width: 40px;
+        width: 30px;
+        height: 30px;
         padding-left: 0;
         padding-right: 0;
         flex-shrink: 0;
     }
     .o_scan_key {
-        padding: 0 10px;
+        padding: 0 12px;
         border: 0;
         border-radius: 4px;
         background: var(--scan-key-bg);
         color: var(--scan-key-fg);
-        font-size: 14px;
+        font-size: 12px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 4px;
-        box-shadow: 0 1.5px 0 0 var(--scan-key-shadow);
+        // 新拟态：右下暗影 + 左上高光（spread 4）
+        box-shadow: 2px 2px 4px 4px var(--scan-key-shadow),
+            -2px -2px 4px 4px var(--scan-key-light);
         white-space: nowrap;
 
+        // 按下：阴影内凹
         &:active:not(:disabled) {
-            transform: translateY(1px);
-            box-shadow: none;
+            box-shadow: inset 2px 2px 2px 2px var(--scan-key-shadow),
+                inset -2px -2px 2px 2px var(--scan-key-light);
         }
         &:disabled {
             opacity: 0.6;
+        }
+    }
+    // 真实字形尺寸覆盖（按钮内的图标）
+    .o_picking_scan_back .o_scan_back_icon {
+        width: 19.18px;
+        height: 16.78px;
+    }
+    // 返回键固定 30×30、无内边距（避免 o_scan_key 的 12px padding 压缩图标）
+    .o_scan_scanrow > .o_picking_scan_back {
+        width: 30px;
+        min-width: 30px;
+        height: 30px;
+        padding: 0;
+    }
+    .o_scan_back_icon {
+        flex: 0 0 auto;
+    }
+    // 按下态切换成蓝色箭头（第二张图常驻隐藏）
+    .o_scan_icon_pressed {
+        display: none;
+    }
+    .o_scan_scanrow > .o_picking_scan_back:active .o_scan_back_icon:not(.o_scan_icon_pressed) {
+        display: none;
+    }
+    .o_scan_scanrow > .o_picking_scan_back:active .o_scan_icon_pressed {
+        display: block;
+    }
+    // 抬头返回键按下：内凹 2/2/2/2（设计稿「按钮 / 状态=按下」）
+    .o_scan_scanrow .o_picking_scan_back:active:not(:disabled) {
+        transform: none;
+        box-shadow: inset 2px 2px 2px 2px var(--scan-key-shadow),
+            inset -2px -2px 2px 2px var(--scan-key-light);
+    }
+    // 更多…：设计稿是纯文字，没有键帽底
+    .o_scan_key.o_scan_more_btn {
+        background: transparent;
+        box-shadow: none;
+        padding: 0 4px;
+        &:active:not(:disabled) {
+            transform: none;
+            box-shadow: none;
         }
     }
     .o_scan_key_primary {
@@ -225,54 +358,82 @@
         background: #C97E1B;
         color: #FFFFFF;
     }
+    // Pack intent (one-shot): the next package scan packs into a package
+    // instead of picking it as a whole.
+    .o_scan_key_intent {
+        background: var(--scan-purple);
+        color: #FFFFFF;
+        font-weight: 600;
+    }
+    .o_scan_key_small {
+        min-width: 34px;
+        padding: 0 8px;
+    }
 
     // ---------- hint bar (design 2: 青底信息 / 红底错误 / 绿底成功) ----------
     .o_scan_hintbar {
-        margin: 5px 10px 0;    // 上方与扫码行 gap:5px，左右对齐按钮 padding
-        min-height: 25px;
+        margin: 6px 10px 0;    // 上方与扫码行 gap:5px，左右对齐按钮 padding
+        min-height: 28px;
         box-sizing: border-box;
         border: 1px solid var(--scan-hint-border);
-        border-radius: 4px;
-        padding: 1px 10px;
+        border-radius: 6px;
+        padding: 3px 10px;
         background-color: var(--scan-hint-bg);
         color: var(--scan-hint-fg);
         font-size: 12px;
-        line-height: 21px;
-        box-shadow: 0 4px 4px 0 var(--scan-hint-shadow);
+        line-height: 20px;
+        box-shadow: none;
+        // 状态文案 + 模式提示合并到同一行
+        display: flex;
+        align-items: center;
+        gap: 8px;
         // Long barcodes / product names wrap onto new lines instead of
         // being clipped; the bar grows with the content (min-height keeps
         // the single-line look).
         word-break: break-word;
         overflow-wrap: anywhere;
 
+        .o_scan_hint_text {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
         &.alert-success {
             border-color: var(--scan-ok-border);
             background-color: var(--scan-ok-bg);
             color: var(--scan-ok-fg);
-            box-shadow: 0 4px 4px 0 var(--scan-ok-shadow);
+            box-shadow: none;
         }
-        &.alert-danger,
+        &.alert-danger {
+            border-color: var(--scan-danger-bg);
+            background-color: var(--scan-danger-bg);
+            color: var(--scan-danger-fg);
+            box-shadow: none;
+        }
+        // Warnings are prompts to act, not failures: keep the info look.
         &.alert-warning {
-            border-color: rgba(229, 45, 106, 0.7);
-            background-color: rgba(229, 45, 106, 0.7);
-            color: #FFFFFF;
-            box-shadow: 0 4px 4px 0 rgba(165, 46, 86, 0.7);
+            border-color: var(--scan-hint-border);
+            background-color: var(--scan-hint-bg);
+            color: var(--scan-hint-fg);
+            box-shadow: none;
         }
         .btn {
             line-height: 1.2;
             padding: 2px 8px;
-            margin-left: 6px;
+            margin-left: 0;
+            flex-shrink: 0;
         }
     }
 
     // ---------- section title ----------
     .o_scan_section_title {
-        height: 30px;
-        line-height: 30px;
+        height: 32px;
+        line-height: 32px;
         text-align: center;
         font-size: 12px;
         font-weight: 700;
-        margin-top: 4px;
+        margin-top: 6px;
+        border-bottom: 1px solid rgba(222, 213, 206, 0.55);
     }
 
     // ---------- candidate picking overlay ----------
@@ -788,40 +949,44 @@
 
     // ---------- footer ----------
     .o_scan_footer {
-        padding: 2px 12px 10px;
+        flex: 0 0 auto;
+        padding: 4px 10px 10px;
         background: var(--scan-page);
+        border-top: 1px solid rgba(222, 213, 206, 0.55);
     }
     .o_scan_footer_progress {
         text-align: center;
         font-size: 12px;
-        line-height: 25px;
+        line-height: 24px;
     }
     .o_scan_footer_actions {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         flex-wrap: wrap;
-        padding-bottom: 6px;
+        padding-bottom: 2px;
     }
     .o_scan_footer_actions_right {
         display: flex;
         justify-content: flex-end;
-        gap: 10px;
         flex-wrap: wrap;
+        gap: 8px;
         flex: 1;
     }
     .o_scan_key_add_product {
-        background-color: #27A844;
+        background-color: var(--scan-green);
         color: #FFFFFF;
         font-weight: 600;
         min-width: 130px;
-        box-shadow: 0px 1.5px 0px 0px rgba(116, 120, 123, 1);
+        box-shadow: -2px -2px 4px rgba(253, 247, 244, 0.9),
+            2px 2px 4px var(--scan-key-shadow);
         &:hover {
-            background-color: darken(#27A844, 5%);
+            background-color: var(--scan-green);
+            filter: brightness(0.95);
         }
         &:active {
-            background-color: darken(#27A844, 8%);
+            filter: brightness(0.9);
         }
     }
 
@@ -832,4 +997,408 @@
         font-size: 12px;
         padding: 24px 0;
     }
+
+    // ---------- v4 product rows (values measured from the Pixso export) ----------
+    .o_picking_scan_rows {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        // 与顶部/底部一致使用 10px 页边距（覆盖 .o_picking_scan_moves 的 12px padding）
+        padding: 0;
+        margin: 8px 10px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        // 隐藏滚动条占位，保证卡片左右边缘与页头/页尾对齐
+        scrollbar-width: none;
+        &::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+    }
+    // 产品框（Pixso「产品框」194:23215）：页面色底 + 内凹双阴影，区分上下行
+    .o_scan_row {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        border: 0;
+        background: var(--scan-page);
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: inset 2px 2px 4px 4px var(--scan-key-shadow),
+            inset -2px -2px 4px 4px var(--scan-key-light);
+        min-width: 0;
+        flex: 0 0 auto;
+    }
+    .o_scan_row_top {
+        display: flex;
+        gap: 24px;
+        padding: 0 2px;
+        font-size: 9px;
+        color: var(--scan-text-2);
+        line-height: 13px;
+    }
+    .o_scan_row_demand {
+        margin-left: auto;
+        font-weight: 600;
+    }
+    .o_scan_row_main {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-top: 0;
+        cursor: pointer;
+    }
+    // 产品名称卡片（Pixso「新拟态」页 194:17362）：
+    //   未选中 = 外凸阴影 + 黑色文字；选中 = 内凹阴影 + 蓝色文字
+    .o_scan_prod_box {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        background: var(--scan-key-bg);
+        border-radius: 4px;
+        padding: 9px 10px;
+        min-height: 40px;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 17px;
+        color: var(--scan-text);
+        // 外凸阴影收小，避免向上盖住「从/至」等元信息文字
+        box-shadow: 2px 2px 4px 0 var(--scan-key-shadow),
+            -2px -2px 4px 0 var(--scan-key-light);
+        i {
+            margin-top: 2px;
+            color: var(--scan-text);
+            font-size: 12px;
+        }
+        // 按下反馈：按下时内凹
+        &:active {
+            box-shadow: inset 4px 4px 8px var(--scan-key-shadow),
+                inset -4px -4px 8px var(--scan-key-light);
+        }
+    }
+    // 选中态：内凹 + 蓝色文字/图标
+    .o_scan_row.is-selected .o_scan_prod_box {
+        color: var(--scan-hint-fg);
+        box-shadow: inset 4px 4px 8px var(--scan-key-shadow),
+            inset -4px -4px 8px var(--scan-key-light);
+        i {
+            color: var(--scan-hint-fg);
+        }
+    }
+    .o_scan_picked {
+        display: flex;
+        align-items: baseline;
+        align-self: center;
+        gap: 4px;
+        color: var(--scan-text-2);
+        font-size: 9px;
+        white-space: nowrap;
+        padding-top: 0;
+        flex: 0 0 auto;
+    }
+    .o_scan_picked_label,
+    .o_scan_picked_uom {
+        font-size: 9px;
+        color: var(--scan-text-2);
+    }
+    .o_scan_picked b {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--scan-text);
+        line-height: 1;
+    }
+    // ---------- lot dropdown（Pixso「序列号带下拉框」194:21129） ----------
+    .o_scan_lots {
+        margin-top: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        min-width: 0;
+    }
+    // 收起态头部：347×25 / r4 / #FDF7F4，右侧下拉箭头
+    .o_scan_lot_box {
+        background: var(--scan-lot-bg);
+        border: 0;
+        border-radius: 4px;
+        padding: 4px 10px;
+        min-height: 25px;
+    }
+    .o_scan_lot_box.is-scanned {
+        background: var(--scan-hl);
+    }
+    .o_scan_lot_select {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        font-size: 10px;
+        line-height: 15px;
+    }
+    .o_scan_lot_info {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .o_scan_lot_line {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        font-size: 10px;
+        line-height: 15px;
+        i {
+            color: var(--scan-text-2);
+            font-size: 11px;
+            flex: 0 0 auto;
+        }
+    }
+    // 批次名：10px，长序列号换行不裁切
+    .o_scan_lot_name {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0;
+        color: var(--scan-text);
+        word-break: break-all;
+        overflow-wrap: anywhere;
+    }
+    // 包裹行：📦 PACK... › PACK...
+    .o_scan_lot_pkg {
+        color: var(--scan-text-2);
+    }
+    .o_scan_pkg_arrow {
+        color: var(--scan-text-2);
+    }
+    .o_scan_row_toggle {
+        border: 0;
+        background: transparent;
+        color: var(--scan-text-2);
+        font-size: 12px;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    // 展开面板：页面色底、r4，内部批次行 26px；面板整体外凸（设计稿）
+    .o_scan_lots_panel {
+        margin-top: 5px;
+        background: var(--scan-page);
+        border-radius: 4px;
+        padding: 5px 10px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 4px 4px 4px 4px var(--scan-key-shadow),
+            -4px -4px 8px 4px var(--scan-key-light);
+    }
+    .o_scan_lot_row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 26px;
+        padding: 2px 0;
+        border-radius: 4px;
+    }
+    .o_scan_lot_row.is-scanned {
+        background: var(--scan-hl);
+    }
+    .o_scan_lot_actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .o_scan_lot_qty {
+        font-size: 10px;
+        color: var(--scan-text-2);
+        white-space: nowrap;
+    }
+    .o_scan_lot_add {
+        border: 0;
+        background: transparent;
+        color: var(--scan-hint-fg);
+        font-weight: 700;
+        font-size: 12px;
+        padding: 0 2px;
+        flex-shrink: 0;
+    }
+    .o_scan_lot_edit_btn {
+        border: 0;
+        background: transparent;
+        color: var(--scan-hint-fg);
+        font-size: 12px;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .o_scan_lot_empty {
+        color: var(--scan-text-2);
+        font-size: 10px;
+    }
+    // ---------- cross-order confirm bar ----------
+    .o_scan_confirm_bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 10px 0;
+        padding: 5px 10px;
+        border-radius: 4px;
+        background: var(--scan-danger-bg);
+        color: var(--scan-danger-fg);
+        font-size: 12px;
+    }
+    .o_scan_confirm_text {
+        flex: 1;
+    }
+    .o_scan_confirm_btn {
+        border: 0;
+        border-radius: 4px;
+        background: #ffffff;
+        color: var(--scan-danger-bg);
+        font-weight: 700;
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+
+    // ---------- more menu ----------    // ---------- more menu ----------
+    .o_scan_more_menu {
+        position: absolute;
+        left: 10px;
+        bottom: 64px;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        min-width: 150px;
+        background: var(--scan-card);
+        border-radius: 8px;
+        box-shadow: -4px -4px 8px rgba(253, 247, 244, 0.9),
+            4px 4px 8px var(--scan-key-shadow);
+        overflow: hidden;
+        button {
+            border: 0;
+            background: transparent;
+            color: var(--scan-text);
+            text-align: left;
+            padding: 10px 14px;
+            font-size: 13px;
+            & + button {
+                border-top: 1px solid var(--scan-frame);
+            }
+        }
+    }
+
+    // ---------- split dialog ----------
+    .o_scan_split_dialog {
+        position: absolute;
+        inset: 0;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.35);
+    }
+    .o_scan_split_card {
+        width: 86%;
+        max-width: 360px;
+        background: var(--scan-card);
+        border-radius: 8px;
+        padding: 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+    .o_scan_split_title {
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+    .o_scan_split_list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 260px;
+        overflow-y: auto;
+        button {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--scan-frame);
+            background: var(--scan-page);
+            border-radius: 4px;
+            padding: 8px 10px;
+            font-size: 13px;
+            color: var(--scan-text);
+        }
+    }
+    .o_scan_split_meta {
+        color: var(--scan-text-2);
+        font-size: 11px;
+    }
+    .o_scan_split_empty {
+        text-align: center;
+        color: var(--scan-text-2);
+        font-size: 12px;
+        padding: 12px 0;
+    }
+    .o_scan_edit_row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: var(--scan-text-2);
+        span {
+            width: 74px;
+            flex-shrink: 0;
+        }
+        input {
+            flex: 1;
+            border: 1px solid var(--scan-frame);
+            border-radius: 4px;
+            background: var(--scan-page);
+            color: var(--scan-text);
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+    }
+    .o_scan_edit_actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        button {
+            flex: 1;
+            border: 0;
+            border-radius: 4px;
+            padding: 8px 0;
+            font-size: 13px;
+            background: var(--scan-page);
+            color: var(--scan-text);
+        }
+        .o_scan_edit_save {
+            background: var(--scan-primary);
+            color: #fff;
+        }
+    }
+    .o_scan_split_cancel {
+        margin-top: 10px;
+        width: 100%;
+        border: 0;
+        border-radius: 4px;
+        background: var(--scan-page);
+        color: var(--scan-text);
+        padding: 8px 0;
+        font-size: 13px;
+    }
+
 }
