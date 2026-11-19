@@ -102,51 +102,70 @@ Object.assign(this.state, res.state)   ← 后端快照整体覆盖
 ## 5. UI 结构
 
 ```
-.o_picking_scan_app  (flex column, 全高, overflow: hidden)
-├── .o_scan_topbar            源单据 | 单号 + 进度 | 刷新键
-├── .o_scan_scanrow           返回 | 输入框(条码图标 + input + 相机) | 齿轮(CogMenu)
-├── .o_scan_hintbar           提示条（三行：模式提示 / 操作提示 / 当前操作）
+.o_picking_scan_app  (flex column, 全高, overflow: hidden, 背景 #F7F3E8)
+├── .o_scan_brand             BY METAODOO 品牌条（粉色）
+├── .o_scan_topbar            黄色单据大按钮 + 右上「源单据 / 刷新」
+├── .o_scan_progress          进度：1 / 12 + 白底绿填充进度条
+├── .o_scan_scanrow           返回 | 输入框(条码图标 + input) | 相机 | 齿轮(CogMenu)
+├── .o_scan_hintbar           黄色提示卡（粉色图标 + 三行文案）
+├── .o_scan_section_title     产品 + 黑色分隔线 + 蓝色 N ITEMS
 ├── .o_scan_pull_indicator    下拉刷新提示（下拉刷新 / 松开刷新 / 刷新中）
-├── .o_picking_scan_rows      产品行列表（滚动容器）
-│   └── .o_scan_row           产品行（数量追溯按包裹拆行）
-│       ├── .o_scan_row_top       从 / 至 / 需求
-│       ├── .o_scan_row_main      产品名 + 已拣 + +1 / 修改
-│       ├── .o_scan_qty_pkg       数量追溯行的包裹号
-│       └── .o_scan_lots          批次下拉（头 + 展开面板，逐项分隔线）
-├── .o_scan_footer            进度 + 更多… / 模式按钮 / 验证
+├── .o_picking_scan_rows      产品行列表（滚动容器；≥768px 两列）
+│   └── .o_scan_col           列容器（移动端 display:contents，卡片按 order 回到单列）
+│       └── .o_scan_row       白卡 + 3px 黑边 + 左侧 3px 彩条（黄=普通 / 绿=拣齐 / 橙=选中）
+│       ├── .o_scan_row_top       从 / 至 芯片 + 需求徽标
+│       ├── .o_scan_row_main      产品名 + 已拣徽标 + +1 / 修改
+│       ├── .o_scan_qty_pkg       数量追溯行的包裹框
+│       └── .o_scan_lots          批次下拉（黑边框 + 展开面板虚线分隔）
+├── .o_scan_footer            黑色底栏：进度 + 更多... / 新包裹 / 装包 / 验证
 └── .o_scan_split_dialog      行编辑 / 移除包裹 / 取消拣货·拆包选包
 ```
 
 ### 5.1 设计 token（当前生效值）
 
+> 设计源：Pixso `QCYzTmFbRuUHHkLF-fg7TA` / page `7:1188` / frame `14:12481`。
+
+> 深色取自 Pixso 变量集「扫码页主题 / 暗色模式」。
+
 | Token | 亮色 | 深色 |
 |---|---|---|
-| `--scan-page` | `#F2E9E2` | `#161D20` |
-| `--scan-card` | `#FDF7F4` | `#48525C` |
-| `--scan-frame` | `#DED5CE` | `#3B4543` |
-| `--scan-text` / `--scan-text-2` | `#000000` / `#74787B` | `#FFFFFF` / `#A4A5A6` |
-| `--scan-row-bg` / `--scan-fold-bg` | `rgba(37,77,195,.12)` / `.22` | `rgba(37,77,195,.25)` / `.4` |
-| `--scan-hint-bg` / `-fg` | `#D2D9EC` / `#254DC3` | 同左（深色也用浅紫底） |
-| `--scan-ok-bg` / `-fg` | `#66E7B0` / `#000000` | 同左 |
-| `--scan-danger-bg` / `-fg` | `#F0315B` / `#FFFFFF` | 同左 |
-| `--scan-key-bg` / `-fg` | `#F2E9E2` / `#000000` | `#161D20` / `#FFFFFF` |
-| `--scan-key-shadow` / `-light` | `#DED5CE` / `#FDF7F4` | `#0B0F11` / `#2A3339` |
-| `--scan-lot-bg` | `#FDF7F4` | `#404144` |
-| `--scan-green` / `--scan-purple` | `#254DC3` / `#8174AA` | `#4C7BD9` / `#8E82B5` |
-| `--scan-hl` | `rgba(37,77,195,.28)` | `rgba(76,123,217,.5)` |
+| `--scan-page` | `#F7F3E8` | `#0B1017` |
+| `--scan-card` | `#FFFFFF` | `#161E29` |
+| `--scan-ink` / `--scan-ink-2` | `#111111` / `#555555` | `#E6EDF7` / `#9AA7B8` |
+| `--scan-divider` | `#BBB6A6` | `#5A6878` |
+| `--scan-yellow` | `#FFE500` | `#C8FF3D` |
+| `--scan-pink` | `#FF4D97` | `#FF4D97` |
+| `--scan-green` | `#00D97E` | `#00E5A0` |
+| `--scan-orange` | `#FF6B2C` | `#FF8A3D` |
+| `--scan-blue` | `#4361EE` | `#4D7CFF` |
+| `--scan-on-accent` | `#111111` | `#0B1017` |
+| `--scan-border`（描边/主） | `#111111` | `#E6EDF7` |
+| `--scan-shadow`（卡片硬阴影） | `#111111` | `#E6EDF7` |
+| `--scan-shadow-deep`（按钮硬阴影，描边/深） | `#111111` | `#0B1017` |
+| `--scan-darkbar`（从芯片/底栏，背景/深色条） | `#111111` | `#0B1017` |
+| `--scan-footer-bg` | `#111111` | `#0B1017` |
+| `--scan-hl` | `rgba(255,229,0,.35)` | `rgba(200,255,61,.25)` |
 
-> 旧 token `--scan-primary` 已不存在；深色实际以 `picking_scan_app.dark.scss` 为准，主 SCSS 的 `[data-theme="dark"]` 仅作兜底。
+> 深色实际以 `picking_scan_app.dark.scss` 为准，主 SCSS 的 `[data-theme="dark"]` 仅作兜底；两处 token 必须同步改。
 
 ### 5.2 尺寸
 
-| 元素 | 规格 |
+| 元素 | 规格（Pixso 实测） |
 |---|---|
-| 顶栏 | 高 34px，`padding: 0 10px`，`space-between` |
-| 顶栏 / 扫码行按钮 | 30×30，圆角 4px；新拟态外凸 `2/2/4/4`，按下 inset `2/2/2/2` |
-| 扫码输入框 | 高 30px，圆角 8px，白底无边框，内嵌相机 |
-| 提示条 | 最小高 28px，圆角 6px，`padding: 6px 10px`，三行 `gap: 2px`；高度随内容自适应 |
-| 产品框 | 圆角 8px，`padding: 10px`，内凹阴影（区分上下行） |
-| 批次/序列号项 | 最小高 26px，底部 1px 分隔线（`--scan-frame`） |
+| 页面边距 | 抬头/页尾/卡片统一左右 16px（卡片容器右侧另留 4px 给硬阴影） |
+| 品牌条 | 高 20px，粉底黑字 10px/900，字距 3px |
+| 顶栏 | 单据按钮高 36px、宽度自适应内容，黑边 2px + `4/4` 硬阴影，23px/900；右上 38×38、间距 8，图标 15×18 / 17×17 |
+| 进度 | 标签与总数 11px/700，当前值 13px/900；进度条高 11px，2px 黑边，填充 `#00D97E` |
+| 扫码行 | 38×38 按钮，2px 黑边 + `4/4` 硬阴影；输入框高 38px，占位 11px/700；图标 18 / 16 / 17.6 / 17.7；输入框聚焦时整框右下位移 4px 并去阴影 |
+| 提示卡 | 固定 79px 高（三行），`overflow: hidden`，每行单行省略；11px/900，粉色图标 15×15 |
+| 产品标题 | `产品` 15px/900 + 3px 黑线 + `N ITEMS` 蓝底 10px/900（无阴影） |
+| 产品卡 | 358 宽，3px 黑边 + **仅左侧** 3px 彩条（设计稿总彩条 6px，外半被黑边遮住）+ `4/4` 黑硬阴影；内容内边距上/右/下 8px、左 11px（彩条内侧到内容 8px）；选中态**整卡右下位移 4px 并移除黑阴影**、左侧彩条变橙 |
+| 展开面板 | 行铺在白色卡片上、无完整边框；**仅左侧一条 3px 黑色竖线**（与批次头图标左对齐），行内容再缩进 7px；行高 48px，行间 1px 灰色虚线分隔 |
+| 卡内文字 | 从/至 9px/700（从=黑底白字，至=橙底黑字）；`需求:` / `已拣:` 在同一右侧网格中左对齐，标签 10px/700；产品名 12px/800 |
+| 已拣 | 数字徽标 23×23，15px/900，拣齐 `#00D97E`，否则 `#FFE500`；单位 10px/700 |
+| 行内按钮 | 铅笔 18×18（图标 13px）；`+1` 26×18，2px 黑边，字号 10px/900；默认黄底黑字，按下变蓝底白字（产品卡与批次行一致） |
+| 批次框 | 48 高，页面色底 + 2px 黑边；批次名 11px/900，包裹行 9px/700，图标 15px，箭头 14px |
+| 底栏 | 左右 16px；进度 10px/700 + 12px/900 徽标；按钮 90×36、间距 12，11px/900；`更多...` 10px/700 |
 
 ### 5.3 行为约定（容易改错的地方）
 
@@ -159,9 +178,11 @@ Object.assign(this.state, res.state)   ← 后端快照整体覆盖
 7. **取消拣货 / 扫描拆包**：取消拣货对数量追溯与批次号产品一次只处理 1 件（多包裹时由 `unclaim_choices` 弹窗选包）；扫描拆包的单件处理仅数量追溯产品；选择前不写数据。
 8. **超拣 `warn`**：行 +1/扫码 +1 被拦下时写入 `pending_add` 并置 `visible_force_done`，底栏「强制」按钮经 `action_force_done()` 按原目标数量强制写入；`forbid` 永远不可绕过。
 9. **单据外产品（数量追溯）**：按 `barcode_new_product_policy`；`allow` 自动新建 move 拣 1 件，`warn` 走底栏确认。
-10. **行选中可取消**：`set_active_move(move_id=False)` 清空选中，前端再次点击同一行即切换。
-11. **下拉刷新**：只调用 `get_scan_state` 刷新数据，不重建向导；手势绑定在根节点（触摸 + 鼠标），列表需在顶部。
-12. **提示条三行**：模式提示 / 操作提示 / 当前操作，无 ✕；深色模式正常提示仍为浅紫底。
+10. **行选中按行记录**：视觉选中用 `active_row_key`，同一 move 拆成多行（按包裹/未装包）时只高亮点击的那一行；卡片任意区域都可选中/取消，只有「修改」「+1」「下拉箭头」等按钮通过 `.stop` 不触发选中；再次点击同一行取消（`set_active_move(false)`），后端 `active_move_id` 仍只用于扫码目标。
+11. **两列瀑布流**：`scanColumns` 按奇偶把行分到左右两列；≥768px 两列各自独立纵向排列（展开卡片只影响本列），<768px 列容器 `display: contents`，卡片用内联 `order` 恢复 0,1,2… 单列顺序。
+12. **下拉刷新**：只调用 `get_scan_state` 刷新数据，不重建向导；手势绑定在根节点（触摸 + 鼠标），列表需在顶部。
+13. **提示条三行**：模式提示 / 操作提示 / 当前操作，无 ✕；正常/警告为黄底（浅色深色一致），成功绿底、错误粉底。
+14. **更多菜单**：底部左侧弹出（距底部 86px），打开时从下往上滑入 0.22s；菜单外点击透明遮罩即关闭；菜单项「扫码取消拣货」。
 
 ---
 

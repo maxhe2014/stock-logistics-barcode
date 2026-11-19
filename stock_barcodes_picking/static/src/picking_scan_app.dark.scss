@@ -1,68 +1,54 @@
 // Picking scan app — dark theme overrides.
 // Loaded only in web.assets_web_dark, i.e. when Odoo's color_scheme is "dark"
 // (driven by the web_dark_mode module / user preference, not the OS).
+// Values come from the Pixso variable set "扫码页主题 / 暗色模式".
 
 .o_picking_scan_app {
-    --scan-page: #161D20;
-    --scan-card: #48525C;
-    --scan-frame: #3B4543;
-    --scan-text: #FFFFFF;
-    --scan-text-2: #A4A5A6;
-    --scan-row-bg: rgba(37, 77, 195, 0.25);
-    --scan-fold-bg: rgba(37, 77, 195, 0.4);
-    --scan-hint-bg: #D2D9EC;
-    --scan-hint-fg: #254DC3;
-    --scan-hint-border: transparent;
-    --scan-hint-shadow: transparent;
-    --scan-ok-bg: #66E7B0;
-    --scan-ok-fg: #000000;
-    --scan-ok-border: transparent;
-    --scan-danger-bg: #F0315B;
-    --scan-danger-fg: #FFFFFF;
-    --scan-key-bg: #161D20;
-    --scan-key-fg: #FFFFFF;
-    --scan-key-shadow: #0B0F11;
-    --scan-key-light: #2A3339;
-    --scan-group: #161D20;
-    --scan-lot-bg: #404144;
-    --scan-green: #4C7BD9;
-    --scan-purple: #8E82B5;
-    --scan-hl: rgba(76, 123, 217, 0.5);
+    --scan-page: #0B1017;
+    --scan-card: #161E29;
+    --scan-ink: #E6EDF7;
+    --scan-ink-2: #9AA7B8;
+    --scan-divider: #5A6878;
+    --scan-yellow: #C8FF3D;
+    --scan-pink: #FF4D97;
+    --scan-green: #00E5A0;
+    --scan-orange: #FF8A3D;
+    --scan-blue: #4D7CFF;
+    --scan-on-accent: #0B1017;
+    // 描边/主 -> borders + card shadows; 描边/深 -> button shadows;
+    // 背景/深色条 -> from-chip + footer.
+    --scan-border: #E6EDF7;
+    --scan-shadow: #E6EDF7;
+    --scan-shadow-deep: #0B1017;
+    --scan-darkbar: #0B1017;
+    --scan-lot-bg: #0B1017;
+    --scan-footer-bg: #0B1017;
+    --scan-hl: rgba(200, 255, 61, 0.25);
+    --scan-hint-bg: var(--scan-yellow);
+    --scan-hint-fg: var(--scan-on-accent);
+    --scan-ok-bg: var(--scan-green);
+    --scan-danger-bg: var(--scan-pink);
 
-    // 抬头图标：暗色下反白（返回/源单据），齿轮换白色版本
-    .o_scan_back_icon:not(.o_scan_icon_pressed),
-    .o_scan_src_icon {
+    // Black glyphs on dark surfaces need to be inverted; icons sitting on a
+    // yellow fill (camera, source doc, refresh) stay black.
+    .o_scan_back_icon,
+    .o_scan_barcode_icon {
         filter: invert(1);
     }
-    .o_scan_topbar .o_cp_action_menus button,
+    .o_scan_lot_ico,
+    .o_scan_lot_pkg_ico,
+    .o_scan_chevron,
+    .o_scan_pkg_ico {
+        filter: invert(1);
+    }
+
+    // Gear button: light glyph on the dark card.
     .o_scan_scanrow .o_cp_action_menus button,
-    .o_scan_topbar .o_cp_action_menus button:hover,
     .o_scan_scanrow .o_cp_action_menus button:hover,
-    .o_scan_topbar .o_cp_action_menus button:focus,
     .o_scan_scanrow .o_cp_action_menus button:focus,
-    .o_scan_topbar .o_cp_action_menus button:focus-visible,
     .o_scan_scanrow .o_cp_action_menus button:focus-visible,
-    .o_scan_topbar .o_cp_action_menus button.show,
+    .o_scan_scanrow .o_cp_action_menus button:active,
     .o_scan_scanrow .o_cp_action_menus button.show {
         background-image: url('/stock_barcodes_picking/static/src/img/top_gear_light.svg') !important;
-    }
-
-    // 产品名称卡：未选中白色、选中蓝色（与「新拟态」组件一致）
-    .o_scan_prod_box {
-        color: #FFFFFF;
-        i {
-            color: #FFFFFF;
-        }
-    }
-    .o_scan_row.is-selected .o_scan_prod_box {
-        color: #8FA6E8;
-        i {
-            color: #8FA6E8;
-        }
-    }
-
-    .o_scan_card.is-selected > .o_scan_card_head {
-        background: #3F4A54;
-        box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.6) inset;
     }
 }

@@ -4,17 +4,9 @@
   License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
   Template for the PickingScanApp client action (OWL).
-  Responsive card-stack layout (design: /home/max/下载/扫码设计).
-
-  Structure:
-    - top bar (doc name + progress)
-    - scan row (input + camera + back)
-    - hint bar (status + active target + force-add offer)
-    - from/to strip
-    - candidate-picking selector overlay (multi-match)
-    - package stacks: one stack per result_package, each holding
-      product cards (qty / lot / serial) and a package footer bar
-    - footer (progress + action buttons)
+  Layout follows the Pixso "手机扫码APP" file (page 7:1188, frame 14:12481):
+  yellow doc button + source/refresh, progress track, scan row, yellow hint
+  card, product section header, white cards with colored borders, dark footer.
 
   JS hooks kept: .o_picking_scan_moves, [data-scan-row], [data-scan-lot].
 -->
@@ -22,37 +14,59 @@
     <t t-name="stock_barcodes_picking.PickingScanApp">
         <div class="o_picking_scan_app d-flex flex-column h-100">
 
-            <!-- Top bar: source button + transfer name + progress + cog -->
-            <div class="o_scan_topbar" t-if="state.picking_id">
-                <button type="button" class="o_scan_src_btn" t-on-click="onOpenSourcePicking" title="查看源单据">
-                    <img class="o_scan_src_icon" src="/stock_barcodes_picking/static/src/img/top_doc.svg" alt=""/>
-                </button>
-                <div class="o_scan_doc_wrap">
-                    <a
-                        class="o_scan_doc o_scan_doc_link"
-                        href="#"
-                        title="打开拣货单"
-                        t-on-click.prevent="onOpenPicking"
-                    ><t t-out="state.picking_name" /></a>
-                    <div class="o_scan_doc_progress">
-                        进度：<t t-out="state.total_done" />/<t t-out="state.total_demand" />
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    class="o_scan_refresh_btn"
-                    title="刷新单据"
-                    t-att-disabled="state.scanning or state.pullRefresh === 'refreshing' ? 'disabled' : ''"
-                    t-on-click="() => this.onRefreshPicking()"
-                >
-                    <i
-                        t-att-class="'fa fa-refresh' + (state.pullRefresh === 'refreshing' ? ' fa-spin' : '')"
-                        aria-hidden="true"
-                    />
-                </button>
+            <!-- Brand strip (design header) -->
+            <div class="o_scan_brand">
+                <span class="o_scan_brand_chip">BY ODOO</span>
             </div>
 
-            <!-- Scan row: back + input(with barcode icon) + camera (design 23) -->
+            <!-- Top bar: big doc button + source / refresh buttons -->
+            <div class="o_scan_topbar" t-if="state.picking_id">
+                <a
+                    class="o_scan_doc_btn"
+                    href="#"
+                    title="打开拣货单"
+                    t-on-click.prevent="onOpenPicking"
+                ><span t-out="state.picking_name" /></a>
+                <div class="o_scan_top_actions">
+                    <button
+                        type="button"
+                        class="o_scan_src_btn"
+                        t-on-click="onOpenSourcePicking"
+                        title="查看源单据"
+                    >
+                        <img class="o_scan_src_icon" src="/stock_barcodes_picking/static/src/img/top_doc.svg" alt=""/>
+                    </button>
+                    <button
+                        type="button"
+                        class="o_scan_refresh_btn"
+                        title="刷新单据"
+                        t-att-disabled="state.scanning or state.pullRefresh === 'refreshing' ? 'disabled' : ''"
+                        t-on-click="() => this.onRefreshPicking()"
+                    >
+                        <img
+                            t-att-class="'o_scan_refresh_icon' + (state.pullRefresh === 'refreshing' ? ' is-spinning' : '')"
+                            src="/stock_barcodes_picking/static/src/img/icon_refresh.svg"
+                            alt=""
+                        />
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress: 进度：1 / 12 + green fill track -->
+            <div class="o_scan_progress" t-if="state.picking_id">
+                <span class="o_scan_progress_lbl">进度：</span>
+                <span class="o_scan_progress_done" t-out="state.total_done" />
+                <span class="o_scan_progress_sep">/</span>
+                <span class="o_scan_progress_total" t-out="state.total_demand" />
+                <span class="o_scan_progress_track">
+                    <span
+                        class="o_scan_progress_fill"
+                        t-att-style="'width: ' + this.progressPercent + '%'"
+                    />
+                </span>
+            </div>
+
+            <!-- Scan row: back + input + camera + cog -->
             <div class="o_scan_scanrow">
                 <button
                     type="button"
@@ -60,11 +74,6 @@
                     t-on-click="onBack"
                     title="返回">
                     <img class="o_scan_back_icon" src="/stock_barcodes_picking/static/src/img/icon_back.svg" alt=""/>
-                    <img
-                        class="o_scan_back_icon o_scan_icon_pressed"
-                        src="/stock_barcodes_picking/static/src/img/icon_back_blue.svg"
-                        alt=""
-                    />
                 </button>
                 <div class="o_scan_input_wrap">
                     <img class="o_scan_barcode_icon" src="/stock_barcodes_picking/static/src/img/icon_barcode.svg" alt=""/>
@@ -75,60 +84,72 @@
                         t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
                         t-on-keydown="onManualScanEnter"
                     />
-                    <button
-                        type="button"
-                        class="o_scan_cam_inline o_picking_scan_camera"
-                        t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
-                        t-on-click="onCameraScan"
-                        aria-label="扫码"
-                        title="扫码"
-                    >
-                        <img class="o_scan_camera_icon" src="/stock_barcodes_picking/static/src/img/icon_camera.svg" alt=""/>
-                    </button>
                 </div>
+                <button
+                    type="button"
+                    class="o_scan_key o_picking_scan_camera"
+                    t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
+                    t-on-click="onCameraScan"
+                    aria-label="扫码"
+                    title="扫码"
+                >
+                    <img class="o_scan_camera_icon" src="/stock_barcodes_picking/static/src/img/icon_camera.svg" alt=""/>
+                </button>
                 <CogMenu t-if="state.picking_id" t-props="cogMenuProps"/>
             </div>
 
-            <!-- Hint bar: mode hint / status / active target, one line each -->
+            <!-- Hint card: mode hint / status / active target -->
             <div t-if="state.message || state.active_move_product_name || state.last_unmatched_barcode || state.scan_mode !== 'default'"
                  t-att-class="'o_scan_hintbar ' + (state.message ? alertClass : '')">
                 <div class="o_scan_hint_text">
                     <div
                         class="o_scan_hint_line"
                         t-if="state.scan_mode !== 'default' and state.mode_hint and state.mode_hint != state.message"
-                    ><t t-out="state.mode_hint" /></div>
+                    >
+                        <span class="o_scan_hint_ico"><i class="fa fa-cube" aria-hidden="true"/></span>
+                        <span class="o_scan_hint_line_text" t-out="state.mode_hint" />
+                    </div>
                     <div class="o_scan_hint_line" t-if="state.message">
-                        <t t-out="state.message" />
+                        <span class="o_scan_hint_ico"><i class="fa fa-barcode" aria-hidden="true"/></span>
+                        <span class="o_scan_hint_line_text" t-out="state.message" />
                     </div>
                     <div class="o_scan_hint_line" t-if="state.active_move_product_name">
-                        当前操作： <t t-out="state.active_move_product_name" />
+                        <span class="o_scan_hint_ico"><i class="fa fa-mouse-pointer" aria-hidden="true"/></span>
+                        <span class="o_scan_hint_line_text">
+                            当前操作： <t t-out="state.active_move_product_name" />
+                        </span>
                     </div>
                 </div>
                 <button
                     t-if="state.last_unmatched_barcode"
                     type="button"
-                    class="btn btn-sm btn-outline-primary"
+                    class="o_scan_hint_action"
                     t-on-click="onForceAddFromBarcode"
                 >
                     <i class="fa fa-plus me-1"/>Force add "<t t-out="state.last_unmatched_barcode" />"
                 </button>
             </div>
 
-            <!-- Section title -->
-            <div class="o_scan_section_title" t-if="state.rows.length">产品</div>
+            <!-- Product section header: 产品 ───── ITEMS -->
+            <div class="o_scan_section_title" t-if="state.rows.length">
+                <span class="o_scan_section_label">产品</span>
+                <span class="o_scan_section_line" />
+                <span class="o_scan_section_count">
+                    <t t-out="state.rows.length" /> ITEMS
+                </span>
+            </div>
 
             <!-- Candidate-picking selector overlay (multi-match) -->
-            <div t-if="state.visible_switch_selector"
-                 class="o_picking_scan_selector p-3 border rounded bg-warning bg-opacity-10">
-                <div class="fw-bold mb-2">
+            <div t-if="state.visible_switch_selector" class="o_picking_scan_selector">
+                <div class="o_scan_selector_title">
                     <i class="fa fa-exclamation-triangle me-1"/>
                     Multiple transfers match — select one:
                 </div>
-                <div class="list-group">
+                <div class="o_scan_selector_list">
                     <t t-foreach="state.pending_switch_pickings" t-as="p" t-key="p.id">
                         <button
                             type="button"
-                            class="list-group-item list-group-item-action"
+                            class="o_scan_selector_item"
                             t-on-click="() => this.onSelectPickingCandidate(p.id)"
                         >
                             <i class="fa fa-file-text-o me-2"/>
@@ -148,7 +169,7 @@
                 >确认拣货</button>
             </div>
 
-            <!-- Pull-to-refresh feedback (touch gesture on the list) -->
+            <!-- Pull-to-refresh feedback -->
             <div
                 class="o_scan_pull_indicator"
                 t-if="state.pullRefresh !== 'idle'"
@@ -163,188 +184,35 @@
                 <span t-else="">下拉刷新</span>
             </div>
 
-            <!-- Product rows (v4: one card per move, packages on the lot) -->
+            <!-- Product rows (v4: one card per move / package split) -->
             <div class="o_picking_scan_rows o_picking_scan_moves">
                 <div t-if="!state.rows.length" class="o_scan_empty">
                     <t t-out="this.tr('Scan a transfer name or product to begin.')" />
                 </div>
-                <t t-foreach="state.rows" t-as="row" t-key="row.row_key">
-                    <div
-                        t-att-class="'o_scan_row' + (state.active_move_id === row.move_id ? ' is-selected' : '')"
-                        t-att-data-scan-row="row.row_key"
-                    >
-                        <div class="o_scan_row_top">
-                            <span>从：<t t-out="row.location_name" /></span>
-                            <span>至：<t t-out="row.location_dest_name" /></span>
-                            <span class="o_scan_row_demand">需求 <t t-out="row.demand_qty" /></span>
-                        </div>
-                        <div
-                            class="o_scan_row_main"
-                            t-on-click="() => this.onSelectMove(row.move_id)"
-                        >
-                            <div class="o_scan_prod_box">
-                                <i class="fa fa-tag" />
-                                <span t-out="row.product_name" />
-                            </div>
-                            <div class="o_scan_side">
-                                <div class="o_scan_picked">
-                                    <span class="o_scan_picked_label">已拣:</span>
-                                    <b
-                                        t-att-class="this.isRowComplete(row) ? 'is-done' : ''"
-                                        t-out="row.picked_qty"
-                                    />
-                                    <span class="o_scan_picked_uom" t-out="row.uom_name" />
-                                </div>
-                                <!-- 数量追溯产品：已拣下方的 修改 / +N -->
-                                <div class="o_scan_qty_btns" t-if="row.tracking === 'none'">
-                                    <button
-                                        t-if="this.quantityEditLot(row)"
-                                        type="button"
-                                        class="o_scan_lot_edit_btn"
-                                        title="修改"
-                                        t-on-click.stop="() => this.onOpenLineEditor(this.quantityEditLot(row), row)"
-                                    >
-                                        <i class="fa fa-pencil" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="o_scan_lot_add"
-                                        title="增加一个单位"
-                                        t-on-click.stop="() => this.onAddMoveQuantity(row.move_id, null, row.package_id)"
-                                    >+1</button>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- 数量追溯产品：卡片上的包裹号 -->
-                        <div
-                            class="o_scan_qty_pkg"
-                            t-if="row.tracking === 'none' and this.quantityPackages(row)"
-                        >
-                            <i class="fa fa-cube" />
-                            <span t-out="this.quantityPackages(row)" />
-                        </div>
-                        <div class="o_scan_lots" t-if="row.tracking !== 'none'">
-                            <t t-set="head" t-value="this.headerLot(row)" />
-                            <!-- 收起态头部：显示当前（最后扫码）批次 -->
-                            <div
-                                t-if="head"
-                                t-att-class="'o_scan_lot_box o_scan_lot_head' + (state.recentScanLotKey === row.row_key + ':' + (head.id or '') ? ' is-scanned' : '')"
-                                t-att-data-scan-lot="row.row_key + ':' + (head.id or '')"
-                            >
-                                <div class="o_scan_lot_select">
-                                    <div class="o_scan_lot_info">
-                                        <div class="o_scan_lot_line">
-                                            <i class="fa fa-barcode" />
-                                            <span
-                                                class="o_scan_lot_name"
-                                                t-out="head.name or '未分配批次'"
-                                            />
-                                        </div>
-                                        <div
-                                            class="o_scan_lot_line o_scan_lot_pkg"
-                                            t-if="head.package_from or head.package_to"
-                                        >
-                                            <i class="fa fa-cube" />
-                                            <span t-out="head.package_from or '未装包'" />
-                                            <t
-                                                t-if="head.package_to and head.package_to !== head.package_from"
-                                            >
-                                                <span class="o_scan_pkg_arrow">›</span>
-                                                <span t-out="head.package_to" />
-                                            </t>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        class="o_scan_row_toggle"
-                                        title="展开/收起批次"
-                                        t-on-click.stop="() => this.onToggleRowLots(row.row_key)"
-                                    >
-                                        <i
-                                            t-att-class="'fa ' + (this.isRowExpanded(row) ? 'fa-chevron-up' : 'fa-chevron-down')"
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                            <!-- 展开面板：全部批次 -->
-                            <div class="o_scan_lots_panel" t-if="this.isRowExpanded(row)">
-                                <t
-                                    t-foreach="row.lots"
-                                    t-as="lot"
-                                    t-key="row.row_key + '_p_' + (lot.id or lot.name or 'none') + (lot.picked ? '_p' : '_r')"
-                                >
-                                    <div
-                                        t-att-class="'o_scan_lot_row' + (state.recentScanLotKey === row.row_key + ':' + (lot.id or '') ? ' is-scanned' : '')"
-                                        t-att-data-scan-lot="row.row_key + ':' + (lot.id or '')"
-                                    >
-                                        <div class="o_scan_lot_info">
-                                            <div class="o_scan_lot_line">
-                                                <i class="fa fa-barcode" />
-                                                <span
-                                                    class="o_scan_lot_name"
-                                                    t-out="lot.name or '未分配批次'"
-                                                />
-                                            </div>
-                                            <div
-                                                class="o_scan_lot_line o_scan_lot_pkg"
-                                                t-if="lot.package_from or lot.package_to"
-                                            >
-                                                <i class="fa fa-cube" />
-                                                <span t-out="lot.package_from or '未装包'" />
-                                                <t
-                                                    t-if="lot.package_to and lot.package_to !== lot.package_from"
-                                                >
-                                                    <span class="o_scan_pkg_arrow">›</span>
-                                                    <span t-out="lot.package_to" />
-                                                </t>
-                                            </div>
-                                        </div>
-                                        <div class="o_scan_lot_actions">
-                                            <span class="o_scan_lot_qty">
-                                                已拣: <t t-out="lot.quantity" />
-                                            </span>
-                                            <button
-                                                t-if="lot.show_add"
-                                                type="button"
-                                                class="o_scan_lot_add"
-                                                title="增加一个单位"
-                                                t-on-click.stop="() => this.onPickReservedLot(row.move_id, lot.id)"
-                                            >+1</button>
-                                            <button
-                                                t-if="lot.picked and lot.line_ids and lot.line_ids.length"
-                                                type="button"
-                                                class="o_scan_lot_edit_btn"
-                                                title="修改"
-                                                t-on-click.stop="() => this.onOpenLineEditor(lot)"
-                                            >
-                                                <i class="fa fa-pencil" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </t>
-                            </div>
-                            <div
-                                t-if="!head"
-                                class="o_scan_lot_box o_scan_lot_empty"
-                            >
-                                <span>未分配批次</span>
-                            </div>
-                        </div>
+                <t t-else="" t-foreach="this.scanColumns" t-as="column" t-key="column_index">
+                    <div class="o_scan_col">
+                        <t t-foreach="column" t-as="row" t-key="row.row_key">
+                            <t t-set="cardOrder" t-value="row_index * 2 + column_index" />
+                            <t t-call="stock_barcodes_picking.PickingScanCard" />
+                        </t>
                     </div>
                 </t>
             </div>
+
             <!-- Footer -->
             <div class="o_scan_footer">
                 <div class="o_scan_footer_progress" t-if="state.picking_id">
-                    进度：<t t-out="state.total_done" /> / <t t-out="state.total_demand" />
+                    <span>进度：</span>
+                    <b class="o_scan_footer_done" t-out="state.total_done" />
+                    <span>/ <t t-out="state.total_demand" /></span>
                 </div>
                 <div class="o_scan_footer_actions">
                     <button
                         t-if="state.picking_id"
                         type="button"
-                        t-att-class="'o_scan_key o_scan_more_btn' + (state.moreMenuOpen ? ' is-open' : '')"
+                        t-att-class="'o_scan_more_btn' + (state.moreMenuOpen ? ' is-open' : '')"
                         t-on-click="() => this.onToggleMoreMenu()"
-                    >更多…</button>
+                    >更多...</button>
                     <div class="o_scan_footer_actions_right">
                         <button
                             t-if="canPutInPack"
@@ -355,7 +223,7 @@
                         <button
                             t-if="state.show_put_in_pack"
                             type="button"
-                            t-att-class="'o_scan_key' + (state.scan_mode === 'pack' ? ' o_scan_key_intent' : '')"
+                            t-att-class="'o_scan_key' + (state.scan_mode === 'pack' ? ' is-active' : '')"
                             title="Pack the picked products into a package: scan or choose one"
                             t-on-click="() => this.onSetPackIntent()"
                             t-out="this.tr(state.scan_mode === 'pack' ? 'Packing…' : 'Pack')"
@@ -407,6 +275,11 @@
             </div>
 
             <!-- 更多… action sheet -->
+            <div
+                class="o_scan_more_backdrop"
+                t-if="state.moreMenuOpen"
+                t-on-click="() => this.onCloseMoreMenu()"
+            ></div>
             <div class="o_scan_more_menu" t-if="state.moreMenuOpen">
                 <button type="button" t-on-click="() => this.onAddProduct()">添加产品</button>
                 <button
@@ -428,7 +301,7 @@
                     t-if="state.show_put_in_pack"
                     type="button"
                     t-on-click="() => this.onStartUnclaimScan()"
-                >取消拣货</button>
+                >扫码取消拣货</button>
                 <button
                     t-if="state.scan_mode !== 'default'"
                     type="button"
@@ -458,7 +331,7 @@
                     </label>
                     <div class="o_scan_edit_actions">
                         <button type="button" t-on-click="() => this.onCloseLineEditor()">取消</button>
-                        <button type="button" t-on-click="() => this.onSaveLineEditor()">保存</button>
+                        <button type="button" class="o_scan_btn_primary" t-on-click="() => this.onSaveLineEditor()">保存</button>
                     </div>
                 </div>
             </div>
@@ -527,4 +400,198 @@
             </div>
         </div>
     </t>
+
+        <t t-name="stock_barcodes_picking.PickingScanCard">
+                    <div
+                        t-att-class="'o_scan_row' + (state.active_row_key === row.row_key ? ' is-selected' : '') + (this.isRowComplete(row) ? ' is-done' : '')"
+                        t-att-data-scan-row="row.row_key"
+                        t-att-style="'order: ' + cardOrder"
+                        t-on-click="() => this.onSelectMove(row.move_id, row.row_key)"
+                    >
+                        <div class="o_scan_row_body">
+                            <div class="o_scan_row_left">
+                                <div class="o_scan_row_top">
+                                    <span class="o_scan_loc_chip">从：<t t-out="row.location_name" /></span>
+                                    <span class="o_scan_loc_chip is-dest">至：<t t-out="row.location_dest_name" /></span>
+                                </div>
+                                <div class="o_scan_prod_box">
+                                    <span t-out="row.product_name" />
+                                </div>
+                            </div>
+                            <div class="o_scan_side">
+                                <span class="o_scan_side_label">需求:</span>
+                                <b class="o_scan_demand_badge" t-out="row.demand_qty" />
+                                <span class="o_scan_side_label">已拣:</span>
+                                <span class="o_scan_picked_value">
+                                    <b
+                                        t-att-class="'o_scan_picked_badge' + (this.isRowComplete(row) ? ' is-done' : '')"
+                                        t-out="row.picked_qty"
+                                    />
+                                    <span class="o_scan_picked_uom" t-out="row.uom_name" />
+                                </span>
+                                <!-- 数量追溯产品：已拣下方的 修改 / +N -->
+                                <div class="o_scan_qty_btns" t-if="row.tracking === 'none'">
+                                    <button
+                                        t-if="this.quantityEditLot(row)"
+                                        type="button"
+                                        class="o_scan_lot_edit_btn"
+                                        title="修改"
+                                        t-on-click.stop="() => this.onOpenLineEditor(this.quantityEditLot(row), row)"
+                                    >
+                                        <i class="fa fa-pencil" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="o_scan_lot_add"
+                                        title="增加一个单位"
+                                        t-on-click.stop="() => this.onAddMoveQuantity(row.move_id, null, row.package_id)"
+                                    >+1</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 数量追溯产品：卡片上的包裹号 -->
+                        <div
+                            class="o_scan_qty_pkg"
+                            t-if="row.tracking === 'none' and this.quantityPackages(row)"
+                        >
+                            <img
+                                class="o_scan_pkg_ico"
+                                src="/stock_barcodes_picking/static/src/img/icon_cube_scan.svg"
+                                alt=""
+                            />
+                            <span t-out="this.quantityPackages(row)" />
+                        </div>
+                        <div class="o_scan_lots" t-if="row.tracking !== 'none'">
+                            <t t-set="head" t-value="this.headerLot(row)" />
+                            <!-- 收起态头部：显示当前（最后扫码）批次 -->
+                            <div
+                                t-if="head"
+                                t-att-class="'o_scan_lot_box o_scan_lot_head' + (state.recentScanLotKey === row.row_key + ':' + (head.id or '') ? ' is-scanned' : '')"
+                                t-att-data-scan-lot="row.row_key + ':' + (head.id or '')"
+                            >
+                                <div class="o_scan_lot_select">
+                                    <div class="o_scan_lot_info">
+                                        <div class="o_scan_lot_line">
+                                            <img
+                                                class="o_scan_lot_ico"
+                                                src="/stock_barcodes_picking/static/src/img/icon_lot_barcode.svg"
+                                                alt=""
+                                            />
+                                            <span
+                                                class="o_scan_lot_name"
+                                                t-out="head.name or '未分配批次'"
+                                            />
+                                        </div>
+                                        <div
+                                            class="o_scan_lot_line o_scan_lot_pkg"
+                                            t-if="head.package_from or head.package_to"
+                                        >
+                                            <img
+                                                class="o_scan_lot_pkg_ico"
+                                                src="/stock_barcodes_picking/static/src/img/icon_cube_scan.svg"
+                                                alt=""
+                                            />
+                                            <span t-out="head.package_from or '未装包'" />
+                                            <t
+                                                t-if="head.package_to and head.package_to !== head.package_from"
+                                            >
+                                                <span class="o_scan_pkg_arrow">›</span>
+                                                <span t-out="head.package_to" />
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="o_scan_row_toggle"
+                                        title="展开/收起批次"
+                                        t-on-click.stop="() => this.onToggleRowLots(row.row_key)"
+                                    >
+                                        <img
+                                            t-att-class="'o_scan_chevron' + (this.isRowExpanded(row) ? ' is-open' : '')"
+                                            src="/stock_barcodes_picking/static/src/img/icon_chevron.svg"
+                                            alt=""
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- 展开面板：全部批次 -->
+                            <div class="o_scan_lots_panel" t-if="this.isRowExpanded(row)">
+                                <t
+                                    t-foreach="row.lots"
+                                    t-as="lot"
+                                    t-key="row.row_key + '_p_' + (lot.id or lot.name or 'none') + (lot.picked ? '_p' : '_r')"
+                                >
+                                    <div
+                                        t-att-class="'o_scan_lot_row' + (state.recentScanLotKey === row.row_key + ':' + (lot.id or '') ? ' is-scanned' : '')"
+                                        t-att-data-scan-lot="row.row_key + ':' + (lot.id or '')"
+                                    >
+                                        <div class="o_scan_lot_info">
+                                            <div class="o_scan_lot_line">
+                                                <img
+                                                class="o_scan_lot_ico"
+                                                src="/stock_barcodes_picking/static/src/img/icon_lot_barcode.svg"
+                                                alt=""
+                                            />
+                                                <span
+                                                    class="o_scan_lot_name"
+                                                    t-out="lot.name or '未分配批次'"
+                                                />
+                                            </div>
+                                            <div
+                                                class="o_scan_lot_line o_scan_lot_pkg"
+                                                t-if="lot.package_from or lot.package_to"
+                                            >
+                                                <img
+                                                    class="o_scan_lot_pkg_ico"
+                                                    src="/stock_barcodes_picking/static/src/img/icon_cube_scan.svg"
+                                                    alt=""
+                                                />
+                                                <span t-out="lot.package_from or '未装包'" />
+                                                <t
+                                                    t-if="lot.package_to and lot.package_to !== lot.package_from"
+                                                >
+                                                    <span class="o_scan_pkg_arrow">›</span>
+                                                    <span t-out="lot.package_to" />
+                                                </t>
+                                            </div>
+                                        </div>
+                                        <div class="o_scan_lot_actions">
+                                            <span class="o_scan_lot_demand">
+                                                <span class="o_scan_lot_demand_label">需求:</span>
+                                                <b class="o_scan_lot_demand_badge" t-out="lot.demand_qty" />
+                                            </span>
+                                            <span class="o_scan_lot_picked">
+                                                <span class="o_scan_lot_qty">
+                                                    已拣: <t t-out="lot.quantity" />
+                                                </span>
+                                                <button
+                                                    t-if="lot.picked and lot.line_ids and lot.line_ids.length"
+                                                    type="button"
+                                                    class="o_scan_lot_edit_btn"
+                                                    title="修改"
+                                                    t-on-click.stop="() => this.onOpenLineEditor(lot)"
+                                                >
+                                                    <i class="fa fa-pencil" />
+                                                </button>
+                                                <button
+                                                    t-if="lot.show_add"
+                                                    type="button"
+                                                    class="o_scan_lot_add"
+                                                    title="增加一个单位"
+                                                    t-on-click.stop="() => this.onPickReservedLot(row.move_id, lot.id)"
+                                                >+1</button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                            <div
+                                t-if="!head"
+                                class="o_scan_lot_box o_scan_lot_empty"
+                            >
+                                <span>未分配批次</span>
+                            </div>
+                        </div>
+                    </div>
+        </t>
 </templates>

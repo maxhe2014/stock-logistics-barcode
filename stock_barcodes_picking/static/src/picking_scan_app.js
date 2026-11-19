@@ -138,6 +138,10 @@ export class PickingScanApp extends Component {
             visible_switch_selector: false,
             pending_switch_pickings: [],
             active_move_id: false,
+            // Row-level selection. A move can render several rows (package
+            // split / unpacked remainder), so highlighting must follow the
+            // clicked row instead of every row sharing active_move_id.
+            active_row_key: "",
             active_move_product_name: "",
             scan_steps: [],
             step: 0,
@@ -278,6 +282,28 @@ export class PickingScanApp extends Component {
         );
         Object.assign(this.state, snapshot);
         this._enrichMoves();
+        this._syncActiveRow();
+    }
+
+    /**
+     * Keep the selected row consistent with the backend active move, while
+     * never highlighting more than one row. Several rows can share one
+     * move_id (one row per destination package), so the visual selection is
+     * tracked with row_key.
+     */
+    _syncActiveRow() {
+        const rows = this.state.rows || [];
+        const activeMove = this.state.active_move_id;
+        const current = rows.find(
+            (row) => row.row_key === this.state.active_row_key
+        );
+        if (current && current.move_id === activeMove) {
+            return;
+        }
+        const fallback = activeMove
+            ? rows.find((row) => row.move_id === activeMove)
+            : null;
+        this.state.active_row_key = fallback ? fallback.row_key : "";
     }
 
     // ---------- pull-to-refresh + topbar refresh button ----------
@@ -806,12 +832,14 @@ export class PickingScanApp extends Component {
      * Click a move row to preselect the target move.
      * Narrow subsequent lot/qty scans to this move.
      */
-    async onSelectMove(moveId) {
+    async onSelectMove(moveId, rowKey) {
         if (this.state.scanning || !this.wizId) {
             return;
         }
-        // Toggle: clicking the row that is already selected clears it.
-        const targetId = this.state.active_move_id === moveId ? false : moveId;
+        // Toggle on the clicked row (not on the move): a move can be split
+        // into several rows, and clicking one must not select the others.
+        const isSameRow = this.state.active_row_key === rowKey;
+        const targetId = isSameRow ? false : moveId;
         try {
             const ok = await this.orm.call(
                 "wiz.stock.barcodes.picking",
@@ -819,6 +847,7 @@ export class PickingScanApp extends Component {
                 [[this.wizId], targetId]
             );
             if (ok) {
+                this.state.active_row_key = targetId ? rowKey : "";
                 await this._refreshState();
             }
         } catch (err) {
@@ -934,6 +963,7 @@ export class PickingScanApp extends Component {
                         [[this.wizId], mv.id, mv.package_id, qty, true]
                     );
                 }
+                this.state.active_row_key = mv.row_key;
                 await this._handleActionResult(res, "Edit quantity");
             } else {
                 // 1. Bind the target move
@@ -947,6 +977,7 @@ export class PickingScanApp extends Component {
                     this._playAlert();
                     return;
                 }
+                this.state.active_row_key = mv.row_key;
                 // 2. Consume with the entered quantity
                 const res = await this.orm.call(
                     "wiz.stock.barcodes.picking",
@@ -1503,6 +1534,11 @@ export class PickingScanApp extends Component {
     /** Toggle the "more" action sheet (design: 更多…). */
     onToggleMoreMenu() {
         this.state.moreMenuOpen = !this.state.moreMenuOpen;
+    }
+
+    /** Close the more sheet when the user taps outside it. */
+    onCloseMoreMenu() {
+        this.state.moreMenuOpen = false;
     }
 
     /** Back to the direction default picking mode. */
@@ -2079,6 +2115,31 @@ export class PickingScanApp extends Component {
             !this.state.visible_force_add &&
             (this.state.product_qty || 0) > 0
         );
+    }
+
+    /**
+     * Two independent columns for the tablet/desktop masonry layout:
+     * even rows go left, odd rows go right. On mobile the columns use
+     * ``display: contents`` and each card's inline ``order`` restores the
+     * original row sequence.
+     */
+    get scanColumns() {
+        const left = [];
+        const right = [];
+        (this.state.rows || []).forEach((row, index) => {
+            (index % 2 === 0 ? left : right).push(row);
+        });
+        return [left, right];
+    }
+
+    /** Progress bar fill ratio (0-100) for the topbar progress track. */
+    get progressPercent() {
+        const total = Number(this.state.total_demand) || 0;
+        const done = Number(this.state.total_done) || 0;
+        if (total <= 0) {
+            return 0;
+        }
+        return Math.max(0, Math.min(100, (done / total) * 100));
     }
 
     /** Validate button: picking exists and is in a validatable state. */

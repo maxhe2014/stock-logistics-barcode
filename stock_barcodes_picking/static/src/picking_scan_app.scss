@@ -1,414 +1,381 @@
-// Picking scan app — responsive card-stack layout.
-// Design source: /home/max/下载/扫码设计 (Pixso export, values pixel-verified
-// against PNG). Dark theme lives in picking_scan_app.dark.scss and follows
-// Odoo's color_scheme (web_dark_mode module cookie), not the OS setting.
+// Picking scan app — "Beast" light theme.
+// Design source: Pixso file QCYzTmFbRuUHHkLF-fg7TA, page 7:1188, frame 14:12481
+// ("手机扫码APP"). Pixel-verified values:
+//   page #F7F3E8, card #FFFFFF, ink #111111, secondary #555555,
+//   yellow #FFE500, pink #FF4D97, green #00D97E, orange #FF6B2C, blue #4361EE,
+//   divider #BBB6A6. Cards: 3px border + 3px left status stripe + 4/4 shadow.
+// Dark values come from the Pixso variable set "扫码页主题 / 暗色模式" and live
+// in picking_scan_app.dark.scss (web.assets_web_dark).
 
-// 命中高亮保持到下一次扫描（由 JS 的 recentScanLotKey 控制，不自动消失）
 .o_picking_scan_app {
-    --scan-page: #F2E9E2;
-    --scan-card: #FDF7F4;
-    --scan-frame: #DED5CE;
-    --scan-text: #000000;
-    --scan-text-2: #74787B;
-    --scan-row-bg: rgba(37, 77, 195, 0.12);
-    --scan-fold-bg: rgba(37, 77, 195, 0.22);
-    // 信息框：米色卡片底 + 蓝色文字（新拟态）
-    --scan-hint-bg: #D2D9EC;
-    --scan-hint-fg: #254DC3;
-    --scan-hint-border: transparent;
-    --scan-hint-shadow: transparent;
-    --scan-ok-bg: #66E7B0;
-    --scan-ok-fg: #000000;
-    --scan-ok-border: transparent;
-    --scan-ok-shadow: transparent;
-    --scan-danger-bg: #F0315B;
-    --scan-danger-fg: #FFFFFF;
-    // 硅胶风格（新拟态）：按钮与页面同色，靠左上高光 + 右下暗影形成凸起
-    --scan-key-bg: #F2E9E2;
-    --scan-key-fg: #000000;
-    --scan-key-shadow: #DED5CE;
-    --scan-key-light: #FDF7F4;
-    --scan-group: #F2E9E2;
-    --scan-lot-bg: #FDF7F4;
-    --scan-green: #254DC3;
-    --scan-purple: #8174AA;
-    --scan-hl: rgba(37, 77, 195, 0.28);
+    --scan-page: #F7F3E8;
+    --scan-card: #FFFFFF;
+    --scan-ink: #111111;
+    --scan-ink-2: #555555;
+    --scan-divider: #BBB6A6;
+    --scan-yellow: #FFE500;
+    --scan-pink: #FF4D97;
+    --scan-green: #00D97E;
+    --scan-orange: #FF6B2C;
+    --scan-blue: #4361EE;
+    // Text/borders drawn on top of an accent fill (yellow / green / orange).
+    --scan-on-accent: #111111;
+    // Pixso variables: 描边/主 (borders + card shadows), 描边/深 (button
+    // shadows), 背景/深色条 (chips + footer).
+    --scan-border: #111111;
+    --scan-shadow: #111111;
+    --scan-shadow-deep: #111111;
+    --scan-darkbar: #111111;
+    --scan-lot-bg: #FFFFFF;
+    --scan-footer-bg: #111111;
+    --scan-hl: rgba(255, 229, 0, 0.35);
+    --scan-hint-bg: var(--scan-yellow);
+    --scan-hint-fg: var(--scan-on-accent);
+    --scan-ok-bg: var(--scan-green);
+    --scan-danger-bg: var(--scan-pink);
 
     background: var(--scan-page);
-    color: var(--scan-text);
+    color: var(--scan-ink);
     overflow: hidden;
+    box-sizing: border-box;
 
-    &[data-theme="dark"] {
-        --scan-page: #161D20;
-        --scan-card: #48525C;
-        --scan-frame: #3B4543;
-        --scan-group: #161D20;
-        --scan-lot-bg: #404144;
-        --scan-text: #FFFFFF;
-        --scan-text-2: #A4A5A6;
-        --scan-row-bg: rgba(37, 77, 195, 0.25);
-        --scan-fold-bg: rgba(37, 77, 195, 0.4);
-        --scan-hint-bg: #D2D9EC;
-        --scan-hint-fg: #254DC3;
-        --scan-hint-border: transparent;
-        --scan-hint-shadow: transparent;
-        --scan-ok-bg: #66E7B0;
-        --scan-ok-fg: #000000;
-        --scan-ok-border: transparent;
-        --scan-danger-bg: #F0315B;
-        --scan-danger-fg: #FFFFFF;
-        --scan-key-bg: #48525C;
-        --scan-key-fg: #FFFFFF;
-        --scan-key-shadow: #2A3339;
-        --scan-key-light: #5A656F;
-        --scan-green: #4C7BD9;
-        --scan-purple: #8E82B5;
-        --scan-hl: rgba(76, 123, 217, 0.5);
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
     }
 
-    // ---------- top: source btn + doc name + progress + actions ----------
-    // Design 17: bare icons (no button frame), 20px bold doc name.
+    button {
+        font-family: inherit;
+        border-radius: 0;
+    }
+
+    // Pixso "扫码页主题 / 暗色模式" values.
+    &[data-theme="dark"] {
+        --scan-page: #0B1017;
+        --scan-card: #161E29;
+        --scan-ink: #E6EDF7;
+        --scan-ink-2: #9AA7B8;
+        --scan-divider: #5A6878;
+        --scan-yellow: #C8FF3D;
+        --scan-pink: #FF4D97;
+        --scan-green: #00E5A0;
+        --scan-orange: #FF8A3D;
+        --scan-blue: #4D7CFF;
+        --scan-on-accent: #0B1017;
+        --scan-border: #E6EDF7;
+        --scan-shadow: #E6EDF7;
+        --scan-shadow-deep: #0B1017;
+        --scan-darkbar: #0B1017;
+        --scan-lot-bg: #0B1017;
+        --scan-footer-bg: #0B1017;
+        --scan-hl: rgba(200, 255, 61, 0.25);
+        --scan-hint-bg: var(--scan-yellow);
+        --scan-hint-fg: var(--scan-on-accent);
+        --scan-ok-bg: var(--scan-green);
+        --scan-danger-bg: var(--scan-pink);
+    }
+
+    // ---------- brand strip ----------
+    .o_scan_brand {
+        padding: 10px 16px 0;
+        flex: 0 0 auto;
+    }
+    .o_scan_brand_chip {
+        display: inline-flex;
+        align-items: center;
+        height: 20px;
+        padding: 0 8px;
+        background: var(--scan-pink);
+        border: 2px solid var(--scan-border);
+        color: var(--scan-on-accent);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 3px;
+        line-height: 1;
+    }
+
+    // ---------- top: doc button + source / refresh ----------
     .o_scan_topbar {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 0;
-        padding: 0 10px;
-        min-height: 34px;
+        gap: 8px;
+        padding: 8px 16px 4px;
+        flex: 0 0 auto;
+    }
+    .o_scan_doc_btn {
+        flex: 0 0 auto;
+        width: fit-content;
+        max-width: calc(100% - 100px);
+        min-width: 0;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        padding: 0 6px;
+        background: var(--scan-yellow);
+        border: 2px solid var(--scan-border);
+        box-shadow: 4px 4px 0 var(--scan-shadow-deep);
+        color: var(--scan-on-accent);
+        font-size: 23px;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        line-height: 1;
+        text-decoration: none;
+        overflow: hidden;
+
+        > span {
+            display: block;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        &:hover,
+        &:focus,
+        &:focus-visible {
+            color: var(--scan-on-accent);
+            text-decoration: none;
+        }
+        &:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 var(--scan-shadow-deep);
+        }
+    }
+    .o_scan_top_actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 0 0 auto;
+        margin-left: auto;
     }
     .o_scan_src_btn,
-    .o_scan_refresh_btn,
-    .o_scan_actions_btn,
-    // Odoo 19 CogMenu 按钮结构：.o_cp_action_menus button.btn (不是 dropdown-toggle)
-    .o_scan_topbar .o_cp_action_menus button,
-    .o_scan_scanrow .o_cp_action_menus button {
-        border: 0 !important;
-        width: 30px;
-        height: 30px;
-        border-radius: 4px;
-        background: var(--scan-key-bg);
-        color: var(--scan-key-fg);
+    .o_scan_refresh_btn {
+        width: 38px;
+        height: 38px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        padding: 0;
+        border: 2px solid var(--scan-border);
+        background: var(--scan-yellow);
+        color: var(--scan-on-accent);
+        box-shadow: 4px 4px 0 var(--scan-shadow-deep);
         cursor: pointer;
         flex-shrink: 0;
-        padding: 0;
-        // 新拟态：右下暗影 + 左上高光
-        box-shadow: 2px 2px 4px 4px var(--scan-key-shadow),
-            -2px -2px 4px 4px var(--scan-key-light);
-        &:hover {
-            background: var(--scan-key-bg);
-            color: var(--scan-key-fg);
+
+        &:hover,
+        &:focus,
+        &:focus-visible {
+            background: var(--scan-yellow);
+            color: var(--scan-on-accent);
         }
-        // 按下：内凹更紧，并切换蓝色图标
         &:active:not(:disabled) {
-            box-shadow: inset 2px 2px 2px 2px var(--scan-key-shadow),
-                inset -2px -2px 2px 2px var(--scan-key-light);
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 var(--scan-shadow-deep);
+        }
+        &:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+        > i {
+            font-size: 18px;
+            line-height: 1;
         }
     }
-    // 齿轮按下变蓝（CogMenu 按钮用背景图）
-    .o_scan_topbar .o_cp_action_menus button:active,
-    .o_scan_scanrow .o_cp_action_menus button:active {
-        background-image: url('/stock_barcodes_picking/static/src/img/top_gear_blue.svg');
-    }
-    // CogMenu 里的 FontAwesome fa-cog 隐藏，换成设计稿 gear SVG
-    .o_scan_topbar .o_cp_action_menus button > i.fa-cog,
-    .o_scan_topbar .o_cp_action_menus button > i,
-    .o_scan_scanrow .o_cp_action_menus button > i.fa-cog,
-    .o_scan_scanrow .o_cp_action_menus button > i {
-        display: none;
-    }
-    .o_scan_topbar .o_cp_action_menus button,
-    .o_scan_scanrow .o_cp_action_menus button {
-        background-image: url('/stock_barcodes_picking/static/src/img/top_gear.svg');
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: 19.68px 18.57px;
-    }
-    // Bootstrap 在 hover / :active / .show / :focus 时会重置 background（导致齿轮消失或平铺），这里锁死
-    .o_scan_topbar .o_cp_action_menus button:hover,
-    .o_scan_topbar .o_cp_action_menus button:focus,
-    .o_scan_topbar .o_cp_action_menus button:focus-visible,
-    .o_scan_topbar .o_cp_action_menus button:active,
-    .o_scan_topbar .o_cp_action_menus button.show,
-    .o_scan_scanrow .o_cp_action_menus button:hover,
-    .o_scan_scanrow .o_cp_action_menus button:focus,
-    .o_scan_scanrow .o_cp_action_menus button:focus-visible,
-    .o_scan_scanrow .o_cp_action_menus button:active,
-    .o_scan_scanrow .o_cp_action_menus button.show {
-        background-color: var(--scan-key-bg) !important;
-        background-image: url('/stock_barcodes_picking/static/src/img/top_gear.svg') !important;
-        background-repeat: no-repeat !important;
-        background-position: center !important;
-        background-size: 19.68px 18.57px !important;
-        border: 0 !important;
-    }
-    // 按下时只换蓝色齿轮，其余外观不变
-    .o_scan_topbar .o_cp_action_menus button:active,
-    .o_scan_scanrow .o_cp_action_menus button:active {
-        background-image: url('/stock_barcodes_picking/static/src/img/top_gear_blue.svg') !important;
-    }
-    // 去掉 Odoo CogMenu 可能带的下拉箭头 caret
-    .o_scan_topbar .o_cp_action_menus,
-    .o_scan_topbar .o_cp_action_menus .lh-1,
-    .o_scan_scanrow .o_cp_action_menus,
-    .o_scan_scanrow .o_cp_action_menus .lh-1 {
-        gap: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    // 右上角刷新键：图标随按钮文字颜色（浅色黑、深色白）
-    .o_scan_refresh_btn i {
-        font-size: 15px;
-        line-height: 1;
-    }
-    // SVG icons inside the topbar buttons.
     .o_scan_src_icon {
-        width: 18px;
-        height: 19px;
+        width: 15px;
+        height: 18px;
         display: block;
     }
-    .o_scan_doc_wrap {
-        flex: none;
-        min-width: 0;
-        text-align: center;
+    .o_scan_refresh_icon {
+        width: 17px;
+        height: 17px;
+        display: block;
+
+        &.is-spinning {
+            animation: o_scan_spin 1s linear infinite;
+        }
     }
-    .o_scan_doc {
-        font-size: 20px;
+
+    // ---------- progress ----------
+    .o_scan_progress {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 16px 0;
+        line-height: 20px;
+        flex: 0 0 auto;
+    }
+    .o_scan_progress_lbl,
+    .o_scan_progress_sep,
+    .o_scan_progress_total {
+        font-size: 11px;
         font-weight: 700;
-        line-height: 25px;
-        overflow: hidden;
-        text-overflow: ellipsis;
         white-space: nowrap;
     }
-    // 单据号超链接：保持设计稿黑色粗体，悬停加下划线提示可点击
-    .o_scan_doc_link {
-        display: block;
-        color: inherit;
-        text-decoration: none;
-        cursor: pointer;
-        &:hover,
-        &:focus-visible {
-            color: inherit;
-            text-decoration: underline;
-        }
+    .o_scan_progress_done {
+        font-size: 13px;
+        font-weight: 900;
+        line-height: 17px;
+        white-space: nowrap;
     }
-    .o_scan_doc_progress {
-        font-size: 12px;
-        line-height: 18px;
-        color: var(--scan-text);
+    .o_scan_progress_track {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 11px;
+        margin-left: 4px;
+        background: var(--scan-card);
+        border: 2px solid var(--scan-border);
+        overflow: hidden;
+        display: block;
+    }
+    .o_scan_progress_fill {
+        display: block;
+        height: 100%;
+        background: var(--scan-green);
+        transition: width 0.2s ease;
     }
 
     // ---------- scan row ----------
     .o_scan_scanrow {
         display: flex;
         align-items: center;
-        gap: 5px;
-        padding: 0 10px;
-        margin-top: 2px;       // 与顶栏的微小间距
-
-        // 扫码输入框：白底、无边框、圆角 8（硅胶风格画板 241×30 / r8）
-        .o_scan_input_wrap {
-            flex: 1 1 0%;      // 全宽自适应，min-width:0 让 flex item 可压缩
-            min-width: 0;
-            height: 30px;
-            border: 0;
-            border-radius: 8px;
-            background: #FFFFFF;
-            padding: 0 4px 0 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-
-            .o_scan_barcode_icon {
-                width: 17px;
-                height: 14.27px;
-                flex-shrink: 0;
-                display: block;
-                opacity: 0.45;
-            }
-
-            .o_picking_scan_input {
-                flex: 1 1 0%;
-                min-width: 0;
-                border: 0;
-                outline: none;
-                background: transparent;
-                height: 100%;
-                padding: 0;
-                font-size: 15px;
-                color: #000000;
-                &::placeholder {
-                    color: #DED5CE;
-                }
-            }
-
-            // 相机按钮内嵌在输入框里（设计稿：灰色图标，无独立按钮底）
-            .o_scan_cam_inline {
-                width: 28px;
-                height: 26px;
-                flex: 0 0 28px;
-                border: 0;
-                background: transparent;
-                box-shadow: none;
-                padding: 0;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-
-                &:disabled {
-                    opacity: 0.45;
-                }
-            }
-        }
-    }
-
-    // 返回/相机按钮里的 SVG 图标（已裁掉 SVG 画布留白，按真实字形尺寸渲染）
-    .o_scan_back_icon {
-        width: 19.18px;
-        height: 16.78px;
-        display: block;
-    }
-    .o_scan_camera_icon {
-        width: 20px;
-        height: 18.57px;
-        display: block;
-        opacity: 0.55;
-    }
-
-    // key-style button (footer actions)：硅胶风格 26px 高
-    .o_scan_key {
-        height: 26px;
-        min-width: 40px;
-        font-size: 12px;
-        // Never shrink below the label: on narrow screens the footer wraps
-        // instead of squeezing the button (text used to spill outside).
-        flex-shrink: 0;
-    }
-    // 返回键与相机键等宽（30px），纯图标
-    .o_picking_scan_back,
-    .o_picking_scan_camera {
-        width: 30px;
-        height: 30px;
-        padding-left: 0;
-        padding-right: 0;
-        flex-shrink: 0;
-    }
-    .o_scan_key {
-        padding: 0 12px;
-        border: 0;
-        border-radius: 4px;
-        background: var(--scan-key-bg);
-        color: var(--scan-key-fg);
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        // 新拟态：右下暗影 + 左上高光（spread 4）
-        box-shadow: 2px 2px 4px 4px var(--scan-key-shadow),
-            -2px -2px 4px 4px var(--scan-key-light);
-        white-space: nowrap;
-
-        // 按下：阴影内凹
-        &:active:not(:disabled) {
-            box-shadow: inset 2px 2px 2px 2px var(--scan-key-shadow),
-                inset -2px -2px 2px 2px var(--scan-key-light);
-        }
-        &:disabled {
-            opacity: 0.6;
-        }
-    }
-    // 真实字形尺寸覆盖（按钮内的图标）
-    .o_picking_scan_back .o_scan_back_icon {
-        width: 19.18px;
-        height: 16.78px;
-    }
-    // 返回键固定 30×30、无内边距（避免 o_scan_key 的 12px padding 压缩图标）
-    .o_scan_scanrow > .o_picking_scan_back {
-        width: 30px;
-        min-width: 30px;
-        height: 30px;
-        padding: 0;
-    }
-    .o_scan_back_icon {
+        gap: 8px;
+        padding: 8px 16px 5px;
         flex: 0 0 auto;
-    }
-    // 按下态切换成蓝色箭头（第二张图常驻隐藏）
-    .o_scan_icon_pressed {
-        display: none;
-    }
-    .o_scan_scanrow > .o_picking_scan_back:active .o_scan_back_icon:not(.o_scan_icon_pressed) {
-        display: none;
-    }
-    .o_scan_scanrow > .o_picking_scan_back:active .o_scan_icon_pressed {
-        display: block;
-    }
-    // 抬头返回键按下：内凹 2/2/2/2（设计稿「按钮 / 状态=按下」）
-    .o_scan_scanrow .o_picking_scan_back:active:not(:disabled) {
-        transform: none;
-        box-shadow: inset 2px 2px 2px 2px var(--scan-key-shadow),
-            inset -2px -2px 2px 2px var(--scan-key-light);
-    }
-    // 更多…：设计稿是纯文字，没有键帽底
-    .o_scan_key.o_scan_more_btn {
-        background: transparent;
-        box-shadow: none;
-        padding: 0 4px;
-        &:active:not(:disabled) {
-            transform: none;
-            box-shadow: none;
-        }
-        // 展开动作面板时文字变蓝
-        &.is-open {
-            color: var(--scan-green);
-        }
-    }
-    .o_scan_key_primary {
-        background: var(--scan-green);
-        color: #FFFFFF;
-    }
-    .o_scan_key_warn {
-        background: #C97E1B;
-        color: #FFFFFF;
-    }
-    // Pack intent (one-shot): the next package scan packs into a package
-    // instead of picking it as a whole.
-    .o_scan_key_intent {
-        background: var(--scan-purple);
-        color: #FFFFFF;
-        font-weight: 600;
-    }
-    .o_scan_key_small {
-        min-width: 34px;
-        padding: 0 8px;
-    }
 
-    // ---------- hint bar (design 2: 青底信息 / 红底错误 / 绿底成功) ----------
-    .o_scan_hintbar {
-        margin: 6px 10px 0;    // 上方与扫码行 gap:5px，左右对齐按钮 padding
-        min-height: 28px;
-        // 内容多（多行/换行）时按内容增高，不被列表/页面挤压
-        flex: 0 0 auto;
-        box-sizing: border-box;
-        border: 1px solid var(--scan-hint-border);
-        border-radius: 6px;
-        // 上下留出与行高匹配的填充（3 行及以上不贴边）
-        padding: 6px 10px;
-        background-color: var(--scan-hint-bg);
-        color: var(--scan-hint-fg);
-        font-size: 12px;
-        line-height: 20px;
-        box-shadow: none;
-        // 状态文案 + 模式提示合并到同一行
+        .o_scan_key {
+            width: 38px;
+            min-width: 38px;
+            height: 38px;
+            padding: 0;
+            border: 2px solid var(--scan-border);
+            background: var(--scan-card);
+            color: var(--scan-ink);
+            box-shadow: 4px 4px 0 var(--scan-shadow-deep);
+        }
+        .o_picking_scan_camera {
+            background: var(--scan-yellow);
+            color: var(--scan-on-accent);
+
+            &:hover,
+            &:focus,
+            &:focus-visible {
+                background: var(--scan-yellow);
+                color: var(--scan-on-accent);
+            }
+        }
+        .o_scan_key:active:not(:disabled) {
+            border-color: var(--scan-border);
+        }
+    }
+    .o_scan_input_wrap {
+        flex: 1 1 0%;
+        min-width: 0;
+        height: 38px;
         display: flex;
         align-items: center;
         gap: 8px;
-        // Long barcodes / product names wrap onto new lines instead of
-        // being clipped; the bar grows with the content (min-height keeps
-        // the single-line look).
+        padding: 0 8px;
+        background: var(--scan-card);
+        border: 2px solid var(--scan-border);
+        box-shadow: 4px 4px 0 var(--scan-shadow-deep);
+
+        // Focused input behaves like a pressed control: the whole box drops
+        // 4px down/right and loses its hard shadow, so the operator can see
+        // that this is the active operation target.
+        &:focus-within {
+            transform: translate(4px, 4px);
+            box-shadow: none;
+        }
+
+        .o_scan_barcode_icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            display: block;
+        }
+        .o_picking_scan_input {
+            flex: 1 1 0%;
+            min-width: 0;
+            height: 100%;
+            border: 0;
+            outline: none;
+            background: transparent;
+            padding: 0;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--scan-ink);
+
+            &::placeholder {
+                color: var(--scan-ink-2);
+                font-weight: 700;
+            }
+        }
+    }
+    .o_scan_back_icon {
+        width: 18px;
+        height: 18px;
+        display: block;
+    }
+    .o_scan_camera_icon {
+        width: 17.6px;
+        height: 17.6px;
+        display: block;
+    }
+
+    // Odoo 19 CogMenu renders a plain button inside .o_cp_action_menus.
+    .o_scan_scanrow .o_cp_action_menus,
+    .o_scan_scanrow .o_cp_action_menus .lh-1 {
+        gap: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .o_scan_scanrow .o_cp_action_menus button,
+    .o_scan_scanrow .o_cp_action_menus button:hover,
+    .o_scan_scanrow .o_cp_action_menus button:focus,
+    .o_scan_scanrow .o_cp_action_menus button:focus-visible,
+    .o_scan_scanrow .o_cp_action_menus button:active,
+    .o_scan_scanrow .o_cp_action_menus button.show {
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        border: 2px solid var(--scan-border) !important;
+        border-radius: 0;
+        background-color: var(--scan-card) !important;
+        background-image: url('/stock_barcodes_picking/static/src/img/top_gear.svg') !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-size: 18px 18px !important;
+        box-shadow: 4px 4px 0 var(--scan-shadow-deep);
+        color: var(--scan-ink);
+    }
+    .o_scan_scanrow .o_cp_action_menus button > i {
+        display: none;
+    }
+    .o_scan_scanrow .o_cp_action_menus button:active {
+        transform: translate(2px, 2px);
+        box-shadow: 1px 1px 0 var(--scan-shadow-deep);
+    }
+
+    // ---------- hint card ----------
+    .o_scan_hintbar {
+        margin: 8px 16px 0;
+        padding: 8px 10px;
+        // Fixed three-line height (design: 79px); extra content is clipped.
+        flex: 0 0 79px;
+        height: 79px;
+        overflow: hidden;
+        background: var(--scan-hint-bg);
+        color: var(--scan-hint-fg);
+        border: 2px solid var(--scan-border);
+        box-shadow: none;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 15px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
         word-break: break-word;
         overflow-wrap: anywhere;
 
@@ -417,810 +384,463 @@
             min-width: 0;
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 6px;
         }
         .o_scan_hint_line {
-            display: block;
-        }
-
-        &.alert-success {
-            border-color: var(--scan-ok-border);
-            background-color: var(--scan-ok-bg);
-            color: var(--scan-ok-fg);
-            box-shadow: none;
-        }
-        &.alert-danger {
-            border-color: var(--scan-danger-bg);
-            background-color: var(--scan-danger-bg);
-            color: var(--scan-danger-fg);
-            box-shadow: none;
-        }
-        // Warnings are prompts to act, not failures: keep the info look.
-        &.alert-warning {
-            border-color: var(--scan-hint-border);
-            background-color: var(--scan-hint-bg);
-            color: var(--scan-hint-fg);
-            box-shadow: none;
-        }
-        .btn {
-            line-height: 1.2;
-            padding: 2px 8px;
-            margin-left: 0;
-            flex-shrink: 0;
-        }
-    }
-
-    // ---------- section title ----------
-    .o_scan_section_title {
-        height: 32px;
-        line-height: 32px;
-        text-align: center;
-        font-size: 12px;
-        font-weight: 700;
-        margin-top: 6px;
-        border-bottom: 1px solid rgba(222, 213, 206, 0.55);
-    }
-
-    // ---------- candidate picking overlay ----------
-    .o_picking_scan_selector {
-        margin: 0 12px 8px;
-    }
-
-    // ---------- package stacks ----------
-    .o_picking_scan_moves {
-        flex: 1;
-        padding: 0 12px 8px;
-        overflow-y: auto;
-    }
-
-    .o_scan_stack {
-        background: var(--scan-frame);
-        padding: 5px 5px 0;
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        margin-bottom: 8px;
-        overflow: hidden;
-        min-width: 0;
-        width: 100%;
-
-        // Packed stacks are done: fade them so the operator's eye stays on
-        // the unpacked work on top.
-        &.is-packed {
-            opacity: 0.6;
-        }
-    }
-
-    // ---------- product card ----------
-    .o_scan_card {
-        background: var(--scan-card);
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-
-        &:first-child {
-            border-radius: 4px 4px 0 0;
-
-            // 首张卡片顶部圆角：让选中态内阴影/背景跟随圆角裁切
-            > .o_scan_card_head {
-                border-radius: 4px 4px 0 0;
-            }
-        }
-
-        &.is-selected > .o_scan_card_head {
-            box-shadow: 2px 4px 4px 0 rgba(64, 65, 68, 0.9) inset;
-        }
-    }
-
-    // Global "Packages" setting off: drop the package layer (frame +
-    // footer bar). Cards sit directly on the page background, each one
-    // rounded and clipped on its own, 5px apart as in the design.
-    .o_scan_stack.is-flat {
-        background: transparent;
-        padding: 0;
-        border-radius: 0;
-        overflow: visible;
-        margin-bottom: 5px;
-
-        .o_scan_card {
-            border-radius: 4px;
-            overflow: hidden;
-        }
-    }
-    &[data-theme="dark"] .o_scan_card.is-selected > .o_scan_card_head {
-        background: #404144;
-        box-shadow: 2px 4px 4px 0 rgba(0, 0, 0, 0.9) inset;
-    }
-
-    .o_scan_card_head {
-        display: flex;
-        // row 布局：左边文字堆（flex:1 自适应收缩）+ 右边按钮组（flex-shrink:0 自然宽度）
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        padding: 4px 5px;
-        min-height: 44px;
-        // 宽度约束链：让子元素 flex item 能被压缩
-        width: 100%;
-        min-width: 0;
-
-        &.is-selectable {
-            cursor: pointer;
-        }
-    }
-
-    // 左侧文字块（flex column：源库位 / 产品名 / 元信息 垂直堆）
-    .o_scan_text_block {
-        flex: 1 1 auto;
-        min-width: 0;  // 关键：让这个 flex item 能被压缩 → 子元素能换行
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        overflow: hidden;
-    }
-
-    // 从/至 并排一行（design 17: 9px Regular 灰, opacity .8）
-    .o_scan_pmeta_loc {
-        display: flex;
-        flex-direction: row;
-        gap: 12px;
-        font-size: 9px;
-        font-weight: 400;
-        line-height: 13px;
-        color: var(--scan-text-2);
-        opacity: 0.8;
-        flex-shrink: 0;
-    }
-    .o_scan_pname {
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 17px;
-        // 关键：flex item 可压缩 + 长词换行
-        min-width: 0;
-        width: 100%;
-        word-break: break-word;
-        // 不要 line-clamp —— 设计稿里是自然多行换行
-    }
-    .o_scan_pmeta {
-        font-size: 9px;
-        font-weight: 700;
-        line-height: 13px;
-        color: var(--scan-text-2);
-        flex-shrink: 0;
-    }
-
-    // 右侧按钮组（flex-shrink:0 自然宽度，不用 absolute + padding 硬编码）
-    // 无论按钮 0/1/2/3 个都自适应
-    .o_scan_head_actions {
-        display: flex;
-        flex-direction: row;
-        gap: 5px;
-        align-items: center;
-        flex-shrink: 0;
-        min-width: 0;
-        max-width: 60%;
-        margin-left: 4px;
-
-        // 数量追溯卡：design 20 右侧是纵向两行
-        //   上 = 已拣块，下 = 按钮行
-        // 宽度按内容自适应（min 65px），但不超过卡片一半，保证左侧
-        // 产品名容器始终有空间换行，大数字不会溢出压到文字。
-        &.is-stacked {
-            min-width: 65px;
-            width: auto;
-            max-width: 52%;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0;
-            margin-left: 5px;
-
-            // 数量编辑态：输入框 + 勾 + 叉 需要的宽度，允许向左扩张
-            &.is-editing {
-                width: auto;
-                max-width: 70%;
-            }
-        }
-    }
-    .o_scan_actions_row {
-        display: flex;
-        flex-direction: row;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 5px;
-        width: auto;
-        min-height: 30px;
-    }
-
-    // 已拣块：小标签 + 大号数字 + 单位（design 20 rule 4）
-    // 容器不溢出：数字位数多时自动降档（见 .is-long / .is-xlong）
-    .o_scan_picked {
-        display: inline-flex;
-        flex-direction: row;
-        align-items: baseline;
-        justify-content: flex-end;
-        gap: 3px;
-        min-width: 0;
-        max-width: 100%;
-        height: 30px;
-        line-height: 30px;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-    .o_scan_picked_lbl {
-        font-size: 10px;
-        font-weight: 400;
-        color: var(--scan-text-2);
-        flex-shrink: 0;
-    }
-    .o_scan_picked_num {
-        font-size: 20px;
-        font-weight: 700;
-        line-height: 24px;
-        color: var(--scan-text);
-        min-width: 0;
-
-        &.is-long {
-            font-size: 16px;
-            line-height: 20px;
-        }
-        &.is-xlong {
-            font-size: 13px;
-            line-height: 18px;
-            letter-spacing: -0.3px;
-        }
-    }
-    .o_scan_picked_uom {
-        font-size: 10px;
-        font-weight: 400;
-        color: var(--scan-text-2);
-        flex-shrink: 0;
-    }
-
-    // 拣货完成徽章：使用设计稿原始 SVG（绿色齿形徽章 + 镂空勾）
-    .o_scan_badge_done {
-        width: 31.5337px;
-        height: 30px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-    .o_scan_done_icon {
-        display: block;
-        width: 100%;
-        height: 100%;
-    }
-
-    // 30x30 square buttons (design 17)
-    .o_scan_sq {
-        width: 30px;
-        height: 30px;
-        border-radius: 4px;
-        border: 0;
-        padding: 0;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    .o_scan_sq_add {
-        background: var(--scan-green);
-        color: #FFFFFF;
-    }
-    .o_scan_sq_edit {
-        background: var(--scan-purple);
-        color: #FFFFFF;
-    }
-    .o_scan_sq_hand {
-        background: transparent;
-        color: #BCC0C7;
-        width: 30px;
-        font-size: 17px;
-
-        &.is-active {
-            // Selected product: the hand disappears (the card inset shadow
-            // and the hint bar already show the active target).
-            opacity: 0;
-        }
-        &.is-disabled {
-            opacity: 0.45;
-            cursor: default;
-        }
-    }
-
-    // inline qty edit inside header
-    .o_scan_qty_edit {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-
-        input {
-            width: 5.5rem;
-            height: 26px;
-            border: 1px solid var(--scan-frame);
-            border-radius: 4px;
-            background: #FFFFFF;
-            color: #000000;
-            padding: 0 6px;
-            font-size: 12px;
-        }
-    }
-
-    // ---------- fold bar (serial cards only) ----------
-    .o_scan_foldbar {
-        height: 11.5px;
-        background: var(--scan-fold-bg);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        border: 0;
-        padding: 0;
-        cursor: pointer;
-
-        // 三横线整体高度 7.5px（1.4 + 1.65 + 1.4 + 1.65 + 1.4），在折叠条内垂直居中
-        .o_scan_grip {
-            display: block;
-            width: 20px;
-            height: 7.5px;
-            background-image: linear-gradient(#FFFFFF, #FFFFFF), linear-gradient(#FFFFFF, #FFFFFF), linear-gradient(#FFFFFF, #FFFFFF);
-            background-size: 100% 1.4px;
-            background-position: 0 0, 0 3.05px, 0 6.1px;
-            background-repeat: no-repeat;
-        }
-    }
-
-    // ---------- card body / lot rows ----------
-    .o_scan_card_body {
-        display: flex;
-        flex-direction: column;
-        background: var(--scan-row-bg);
-    }
-
-    .o_scan_row {
-        min-height: 36px;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 5px;
-        position: relative;
-        // design 17: 每行底部 1px 分隔线
-        border-bottom: 1px solid rgba(22, 163, 181, 0.4);
-
-        &.is-collapsed-single {
-            min-height: 36px;
-        }
-
-        // 设计 24：序列号行改为横排「名称 | 已拣 | 按钮」，行高 40px
-        &.is-serial {
-            min-height: 40px;
-
-            .o_scan_row_side {
-                flex-direction: row;
-                align-items: center;
-                gap: 5px;
-            }
-            .o_scan_row_qty {
-                width: 41px;
-                flex-shrink: 0;
-                text-align: center;
-            }
-            .o_scan_row_btns {
-                min-height: 0;
-            }
-        }
-
-        // scan-hit highlight (design 24: 整行 rgba(133,250,158,.6) 叠在行底青 0.2 上，常驻)
-        &.is-scanned {
-            background-color: var(--scan-hl);
-            background-image: linear-gradient(var(--scan-row-bg), var(--scan-row-bg));
-        }
-    }
-    .o_scan_row_name {
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--scan-text-2);
-        flex: 1;
-        min-width: 0;
-        // column：名字一行 + 可选的 从/至 两行（序列号多位置时）
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        overflow: hidden;
-        // Serial numbers are long unbroken tokens: break them so the row
-        // grows in height instead of clipping the right-hand characters.
-        word-break: break-word;
-        overflow-wrap: anywhere;
-    }
-    // lot 行内的 从/至（design 17: 9px 灰 opacity .8）
-    .o_scan_row_loc {
-        font-size: 9px;
-        font-weight: 400;
-        line-height: 13px;
-        color: var(--scan-text-2);
-        opacity: 0.8;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .o_scan_row_qty {
-        font-size: 10px;
-        line-height: 14px;
-        color: var(--scan-text-2);
-        white-space: nowrap;
-    }
-    // 批号/序列号行右侧纵列：上=已拣数量，下=按钮（与卡片头右列一致）
-    .o_scan_row_side {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        justify-content: center;
-        gap: 2px;
-        flex-shrink: 0;
-        min-width: 0;
-    }
-    .o_scan_row_btns {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 5px;
-        min-height: 30px;
-
-        // 没有按钮时（如 mandatory 策略的预留批次行）不占高度
-        &:empty {
-            min-height: 0;
-        }
-    }
-
-    // inline lot / reserved-lot editing panel
-    .o_scan_lot_edit {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        flex: 1;
-        background: var(--scan-card);
-        border: 1px solid var(--scan-frame);
-        border-radius: 4px;
-        padding: 6px;
-
-        .o_scan_lot_edit_line {
             display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-            font-size: 12px;
-            color: var(--scan-text-2);
+            align-items: flex-start;
+            gap: 8px;
         }
-        input {
-            width: 5.5rem;
-            height: 26px;
-            border: 1px solid var(--scan-frame);
-            border-radius: 4px;
-            background: #FFFFFF;
-            color: #000000;
-            padding: 0 6px;
-            font-size: 12px;
-        }
-    }
-
-    // ---------- package bar ----------
-    .o_scan_pkgbar {
-        min-height: 19px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 5px;
-        background: var(--scan-frame);
-        border-radius: 0 0 8px 8px;
-        padding: 0 5px;
-        color: #404144;
-        font-size: 14px;
-
-        // left group: icon + name + rename pencil (design gap: 10px)
-        .o_scan_pkg_left {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
+        .o_scan_hint_line_text {
+            flex: 1 1 auto;
             min-width: 0;
-        }
-        .o_scan_pkg_name {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 0;
-
-            > i {
-                font-size: 19px;
-                line-height: 19px;
-            }
-        }
-        .o_scan_pkg_qty {
-            font-size: 12px;
+            // Three fixed lines: clip each line instead of wrapping.
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .o_scan_pkg_del,
-        .o_scan_pkg_rename {
-            width: 22px;
-            height: 19px;
-            border: 0;
-            border-radius: 4px;
-            padding: 0;
-            cursor: pointer;
-            background: transparent;
-            color: #404144;
+        .o_scan_hint_ico {
+            width: 15px;
+            height: 15px;
+            flex: 0 0 15px;
+            margin-top: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            background: var(--scan-pink);
+            border: 2px solid var(--scan-border);
+            color: var(--scan-on-accent);
+            font-size: 9px;
+            line-height: 1;
+        }
+        .o_scan_hint_action {
             flex-shrink: 0;
-            font-size: 13px;
+            border: 2px solid var(--scan-border);
+            background: var(--scan-card);
+            color: var(--scan-ink);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            box-shadow: 2px 2px 0 var(--scan-shadow);
+        }
 
-            &:hover {
-                background: rgba(64, 65, 68, 0.18);
-            }
+        &.alert-success {
+            background: var(--scan-ok-bg);
+            color: var(--scan-on-accent);
         }
-        .o_scan_pkg_del {
-            font-size: 15px;
+        &.alert-danger {
+            background: var(--scan-danger-bg);
+            color: var(--scan-on-accent);
         }
-        .o_scan_pkg_rename_input {
-            flex: 1;
-            min-width: 0;
+        &.alert-warning,
+        &.alert-info {
+            background: var(--scan-hint-bg);
+            color: var(--scan-hint-fg);
         }
     }
 
-    // ---------- footer ----------
-    .o_scan_footer {
-        flex: 0 0 auto;
-        padding: 4px 10px 10px;
-        background: var(--scan-page);
-        border-top: 1px solid rgba(222, 213, 206, 0.55);
-    }
-    .o_scan_footer_progress {
-        text-align: center;
-        font-size: 12px;
-        line-height: 24px;
-    }
-    .o_scan_footer_actions {
+    // ---------- section header ----------
+    .o_scan_section_title {
         display: flex;
-        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px 0;
+        flex: 0 0 auto;
+    }
+    .o_scan_section_label {
+        font-size: 15px;
+        font-weight: 900;
+        line-height: 20px;
+        white-space: nowrap;
+    }
+    .o_scan_section_line {
+        flex: 1 1 auto;
+        height: 3px;
+        background: var(--scan-divider);
+    }
+    .o_scan_section_count {
+        flex: 0 0 auto;
+        background: var(--scan-blue);
+        color: #FFFFFF;
+        border: 2px solid var(--scan-border);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        line-height: 16px;
+        padding: 0 5px;
+        white-space: nowrap;
+    }
+
+    // ---------- candidate picking selector ----------
+    .o_picking_scan_selector {
+        margin: 10px 16px 0;
+        padding: 10px;
+        background: var(--scan-card);
+        border: 2px solid var(--scan-border);
+        box-shadow: 4px 4px 0 var(--scan-shadow);
+        flex: 0 0 auto;
+    }
+    .o_scan_selector_title {
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .o_scan_selector_list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .o_scan_selector_item {
+        display: flex;
+        align-items: center;
+        text-align: left;
+        padding: 8px 10px;
+        border: 2px solid var(--scan-border);
+        background: var(--scan-page);
+        color: var(--scan-ink);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    // ---------- cross-order confirm ----------
+    .o_scan_confirm_bar {
+        display: flex;
         align-items: center;
         gap: 8px;
-        flex-wrap: wrap;
-        padding-bottom: 2px;
-    }
-    .o_scan_footer_actions_right {
-        display: flex;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-        gap: 8px;
-        flex: 1;
-    }
-    .o_scan_key_add_product {
-        background-color: var(--scan-green);
-        color: #FFFFFF;
-        font-weight: 600;
-        min-width: 130px;
-        box-shadow: -2px -2px 4px rgba(253, 247, 244, 0.9),
-            2px 2px 4px var(--scan-key-shadow);
-        &:hover {
-            background-color: var(--scan-green);
-            filter: brightness(0.95);
-        }
-        &:active {
-            filter: brightness(0.9);
-        }
-    }
-
-    // ---------- misc ----------
-    .o_scan_empty {
-        text-align: center;
-        color: var(--scan-text-2);
+        margin: 8px 16px 0;
+        padding: 6px 10px;
+        background: var(--scan-pink);
+        color: var(--scan-on-accent);
+        border: 2px solid var(--scan-border);
         font-size: 12px;
-        padding: 24px 0;
+        font-weight: 600;
+        flex: 0 0 auto;
+    }
+    .o_scan_confirm_text {
+        flex: 1 1 auto;
+    }
+    .o_scan_confirm_btn {
+        border: 2px solid var(--scan-border);
+        background: var(--scan-card);
+        color: var(--scan-ink);
+        font-weight: 700;
+        padding: 3px 10px;
+        font-size: 12px;
     }
 
-    // ---------- v4 product rows (values measured from the Pixso export) ----------
+    // ---------- pull-to-refresh ----------
     .o_scan_pull_indicator {
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 6px;
         height: 24px;
-        margin: 2px 10px 0;
+        margin: 2px 16px 0;
         font-size: 12px;
         line-height: 24px;
-        color: var(--scan-text-2);
+        color: var(--scan-ink-2);
+        flex: 0 0 auto;
     }
+
+    // ---------- product list ----------
     .o_picking_scan_rows {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
-        // 下拉刷新时禁止浏览器原生回弹/整页下拉
         overscroll-behavior-y: contain;
-        // 与顶部/底部一致使用 10px 页边距（覆盖 .o_picking_scan_moves 的 12px padding）
-        padding: 0;
-        margin: 8px 10px 0;
+        padding: 10px 20px 16px 16px;
+        margin: 0;
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        // 隐藏滚动条占位，保证卡片左右边缘与页头/页尾对齐
+        gap: 12px;
         scrollbar-width: none;
+
         &::-webkit-scrollbar {
             width: 0;
             height: 0;
         }
     }
-    // 产品框（Pixso「产品框」194:23215）：页面色底 + 内凹双阴影，区分上下行
+    .o_scan_empty {
+        width: 100%;
+        flex: 0 0 auto;
+        text-align: center;
+        color: var(--scan-ink-2);
+        font-size: 12px;
+        padding: 24px 0;
+    }
+    // Mobile: the two column wrappers disappear and the cards use their
+    // inline `order` (0,1,2…) to stay in the original single-column order.
+    .o_scan_col {
+        display: contents;
+    }
+    // Tablet / desktop: two independent masonry-like columns.
+    @media (min-width: 768px) {
+        .o_picking_scan_rows {
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .o_scan_col {
+            flex: 1 1 0;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+    }
+
+    // ---------- product card ----------
     .o_scan_row {
+        --scan-card-accent: var(--scan-yellow);
+        position: relative;
         display: flex;
         flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        border: 0;
-        background: var(--scan-page);
-        border-radius: 8px;
-        padding: 10px;
-        box-shadow: inset 2px 2px 4px 4px var(--scan-key-shadow),
-            inset -2px -2px 4px 4px var(--scan-key-light);
+        gap: 6px;
         min-width: 0;
         flex: 0 0 auto;
+        background: var(--scan-card);
+        border: 3px solid var(--scan-border);
+        // Design: 3px black border, then a 3px status stripe *only on the
+        // left* (half of the 6px color band is covered by the border).
+        box-shadow: inset 3px 0 0 var(--scan-card-accent),
+            4px 4px 0 var(--scan-shadow);
+        // 8px from the inner black border on top/right/bottom; on the left
+        // add the 3px status stripe so the text is also 8px from the stripe.
+        padding: 8px 8px 8px 11px;
+        // The whole card is the selection target (inner buttons stop the
+        // click event: edit / +1 / lot dropdown toggle).
+        cursor: pointer;
+
+        // Picked up to demand: green frame (design component set).
+        &.is-done {
+            --scan-card-accent: var(--scan-green);
+        }
+        // Active target: the whole card drops 4px down/right and loses its
+        // hard shadow (design component "状态=按下"); the orange stripe
+        // replaces the status colour.
+        &.is-selected {
+            --scan-card-accent: var(--scan-orange);
+            transform: translate(4px, 4px);
+            box-shadow: inset 3px 0 0 var(--scan-card-accent);
+        }
     }
+
     .o_scan_row_top {
         display: flex;
-        gap: 24px;
-        padding: 0 2px;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        min-width: 0;
         font-size: 9px;
-        color: var(--scan-text-2);
-        line-height: 13px;
+        font-weight: 700;
+        line-height: 14px;
     }
-    .o_scan_row_demand {
-        margin-left: auto;
-        font-weight: 600;
+    .o_scan_loc_chip {
+        display: inline-flex;
+        align-items: center;
+        height: 18px;
+        min-width: 0;
+        max-width: 100%;
+        padding: 0 5px;
+        background: var(--scan-darkbar);
+        color: #FFFFFF;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+
+        &.is-dest {
+            background: var(--scan-orange);
+            color: var(--scan-on-accent);
+        }
     }
-    .o_scan_row_main {
+    .o_scan_side_label {
+        color: var(--scan-ink);
+        font-size: 10px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .o_scan_demand_badge {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--scan-pink);
+        color: var(--scan-on-accent);
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .o_scan_row_body {
         display: flex;
         align-items: flex-start;
-        gap: 8px;
-        margin-top: 0;
-        cursor: pointer;
+        gap: 10px;
+        min-width: 0;
     }
-    // 产品名称卡片（Pixso「新拟态」页 194:17362）：
-    //   未选中 = 外凸阴影 + 黑色文字；选中 = 内凹阴影 + 蓝色文字
-    .o_scan_prod_box {
+    .o_scan_row_left {
         flex: 1 1 auto;
         min-width: 0;
         display: flex;
-        align-items: flex-start;
-        gap: 6px;
-        background: var(--scan-key-bg);
-        border-radius: 4px;
-        padding: 9px 10px;
-        min-height: 40px;
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 17px;
-        color: var(--scan-text);
-        // 外凸阴影收小，避免向上盖住「从/至」等元信息文字
-        box-shadow: 2px 2px 4px 0 var(--scan-key-shadow),
-            -2px -2px 4px 0 var(--scan-key-light);
-        i {
-            margin-top: 2px;
-            color: var(--scan-text);
-            font-size: 12px;
-        }
-        // 按下反馈：按下时内凹
-        &:active {
-            box-shadow: inset 4px 4px 8px var(--scan-key-shadow),
-                inset -4px -4px 8px var(--scan-key-light);
-        }
-    }
-    // 选中态：内凹 + 蓝色文字/图标
-    .o_scan_row.is-selected .o_scan_prod_box {
-        color: var(--scan-hint-fg);
-        box-shadow: inset 4px 4px 8px var(--scan-key-shadow),
-            inset -4px -4px 8px var(--scan-key-light);
-        i {
-            color: var(--scan-hint-fg);
-        }
-    }
-    .o_scan_picked {
-        display: flex;
-        align-items: baseline;
-        align-self: center;
-        gap: 4px;
-        color: var(--scan-text-2);
-        font-size: 9px;
-        white-space: nowrap;
-        padding-top: 0;
-        flex: 0 0 auto;
-    }
-    .o_scan_picked_label,
-    .o_scan_picked_uom {
-        font-size: 9px;
-        color: var(--scan-text-2);
-    }
-    .o_scan_picked b {
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--scan-text);
-        line-height: 1;
-        // 数量已拣齐：数字变蓝
-        &.is-done {
-            color: var(--scan-green);
-        }
-    }
-    // 右侧「已拣 + 操作」竖列（数量追溯产品）
-    .o_scan_side {
-        display: flex;
         flex-direction: column;
-        align-items: flex-end;
-        justify-content: center;
-        gap: 2px;
+        gap: 6px;
+    }
+    .o_scan_prod_box {
+        flex: 1 1 auto;
+        min-width: 0;
+        background: transparent;
+        padding: 0;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 16px;
+        color: var(--scan-ink);
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    // Right column: 需求 and 已拣 share the same grid, so both labels
+    // start at the same x (left aligned with each other).
+    .o_scan_side {
+        display: grid;
+        grid-template-columns: auto auto;
+        column-gap: 4px;
+        row-gap: 4px;
+        align-items: center;
+        justify-content: end;
         flex: 0 0 auto;
     }
-    .o_scan_side .o_scan_picked {
-        align-self: auto;
+    .o_scan_picked_value {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .o_scan_picked_badge {
+        min-width: 23px;
+        height: 23px;
+        padding: 0 3px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--scan-yellow);
+        color: var(--scan-on-accent);
+        font-size: 15px;
+        font-weight: 900;
+        line-height: 1;
+
+        &.is-done {
+            background: var(--scan-green);
+        }
+    }
+    .o_scan_picked_uom {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--scan-ink);
     }
     .o_scan_qty_btns {
+        grid-column: 1 / -1;
+        justify-self: end;
         display: flex;
         align-items: center;
-        gap: 8px;
-        min-height: 22px;
+        justify-content: flex-end;
+        gap: 6px;
+        min-height: 20px;
     }
-    // 卡片底部包裹号（数量追溯产品）
+    .o_scan_lot_add {
+        min-width: 26px;
+        height: 18px;
+        padding: 0 3px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--scan-border);
+        // +1 is yellow in both the product card and the lot dropdown;
+        // pressing it turns blue (design "按下" state).
+        background: var(--scan-yellow);
+        color: var(--scan-on-accent);
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
+        cursor: pointer;
+
+        &:active {
+            transform: translate(1px, 1px);
+            background: var(--scan-blue);
+            color: #FFFFFF;
+        }
+    }
+    .o_scan_lot_edit_btn {
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: transparent;
+        color: var(--scan-ink);
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    // Package chip / box under a quantity-tracked card.
     .o_scan_qty_pkg {
         display: flex;
         align-items: center;
         gap: 6px;
-        min-width: 0;
-        color: var(--scan-text-2);
-        font-size: 10px;
+        min-height: 30px;
+        padding: 2px 8px;
+        background: var(--scan-card);
+        border: 2px solid var(--scan-border);
+        color: var(--scan-ink-2);
+        font-size: 11px;
+        font-weight: 700;
         line-height: 15px;
-        i {
-            font-size: 11px;
-            flex: 0 0 auto;
-        }
+
         span {
             min-width: 0;
             word-break: break-all;
         }
     }
-    // ---------- lot dropdown（Pixso「序列号带下拉框」194:21129） ----------
+    .o_scan_pkg_ico {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 15px;
+        display: block;
+        opacity: 0.6;
+    }
+
+    // ---------- lot dropdown ----------
     .o_scan_lots {
-        margin-top: 0;
         display: flex;
         flex-direction: column;
-        gap: 0;
         min-width: 0;
     }
-    // 收起态头部：347×25 / r4 / #FDF7F4，右侧下拉箭头
     .o_scan_lot_box {
-        background: var(--scan-lot-bg);
-        border: 0;
-        border-radius: 4px;
-        padding: 4px 10px;
-        min-height: 25px;
-    }
-    .o_scan_lot_box.is-scanned {
-        background: var(--scan-hl);
+        background: var(--scan-page);
+        border: 2px solid var(--scan-border);
+        padding: 4px 6px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+
+        &.is-scanned {
+            background: var(--scan-hl);
+        }
     }
     .o_scan_lot_select {
+        flex: 1 1 auto;
         display: flex;
         align-items: center;
         gap: 8px;
         min-width: 0;
-        font-size: 10px;
-        line-height: 15px;
     }
     .o_scan_lot_info {
         flex: 1 1 auto;
         min-width: 0;
         display: flex;
         flex-direction: column;
+        gap: 1px;
     }
     .o_scan_lot_line {
         display: flex;
@@ -1229,158 +849,316 @@
         min-width: 0;
         font-size: 10px;
         line-height: 15px;
+
         i {
-            color: var(--scan-text-2);
-            font-size: 11px;
             flex: 0 0 auto;
+            color: var(--scan-ink);
+            font-size: 11px;
         }
     }
-    // 批次名：10px，长序列号换行不裁切
+    .o_scan_lot_ico {
+        width: 15px;
+        height: 12.59px;
+        flex: 0 0 15px;
+        display: block;
+    }
     .o_scan_lot_name {
         flex: 1 1 auto;
         min-width: 0;
-        font-family: inherit;
-        font-size: 10px;
-        font-weight: 500;
-        letter-spacing: 0;
-        color: var(--scan-text);
+        color: var(--scan-ink);
+        font-size: 11px;
+        font-weight: 900;
         word-break: break-all;
         overflow-wrap: anywhere;
     }
-    // 包裹行：📦 PACK... › PACK...
     .o_scan_lot_pkg {
-        color: var(--scan-text-2);
+        color: var(--scan-ink-2);
+        font-size: 9px;
+        font-weight: 700;
+
+        i {
+            color: var(--scan-ink-2);
+            font-size: 10px;
+        }
+    }
+    .o_scan_lot_pkg_ico {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 15px;
+        display: block;
+        opacity: 0.55;
     }
     .o_scan_pkg_arrow {
-        color: var(--scan-text-2);
+        color: var(--scan-ink-2);
     }
     .o_scan_row_toggle {
+        width: 24px;
+        height: 24px;
+        flex: 0 0 24px;
+        padding: 0;
         border: 0;
         background: transparent;
-        color: var(--scan-text-2);
+        color: var(--scan-ink);
         font-size: 12px;
-        width: 20px;
-        height: 20px;
-        padding: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        flex-shrink: 0;
+        cursor: pointer;
     }
-    // 展开面板：页面色底、r4，内部批次行 26px；面板整体外凸（设计稿）
+    .o_scan_chevron {
+        width: 14px;
+        height: 14px;
+        display: block;
+        transition: transform 0.15s ease;
+
+        &.is-open {
+            transform: rotate(180deg);
+        }
+    }
+    // Expanded panel: rows sit on the white card; the panel keeps only the
+    // design's left vertical stroke (no top/right/bottom border).
     .o_scan_lots_panel {
-        margin-top: 5px;
-        background: var(--scan-page);
-        border-radius: 4px;
-        padding: 5px 10px;
+        // Design: a single black vertical stroke on the left of the panel,
+        // aligned with the lot-header icon; no other panel borders.
+        margin: 0 0 0 8px;
+        padding: 0 0 0 7px;
+        background: transparent;
+        border: 0;
+        border-left: 3px solid var(--scan-border);
         display: flex;
         flex-direction: column;
-        box-shadow: 4px 4px 4px 4px var(--scan-key-shadow),
-            -4px -4px 8px 4px var(--scan-key-light);
     }
     .o_scan_lot_row {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 8px;
-        min-height: 26px;
-        padding: 2px 0;
-        border-radius: 4px;
-        // 设计稿：每个批次/序列号项次底部 1px 分隔线（#DED5CE，深色用主题框线色）
-        border-bottom: 1px solid var(--scan-frame);
-    }
-    .o_scan_lot_row.is-scanned {
-        background: var(--scan-hl);
+        min-height: 48px;
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--scan-divider);
+
+        &.is-scanned {
+            background: var(--scan-hl);
+        }
     }
     .o_scan_lot_actions {
         display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        flex: 0 0 auto;
     }
-    .o_scan_lot_qty {
+    .o_scan_lot_demand {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 16px;
+        color: var(--scan-ink);
         font-size: 10px;
-        color: var(--scan-text-2);
+        font-weight: 700;
+        line-height: 14px;
         white-space: nowrap;
     }
-    .o_scan_lot_add {
-        border: 0;
-        background: transparent;
-        color: var(--scan-hint-fg);
-        font-weight: 700;
-        font-size: 12px;
-        padding: 0 2px;
-        flex-shrink: 0;
+    .o_scan_lot_demand_label {
+        color: var(--scan-ink);
     }
-    .o_scan_lot_edit_btn {
-        border: 0;
-        background: transparent;
-        color: var(--scan-hint-fg);
-        font-size: 12px;
-        padding: 0;
-        width: 24px;
-        height: 24px;
+    .o_scan_lot_demand_badge {
+        min-width: 14px;
+        height: 16px;
+        padding: 0 3px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        flex-shrink: 0;
+        background: var(--scan-blue);
+        color: #FFFFFF;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
+    }
+    .o_scan_lot_picked {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+    .o_scan_lot_qty {
+        color: var(--scan-ink-2);
+        font-size: 10px;
+        font-weight: 700;
     }
     .o_scan_lot_empty {
-        color: var(--scan-text-2);
+        color: var(--scan-ink-2);
         font-size: 10px;
     }
-    // ---------- cross-order confirm bar ----------
-    .o_scan_confirm_bar {
+
+    // ---------- footer ----------
+    .o_scan_footer {
+        flex: 0 0 auto;
+        background: var(--scan-footer-bg);
+        color: #FFFFFF;
+        padding: 6px 16px 10px;
+    }
+    .o_scan_footer_progress {
         display: flex;
         align-items: center;
+        justify-content: center;
+        gap: 5px;
+        line-height: 20px;
+        padding: 0 0 4px;
+        color: var(--scan-yellow);
+
+        > span {
+            color: var(--scan-yellow);
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+    }
+    .o_scan_footer_done {
+        min-width: 19px;
+        height: 16px;
+        padding: 0 3px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--scan-yellow);
+        color: var(--scan-on-accent);
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+    }
+    .o_scan_footer_actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 8px;
-        margin: 8px 10px 0;
-        padding: 5px 10px;
-        border-radius: 4px;
-        background: var(--scan-danger-bg);
-        color: var(--scan-danger-fg);
-        font-size: 12px;
+        flex-wrap: wrap;
     }
-    .o_scan_confirm_text {
-        flex: 1;
-    }
-    .o_scan_confirm_btn {
+    .o_scan_more_btn {
         border: 0;
-        border-radius: 4px;
-        background: #ffffff;
-        color: var(--scan-danger-bg);
+        background: transparent;
+        color: var(--scan-yellow);
+        font-size: 10px;
         font-weight: 700;
-        padding: 4px 10px;
-        font-size: 12px;
+        padding: 6px 2px;
+        cursor: pointer;
+
+        &.is-open,
+        &:active {
+            color: var(--scan-blue);
+        }
+    }
+    .o_scan_footer_actions_right {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 12px;
+        flex: 1 1 auto;
+    }
+    .o_scan_key {
+        min-width: 90px;
+        height: 36px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        background: var(--scan-card);
+        border: 2px solid var(--scan-yellow);
+        color: var(--scan-ink);
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+        flex-shrink: 0;
+
+        &:hover {
+            background: var(--scan-card);
+            color: var(--scan-ink);
+        }
+        &:active:not(:disabled) {
+            transform: translate(2px, 2px);
+            border-color: var(--scan-blue);
+        }
+        &:disabled {
+            opacity: 0.55;
+            cursor: default;
+        }
+        &.is-active {
+            border-color: var(--scan-blue);
+            color: var(--scan-blue);
+        }
+    }
+    .o_scan_key_primary {
+        background: var(--scan-yellow);
+        border-color: var(--scan-border);
+        color: var(--scan-on-accent);
+
+        &:hover {
+            background: var(--scan-yellow);
+            color: var(--scan-on-accent);
+        }
+        &:active:not(:disabled) {
+            background: var(--scan-green);
+            border-color: var(--scan-border);
+        }
+    }
+    .o_scan_key_warn {
+        background: var(--scan-orange);
+        border-color: var(--scan-border);
+        color: var(--scan-on-accent);
+
+        &:hover {
+            background: var(--scan-orange);
+            color: var(--scan-on-accent);
+        }
     }
 
-    // ---------- more menu ----------    // ---------- more menu ----------
+    // ---------- more menu ----------
+    .o_scan_more_backdrop {
+        position: absolute;
+        inset: 0;
+        z-index: 15;
+        background: transparent;
+    }
     .o_scan_more_menu {
         position: absolute;
-        left: 10px;
-        bottom: 64px;
+        left: 16px;
+        // Sits ~10px above the footer, like the design's bottom-anchored sheet.
+        bottom: 86px;
         z-index: 20;
         display: flex;
         flex-direction: column;
-        min-width: 150px;
+        width: max-content;
+        min-width: 112px;
+        max-width: 220px;
         background: var(--scan-card);
-        border-radius: 8px;
-        box-shadow: -4px -4px 8px rgba(253, 247, 244, 0.9),
-            4px 4px 8px var(--scan-key-shadow);
-        overflow: hidden;
+        border: 2px solid var(--scan-border);
+        box-shadow: 4px 4px 0 var(--scan-shadow);
+        animation: o_scan_sheet_up 0.22s ease-out;
+
         button {
             border: 0;
             background: transparent;
-            color: var(--scan-text);
+            color: var(--scan-ink);
             text-align: left;
-            padding: 10px 14px;
+            padding: 12px 14px;
             font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+
             & + button {
-                border-top: 1px solid var(--scan-frame);
+                border-top: 1px solid var(--scan-divider);
+            }
+            &:active {
+                background: var(--scan-yellow);
+                color: var(--scan-on-accent);
             }
         }
     }
 
-    // ---------- split dialog ----------
+    // ---------- dialogs (edit row / remove package / choose package) ----------
     .o_scan_split_dialog {
         position: absolute;
         inset: 0;
@@ -1388,46 +1166,68 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(0, 0, 0, 0.35);
+        padding: 16px;
+        background: rgba(17, 17, 17, 0.55);
     }
     .o_scan_split_card {
-        width: 86%;
+        width: 100%;
         max-width: 360px;
+        max-height: 86%;
+        overflow-y: auto;
         background: var(--scan-card);
-        border-radius: 8px;
+        border: 3px solid var(--scan-border);
+        box-shadow: 6px 6px 0 var(--scan-shadow);
         padding: 14px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
     }
     .o_scan_split_title {
-        font-weight: 700;
-        font-size: 14px;
-        margin-bottom: 8px;
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 22px;
+        margin-bottom: 12px;
+        word-break: break-word;
     }
     .o_scan_split_list {
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        max-height: 260px;
+        gap: 8px;
+        max-height: 300px;
         overflow-y: auto;
+
         button {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid var(--scan-frame);
+            gap: 8px;
+            padding: 9px 10px;
+            border: 2px solid var(--scan-border);
             background: var(--scan-page);
-            border-radius: 4px;
-            padding: 8px 10px;
+            color: var(--scan-ink);
             font-size: 13px;
-            color: var(--scan-text);
+            font-weight: 600;
+            text-align: left;
+
+            &:active {
+                transform: translate(2px, 2px);
+            }
+        }
+    }
+    .o_scan_split_name {
+        min-width: 0;
+        word-break: break-all;
+
+        i {
+            margin-right: 4px;
         }
     }
     .o_scan_split_meta {
-        color: var(--scan-text-2);
+        flex: 0 0 auto;
+        color: var(--scan-ink-2);
         font-size: 11px;
+        font-weight: 500;
     }
     .o_scan_split_empty {
         text-align: center;
-        color: var(--scan-text-2);
+        color: var(--scan-ink-2);
         font-size: 12px;
         padding: 12px 0;
     }
@@ -1435,46 +1235,83 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
         font-size: 12px;
-        color: var(--scan-text-2);
-        span {
-            width: 74px;
+        font-weight: 600;
+
+        > span {
+            width: 76px;
             flex-shrink: 0;
+            color: var(--scan-ink-2);
         }
         input {
-            flex: 1;
-            border: 1px solid var(--scan-frame);
-            border-radius: 4px;
-            background: var(--scan-page);
-            color: var(--scan-text);
-            padding: 6px 8px;
+            flex: 1 1 auto;
+            min-width: 0;
+            height: 36px;
+            padding: 0 8px;
+            border: 2px solid var(--scan-border);
+            border-radius: 0;
+            background: var(--scan-card);
+            color: var(--scan-ink);
             font-size: 13px;
         }
     }
     .o_scan_edit_actions {
         display: flex;
         gap: 8px;
-        margin-top: 10px;
+        margin-top: 12px;
+
         button {
-            flex: 1;
-            border: 0;
-            border-radius: 4px;
-            padding: 8px 0;
-            font-size: 13px;
-            background: var(--scan-page);
-            color: var(--scan-text);
+            flex: 1 1 0%;
+            height: 38px;
+            border: 2px solid var(--scan-border);
+            border-radius: 0;
+            background: var(--scan-card);
+            color: var(--scan-ink);
+            font-size: 14px;
+            font-weight: 700;
+
+            &.o_scan_btn_primary {
+                background: var(--scan-yellow);
+                color: var(--scan-on-accent);
+                box-shadow: 3px 3px 0 var(--scan-shadow);
+
+                &:active {
+                    transform: translate(2px, 2px);
+                    box-shadow: 1px 1px 0 var(--scan-shadow);
+                }
+            }
         }
     }
     .o_scan_split_cancel {
-        margin-top: 10px;
+        margin-top: 12px;
         width: 100%;
-        border: 0;
-        border-radius: 4px;
-        background: var(--scan-page);
-        color: var(--scan-text);
-        padding: 8px 0;
-        font-size: 13px;
+        height: 38px;
+        border: 2px solid var(--scan-border);
+        border-radius: 0;
+        background: var(--scan-card);
+        color: var(--scan-ink);
+        font-size: 14px;
+        font-weight: 700;
     }
+}
 
+@keyframes o_scan_spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes o_scan_sheet_up {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
