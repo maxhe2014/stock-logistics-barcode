@@ -230,10 +230,16 @@ class StockBarcodesWorkbench(models.Model):
         raise UserError(_("Unknown status filter: %s", key))
 
     @api.model
-    def set_redirect_home(self):
-        """Land on the Web Responsive apps screen when going home."""
+    def set_redirect_home(self, enable=True):
+        """Toggle Web Responsive's "land on the apps screen" preference.
+
+        Kept for cleanup: an earlier version turned it on to reach the
+        apps grid from the workbench, which made Web Responsive reopen the
+        apps overlay over scan/form pages. The nine-dot now opens the
+        overlay directly, so this must be reset.
+        """
         if "is_redirect_home" in self.env["res.users"]._fields:
-            self.env.user.sudo().write({"is_redirect_home": True})
+            self.env.user.sudo().write({"is_redirect_home": bool(enable)})
         return True
 
     @api.model
@@ -516,10 +522,13 @@ class StockBarcodesWorkbench(models.Model):
                 }
             ]
             for picking_type in types:
+                title, _subtitle, color = self._type_meta(picking_type)
+                code = (picking_type.sequence_code or "").upper() or color.upper()
                 facets.append(
                     {
                         "key": str(picking_type.id),
-                        "label": self._type_meta(picking_type)[0],
+                        "label": title,
+                        "code": code,
                         "count": self._count(
                             Domain.AND(
                                 [
@@ -528,7 +537,7 @@ class StockBarcodesWorkbench(models.Model):
                                 ]
                             )
                         ),
-                        "color": self._type_meta(picking_type)[2],
+                        "color": color,
                     }
                 )
             domain = fixed_domain

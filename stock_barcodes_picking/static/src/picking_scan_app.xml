@@ -223,7 +223,7 @@
                         <button
                             t-if="state.show_put_in_pack"
                             type="button"
-                            t-att-class="'o_scan_key' + (state.scan_mode === 'pack' ? ' is-active' : '')"
+                            t-att-class="'o_scan_key o_scan_key_blue' + (state.scan_mode === 'pack' ? ' is-active' : '')"
                             title="Pack the picked products into a package: scan or choose one"
                             t-on-click="() => this.onSetPackIntent()"
                             t-out="this.tr(state.scan_mode === 'pack' ? 'Packing…' : 'Pack')"

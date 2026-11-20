@@ -382,27 +382,13 @@ export class ScanWorkbench extends Component {
     /**
      * Back to the function-selection (apps) screen.
      *
-     * Web Responsive opens its apps grid at /odoo when the user preference
-     * "redirect to home" is on, so make sure it is enabled first. On the
-     * community stack we try to open the apps dropdown instead.
+     * Do NOT toggle the Web Responsive "redirect home" preference: it made
+     * the apps overlay auto-open on top of scan/form pages. Instead go to
+     * /odoo and let open_apps_menu.js click the apps-grid button once the
+     * navbar is mounted.
      */
     async onGoHome() {
-        if (this.state.webResponsive) {
-            try {
-                await this.orm.call(SERVICE, "set_redirect_home", []);
-            } catch (error) {
-                // Keep going: /odoo still loads the user home action.
-            }
-            window.location.href = "/odoo";
-            return;
-        }
-        const appButton = document.querySelector(
-            ".o_navbar_apps_menu button, .o_menu_toggle, .o_navbar .o_menu_toggle"
-        );
-        if (appButton) {
-            appButton.click();
-            return;
-        }
+        sessionStorage.setItem("scan_open_apps_menu", "1");
         window.location.href = "/odoo";
     }
 

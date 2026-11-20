@@ -1,30 +1,16 @@
-// Picking scan app — "Beast" light theme.
+// Picking scan app — "Beast" theme.
 // Design source: Pixso file QCYzTmFbRuUHHkLF-fg7TA, page 7:1188, frame 14:12481
-// ("手机扫码APP"). Pixel-verified values:
+// ("手机扫码APP"). Design values are pixel-verified:
 //   page #F7F3E8, card #FFFFFF, ink #111111, secondary #555555,
 //   yellow #FFE500, pink #FF4D97, green #00D97E, orange #FF6B2C, blue #4361EE,
 //   divider #BBB6A6. Cards: 3px border + 3px left status stripe + 4/4 shadow.
-// Dark values come from the Pixso variable set "扫码页主题 / 暗色模式" and live
-// in picking_scan_app.dark.scss (web.assets_web_dark).
+// The palette and the shared controls live in shared/scan_ui.scss and are
+// reused by the scan workbench. Dark overrides live in
+// picking_scan_app.dark.scss (web.assets_web_dark) plus shared/scan_ui.dark.scss.
 
 .o_picking_scan_app {
-    --scan-page: #F7F3E8;
-    --scan-card: #FFFFFF;
-    --scan-ink: #111111;
-    --scan-ink-2: #555555;
-    --scan-divider: #BBB6A6;
-    --scan-yellow: #FFE500;
-    --scan-pink: #FF4D97;
-    --scan-green: #00D97E;
-    --scan-orange: #FF6B2C;
-    --scan-blue: #4361EE;
-    // Text/borders drawn on top of an accent fill (yellow / green / orange).
-    --scan-on-accent: #111111;
-    // Pixso variables: 描边/主 (borders + card shadows), 描边/深 (button
-    // shadows), 背景/深色条 (chips + footer).
-    --scan-border: #111111;
-    --scan-shadow: #111111;
-    --scan-shadow-deep: #111111;
+    // Scan-app-only tokens (the palette is defined in shared/scan_ui.scss and
+    // exposed through the --scan-* aliases).
     --scan-darkbar: #111111;
     --scan-lot-bg: #FFFFFF;
     --scan-footer-bg: #111111;
@@ -52,49 +38,10 @@
         border-radius: 0;
     }
 
-    // Pixso "扫码页主题 / 暗色模式" values.
-    &[data-theme="dark"] {
-        --scan-page: #0B1017;
-        --scan-card: #161E29;
-        --scan-ink: #E6EDF7;
-        --scan-ink-2: #9AA7B8;
-        --scan-divider: #5A6878;
-        --scan-yellow: #C8FF3D;
-        --scan-pink: #FF4D97;
-        --scan-green: #00E5A0;
-        --scan-orange: #FF8A3D;
-        --scan-blue: #4D7CFF;
-        --scan-on-accent: #0B1017;
-        --scan-border: #E6EDF7;
-        --scan-shadow: #E6EDF7;
-        --scan-shadow-deep: #0B1017;
-        --scan-darkbar: #0B1017;
-        --scan-lot-bg: #0B1017;
-        --scan-footer-bg: #0B1017;
-        --scan-hl: rgba(200, 255, 61, 0.25);
-        --scan-hint-bg: var(--scan-yellow);
-        --scan-hint-fg: var(--scan-on-accent);
-        --scan-ok-bg: var(--scan-green);
-        --scan-danger-bg: var(--scan-pink);
-    }
-
     // ---------- brand strip ----------
     .o_scan_brand {
         padding: 10px 16px 0;
         flex: 0 0 auto;
-    }
-    .o_scan_brand_chip {
-        display: inline-flex;
-        align-items: center;
-        height: 20px;
-        padding: 0 8px;
-        background: var(--scan-pink);
-        border: 2px solid var(--scan-border);
-        color: var(--scan-on-accent);
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 3px;
-        line-height: 1;
     }
 
     // ---------- top: doc button + source / refresh ----------
@@ -247,64 +194,14 @@
         gap: 8px;
         padding: 8px 16px 5px;
         flex: 0 0 auto;
-
-        .o_scan_key {
-            width: 38px;
-            min-width: 38px;
-            height: 38px;
-            padding: 0;
-            border: 2px solid var(--scan-border);
-            background: var(--scan-card);
-            color: var(--scan-ink);
-            box-shadow: 4px 4px 0 var(--scan-shadow-deep);
-        }
-        .o_scan_key:active:not(:disabled) {
-            border-color: var(--scan-border);
-        }
     }
-    .o_scan_input_wrap {
-        flex: 1 1 0%;
-        min-width: 0;
-        height: 38px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 8px;
-        background: var(--scan-card);
-        border: 2px solid var(--scan-border);
-        box-shadow: 4px 4px 0 var(--scan-shadow-deep);
-
-        // Focused input behaves like a pressed control: the whole box drops
-        // 4px down/right and loses its hard shadow, so the operator can see
-        // that this is the active operation target.
-        &:focus-within {
-            transform: translate(4px, 4px);
-            box-shadow: none;
-        }
-
-        .o_scan_barcode_icon {
-            width: 16px;
-            height: 16px;
-            flex-shrink: 0;
-            display: block;
-        }
-        .o_picking_scan_input {
-            flex: 1 1 0%;
-            min-width: 0;
-            height: 100%;
-            border: 0;
-            outline: none;
-            background: transparent;
-            padding: 0;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--scan-ink);
-
-            &::placeholder {
-                color: var(--scan-ink-2);
-                font-weight: 700;
-            }
-        }
+    // Back button, input shell and input field are shared with the workbench
+    // (shared/scan_ui.scss); only the icons are scan-app specific.
+    .o_scan_input_wrap .o_scan_barcode_icon {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        display: block;
     }
     .o_scan_back_icon {
         width: 18px;
@@ -375,8 +272,13 @@
     }
 
     // ---------- hint card ----------
+    // Same 16px side gutter as the header and the product cards (the card
+    // column reserves 4px on the right for its hard shadow), i.e. one content
+    // column per page, on mobile and on the 1000px desktop column alike.
     .o_scan_hintbar {
-        margin: 8px 16px 0;
+        width: calc(100% - 32px);
+        max-width: calc(var(--scan-page-max) - 32px);
+        margin: 8px auto 0;
         padding: 8px 10px;
         // Fixed three-line height (design: 79px); extra content is clipped.
         flex: 0 0 79px;
@@ -1071,6 +973,8 @@
         gap: 12px;
         flex: 1 1 auto;
     }
+    // Design: card-filled keys with an accent outline — yellow by default,
+    // blue for the "Pack" target; the primary key is a solid yellow fill.
     .o_scan_key {
         min-width: 90px;
         height: 36px;
@@ -1089,21 +993,25 @@
         cursor: pointer;
         flex-shrink: 0;
 
-        &:hover {
-            background: var(--scan-card);
-            color: var(--scan-ink);
-        }
         &:active:not(:disabled) {
             transform: translate(2px, 2px);
-            border-color: var(--scan-blue);
         }
         &:disabled {
             opacity: 0.55;
             cursor: default;
         }
-        &.is-active {
+        &:hover {
+            background: var(--scan-card);
+            border-color: var(--scan-yellow);
+            color: var(--scan-ink);
+        }
+    }
+    .o_scan_key_blue,
+    .o_scan_key.is-active {
+        border-color: var(--scan-blue);
+
+        &:hover {
             border-color: var(--scan-blue);
-            color: var(--scan-blue);
         }
     }
     .o_scan_key_primary {
@@ -1113,6 +1021,7 @@
 
         &:hover {
             background: var(--scan-yellow);
+            border-color: var(--scan-border);
             color: var(--scan-on-accent);
         }
         &:active:not(:disabled) {
@@ -1127,6 +1036,7 @@
 
         &:hover {
             background: var(--scan-orange);
+            border-color: var(--scan-border);
             color: var(--scan-on-accent);
         }
     }
@@ -1326,12 +1236,9 @@
         margin-left: auto;
         margin-right: auto;
     }
-    > .o_scan_hintbar,
     > .o_scan_confirm_bar,
     > .o_scan_pull_indicator {
-        // width:100% is required: auto side margins alone stop flex items
-        // from stretching and they shrink to their content width.
-        width: 100%;
+        width: calc(100% - 32px);
         max-width: calc(var(--scan-page-max) - 32px);
         margin-left: auto;
         margin-right: auto;

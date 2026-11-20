@@ -2,26 +2,13 @@
 // Design source: Pixso file QCYzTmFbRuUHHkLF-fg7TA, page 7:1188
 //   - workbench: frame 52:5192
 //   - list pages: 52:8364 (status) / 52:8352 (operation type)
-// Token values are the same as the picking scan app; dark overrides live in
-// scan_workbench.dark.scss (web.assets_web_dark).
+// The palette and the shared controls come from shared/scan_ui.scss, the same
+// file used by the picking scan app; dark overrides live in
+// scan_workbench.dark.scss (web.assets_web_dark) plus shared/scan_ui.dark.scss.
 
 .o_scan_workbench {
-    --wb-page: #F7F3E8;
-    --wb-card: #FFFFFF;
-    --wb-ink: #111111;
-    --wb-ink-2: #555555;
-    --wb-divider: #BBB6A6;
-    --wb-yellow: #FFE500;
-    --wb-pink: #FF4D97;
-    --wb-green: #00D97E;
-    --wb-orange: #FF6B2C;
-    --wb-blue: #4361EE;
-    --wb-red: #DB3847;
-    --wb-teal: #1DA1B7;
-    --wb-amber: #FFAB00;
-    --wb-border: #111111;
-    --wb-shadow: #111111;
-    --wb-on-accent: #111111;
+    // Workbench-only token (the --wb-* palette is aliased in
+    // shared/scan_ui.scss).
     --wb-muted: #777264;
 
     height: 100%;
@@ -53,19 +40,7 @@
     .o_wb_brand {
         padding: 10px 0 0;
     }
-    .o_wb_brand_chip {
-        display: inline-flex;
-        align-items: center;
-        height: 20px;
-        padding: 0 8px;
-        background: var(--wb-pink);
-        border: 2px solid var(--wb-border);
-        color: var(--wb-on-accent);
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 3px;
-        line-height: 1;
-    }
+
 
     // ---------- header ----------
     .o_wb_head {
@@ -99,57 +74,10 @@
         gap: 8px;
         margin-top: 10px;
     }
+    // Size / colours of the key and the input shell are shared with the scan
+    // app (shared/scan_ui.scss); only the flex behaviour is workbench-only.
     .o_wb_key {
         flex: 0 0 auto;
-        width: 38px;
-        min-width: 38px;
-        height: 38px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--wb-card);
-        border: 2px solid var(--wb-border);
-        box-shadow: 4px 4px 0 var(--wb-shadow);
-        color: var(--wb-ink);
-    }
-    .o_wb_key:active:not(:disabled) {
-        transform: translate(4px, 4px);
-        box-shadow: none;
-    }
-    .o_wb_input_wrap {
-        flex: 1 1 0%;
-        min-width: 0;
-        height: 38px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 8px;
-        background: var(--wb-card);
-        border: 2px solid var(--wb-border);
-        box-shadow: 4px 4px 0 var(--wb-shadow);
-
-        &:focus-within {
-            transform: translate(4px, 4px);
-            box-shadow: none;
-        }
-    }
-    .o_wb_input {
-        flex: 1 1 0%;
-        min-width: 0;
-        height: 100%;
-        padding: 0;
-        border: 0;
-        outline: none;
-        background: transparent;
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--wb-ink);
-
-        &::placeholder {
-            color: var(--wb-ink-2);
-            font-weight: 700;
-        }
     }
     .o_wb_icon_back {
         width: 18px;
@@ -203,7 +131,7 @@
         padding: 0;
         background: var(--wb-yellow);
         border: 2px solid var(--wb-border);
-        box-shadow: 3px 3px 0 var(--wb-shadow);
+        box-shadow: 3px 3px 0 var(--wb-shadow-deep);
         color: var(--wb-on-accent);
         font-size: 20px;
         font-weight: 900;
@@ -237,7 +165,7 @@
         padding: 0 10px;
         background: var(--wb-yellow);
         border: 2px solid var(--wb-border);
-        box-shadow: 4px 4px 0 var(--wb-shadow);
+        box-shadow: 4px 4px 0 var(--wb-shadow-deep);
         color: var(--wb-on-accent);
         font-size: 12px;
         font-weight: 900;
@@ -256,26 +184,6 @@
         font-size: 10px;
         font-weight: 800;
     }
-    .o_wb_wh_short {
-        flex: 0 0 auto;
-        height: 34px;
-        max-width: 150px;
-        padding: 0 8px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: var(--wb-yellow);
-        border: 2px solid var(--wb-border);
-        box-shadow: 3px 3px 0 var(--wb-shadow);
-        color: var(--wb-on-accent);
-        font-size: 11px;
-        font-weight: 900;
-        white-space: nowrap;
-    }
-    .o_wb_wh_short:active {
-        transform: translate(3px, 3px);
-        box-shadow: none;
-    }
     .o_wb_wh_backdrop {
         position: fixed;
         inset: 0;
@@ -293,10 +201,6 @@
         background: var(--wb-card);
         border: 2px solid var(--wb-border);
         box-shadow: 4px 4px 0 var(--wb-shadow);
-    }
-    .o_wb_wh_menu_right {
-        left: auto;
-        right: 0;
     }
     .o_wb_wh_option {
         display: flex;
@@ -434,7 +338,7 @@
         justify-content: center;
         background: var(--wb-card);
         border: 2px solid var(--wb-border);
-        box-shadow: 3px 3px 0 var(--wb-shadow);
+        box-shadow: 3px 3px 0 var(--wb-shadow-deep);
         color: var(--wb-ink);
         font-size: 11px;
     }
@@ -512,6 +416,10 @@
     .o_wb_type_band_batch {
         background: var(--wb-red);
         color: #FFFFFF;
+    }
+    .o_wb_type_band_all {
+        background: var(--wb-ink);
+        color: var(--wb-page);
     }
     .o_wb_type_name {
         display: block;
@@ -732,6 +640,17 @@
         &::-webkit-scrollbar {
             display: none;
         }
+
+        // Status pages filter by operation type: reuse the workbench-home
+        // type card (code band + name + count) instead of a flat tile.
+        .o_wb_type_filter {
+            flex: 0 0 118px;
+            min-width: 0;
+        }
+    }
+    .o_wb_type_filter.is-active {
+        transform: translate(4px, 4px);
+        box-shadow: none;
     }
     .o_wb_filter {
         flex: 0 0 auto;
@@ -851,7 +770,7 @@
         justify-content: center;
         background: var(--wb-card);
         border: 2px solid var(--wb-border);
-        box-shadow: 3px 3px 0 var(--wb-shadow);
+        box-shadow: 3px 3px 0 var(--wb-shadow-deep);
         color: var(--wb-ink);
         font-size: 11px;
     }
@@ -878,7 +797,7 @@
         padding: 2px 6px;
         background: var(--wb-card);
         border: 2px solid var(--wb-border);
-        box-shadow: 2px 2px 0 var(--wb-shadow);
+        box-shadow: 2px 2px 0 var(--wb-shadow-deep);
         color: var(--wb-ink);
         font-size: 9px;
         font-weight: 800;
@@ -992,7 +911,7 @@
         padding: 0 16px;
         background: var(--wb-yellow);
         border: 2px solid var(--wb-border);
-        box-shadow: 4px 4px 0 var(--wb-shadow);
+        box-shadow: 4px 4px 0 var(--wb-shadow-deep);
         color: var(--wb-on-accent);
         font-size: 14px;
         font-weight: 900;
@@ -1045,6 +964,10 @@
         .o_wb_filter {
             flex: 1 1 0;
             width: auto;
+            min-width: 0;
+        }
+        .o_wb_filters .o_wb_type_filter {
+            flex: 1 1 0;
             min-width: 0;
         }
     }

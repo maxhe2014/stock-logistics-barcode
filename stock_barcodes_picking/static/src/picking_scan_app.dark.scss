@@ -1,33 +1,14 @@
 // Picking scan app — dark theme overrides.
 // Loaded only in web.assets_web_dark, i.e. when Odoo's color_scheme is "dark"
 // (driven by the web_dark_mode module / user preference, not the OS).
-// Values come from the Pixso variable set "扫码页主题 / 暗色模式".
+// The palette comes from shared/scan_ui.dark.scss; only the scan-app-only
+// tokens are repeated here.
 
 .o_picking_scan_app {
-    --scan-page: #0B1017;
-    --scan-card: #161E29;
-    --scan-ink: #E6EDF7;
-    --scan-ink-2: #9AA7B8;
-    --scan-divider: #5A6878;
-    --scan-yellow: #C8FF3D;
-    --scan-pink: #FF4D97;
-    --scan-green: #00E5A0;
-    --scan-orange: #FF8A3D;
-    --scan-blue: #4D7CFF;
-    --scan-on-accent: #0B1017;
-    // 描边/主 -> borders + card shadows; 描边/深 -> button shadows;
-    // 背景/深色条 -> from-chip + footer.
-    --scan-border: #E6EDF7;
-    --scan-shadow: #E6EDF7;
-    --scan-shadow-deep: #0B1017;
     --scan-darkbar: #0B1017;
     --scan-lot-bg: #0B1017;
     --scan-footer-bg: #0B1017;
     --scan-hl: rgba(200, 255, 61, 0.25);
-    --scan-hint-bg: var(--scan-yellow);
-    --scan-hint-fg: var(--scan-on-accent);
-    --scan-ok-bg: var(--scan-green);
-    --scan-danger-bg: var(--scan-pink);
 
     // Black glyphs on dark surfaces need to be inverted; icons sitting on a
     // yellow fill (camera, source doc, refresh) stay black.

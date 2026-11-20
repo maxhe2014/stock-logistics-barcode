@@ -1,0 +1,25 @@
+// Shared "Beast" scan theme — dark values.
+// Loaded through web.assets_web_dark (Odoo color_scheme = dark). Overrides the
+// --ui-* palette from shared/scan_ui.scss; the --scan-* / --wb-* aliases
+// defined there pick the new values up automatically.
+
+.o_picking_scan_app,
+.o_scan_workbench {
+    --ui-page: #0B1017;
+    --ui-card: #161E29;
+    --ui-ink: #E6EDF7;
+    --ui-ink-2: #9AA7B8;
+    --ui-divider: #5A6878;
+    --ui-yellow: #C8FF3D;
+    --ui-pink: #FF4D97;
+    --ui-green: #00E5A0;
+    --ui-orange: #FF8A3D;
+    --ui-blue: #4D7CFF;
+    --ui-red: #DB3847;
+    --ui-teal: #1DA1B7;
+    --ui-amber: #FFAB00;
+    --ui-border: #E6EDF7;
+    --ui-shadow: #E6EDF7;
+    --ui-shadow-deep: #0B1017;
+    --ui-on-accent: #0B1017;
+}

@@ -1,0 +1,157 @@
+// Shared "Beast" scan theme — light values + common components.
+// Odoo 19 forbids local @import, so this file is compiled as its own asset.
+// The palette is declared once as --ui-*, then aliased by each app to its
+// legacy prefix (--scan-* for the picking scan app, --wb-* for the scan /
+// batch workbench). Dark values live in shared/scan_ui.dark.scss and override
+// the --ui-* set, so the aliases switch automatically.
+
+.o_picking_scan_app,
+.o_scan_workbench {
+    --ui-page: #F7F3E8;
+    --ui-card: #FFFFFF;
+    --ui-ink: #111111;
+    --ui-ink-2: #555555;
+    --ui-divider: #BBB6A6;
+    --ui-yellow: #FFE500;
+    --ui-pink: #FF4D97;
+    --ui-green: #00D97E;
+    --ui-orange: #FF6B2C;
+    --ui-blue: #4361EE;
+    --ui-red: #DB3847;
+    --ui-teal: #1DA1B7;
+    --ui-amber: #FFAB00;
+    --ui-border: #111111;
+    --ui-shadow: #111111;
+    --ui-shadow-deep: #111111;
+    --ui-on-accent: #111111;
+}
+
+.o_picking_scan_app {
+    --scan-page: var(--ui-page);
+    --scan-card: var(--ui-card);
+    --scan-ink: var(--ui-ink);
+    --scan-ink-2: var(--ui-ink-2);
+    --scan-divider: var(--ui-divider);
+    --scan-yellow: var(--ui-yellow);
+    --scan-pink: var(--ui-pink);
+    --scan-green: var(--ui-green);
+    --scan-orange: var(--ui-orange);
+    --scan-blue: var(--ui-blue);
+    --scan-red: var(--ui-red);
+    --scan-teal: var(--ui-teal);
+    --scan-amber: var(--ui-amber);
+    --scan-border: var(--ui-border);
+    --scan-shadow: var(--ui-shadow);
+    --scan-shadow-deep: var(--ui-shadow-deep);
+    --scan-on-accent: var(--ui-on-accent);
+}
+
+.o_scan_workbench {
+    --wb-page: var(--ui-page);
+    --wb-card: var(--ui-card);
+    --wb-ink: var(--ui-ink);
+    --wb-ink-2: var(--ui-ink-2);
+    --wb-divider: var(--ui-divider);
+    --wb-yellow: var(--ui-yellow);
+    --wb-pink: var(--ui-pink);
+    --wb-green: var(--ui-green);
+    --wb-orange: var(--ui-orange);
+    --wb-blue: var(--ui-blue);
+    --wb-red: var(--ui-red);
+    --wb-teal: var(--ui-teal);
+    --wb-amber: var(--ui-amber);
+    --wb-border: var(--ui-border);
+    --wb-shadow: var(--ui-shadow);
+    --wb-shadow-deep: var(--ui-shadow-deep);
+    --wb-on-accent: var(--ui-on-accent);
+}
+
+// ---------- shared components ----------
+
+// "BY ODOO" brand chip. Every selector is scoped to its app so the MRP scan
+// app (which reuses some o_scan_* class names) keeps its own look.
+.o_picking_scan_app .o_scan_brand_chip,
+.o_scan_workbench .o_wb_brand_chip {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    background: var(--ui-pink);
+    border: 2px solid var(--ui-border);
+    color: var(--ui-on-accent);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    line-height: 1;
+}
+
+// Square hard-edged control (back / home / refresh / pager ...).
+.o_picking_scan_app .o_scan_scanrow .o_scan_key,
+.o_scan_workbench .o_wb_key {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ui-card);
+    border: 2px solid var(--ui-border);
+    color: var(--ui-ink);
+    box-shadow: 4px 4px 0 var(--ui-shadow-deep);
+    cursor: pointer;
+
+    &:active:not(:disabled) {
+        transform: translate(4px, 4px);
+        box-shadow: none;
+    }
+    &:disabled {
+        opacity: 0.4;
+        cursor: default;
+        box-shadow: none;
+    }
+}
+
+// Barcode input shell (the camera button lives inside it). Focusing it
+// behaves like a pressed control: the box drops 4px and loses its shadow.
+.o_picking_scan_app .o_scan_input_wrap,
+.o_scan_workbench .o_wb_input_wrap {
+    flex: 1 1 0%;
+    min-width: 0;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    background: var(--ui-card);
+    border: 2px solid var(--ui-border);
+    box-shadow: 4px 4px 0 var(--ui-shadow-deep);
+
+    &:focus-within {
+        transform: translate(4px, 4px);
+        box-shadow: none;
+    }
+}
+
+.o_picking_scan_app .o_scan_input_wrap .o_picking_scan_input,
+.o_scan_workbench .o_wb_input_wrap .o_wb_input {
+    flex: 1 1 0%;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--ui-ink);
+    font-size: 11px;
+    font-weight: 700;
+
+    &:focus {
+        outline: none;
+        box-shadow: none;
+    }
+    &::placeholder {
+        color: var(--ui-ink-2);
+        font-weight: 700;
+    }
+}

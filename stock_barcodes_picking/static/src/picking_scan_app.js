@@ -62,7 +62,33 @@ export class PickingScanApp extends Component {
             this._onScan(ev.detail.barcode)
         );
 
-        this.wizId = this.props.action.params?.wiz_id;
+        // Browser back from a form opened by this page restores the scan
+        // action from the URL, which only carries the action id — the
+        // runtime params (wiz_id) are lost. Remember the wizard per action
+        // path so back returns to the scan page instead of bouncing to the
+        // workbench (the old "no wiz_id" redirect).
+        const wizKey = "stock_barcodes_scan_wiz";
+        const paramWizId = this.props.action.params?.wiz_id;
+        if (paramWizId) {
+            this.wizId = paramWizId;
+            try {
+                browser.sessionStorage.setItem(
+                    wizKey,
+                    JSON.stringify({ id: paramWizId, t: Date.now() })
+                );
+            } catch {
+                // Private mode / storage full: fall back to params only.
+            }
+        } else {
+            let stored = null;
+            try {
+                stored = JSON.parse(browser.sessionStorage.getItem(wizKey) || "null");
+            } catch {
+                stored = null;
+            }
+            const fresh = stored && Date.now() - (stored.t || 0) < 30 * 60 * 1000;
+            this.wizId = fresh ? stored.id : false;
+        }
 
         // Browser back button handling — preserve the source list's context.
         //
@@ -643,8 +669,17 @@ export class PickingScanApp extends Component {
         }
     }
 
-    /** Back button — return to the previous controller (the picking list). */
+    /**
+     * Back button — use the browser history so the in-app back arrow and
+     * the browser back button take exactly the same route (URL-based
+     * restore). ``historyBack()`` would instead restore the in-memory
+     * controller, which keeps params/context and can land somewhere else.
+     */
     onBack() {
+        if (browser.history.length > 1) {
+            browser.history.back();
+            return;
+        }
         this.env.config.historyBack();
     }
 

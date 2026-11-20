@@ -248,36 +248,6 @@
                                 title="新建调拨（扫产品追加明细）"
                                 t-on-click="onNewPicking"
                             >+</button>
-                            <div class="o_wb_wh_wrap">
-                            <button
-                                type="button"
-                                class="o_wb_wh_short"
-                                t-on-click="onToggleWarehouseMenu"
-                            >
-                                <span t-out="state.warehouseLabel" />
-                                <span class="o_wb_wh_chevron">▾</span>
-                            </button>
-                            <t t-if="state.warehouseMenuOpen">
-                                <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
-                                <div class="o_wb_wh_menu o_wb_wh_menu_right">
-                                    <button
-                                        type="button"
-                                        class="o_wb_wh_option"
-                                        t-foreach="warehouses"
-                                        t-as="warehouse"
-                                        t-key="warehouse.id"
-                                        t-on-click="() => this.onSelectWarehouse(warehouse.id)"
-                                    >
-                                        <span t-out="warehouse.name" />
-                                        <i
-                                            t-if="warehouse.id === state.selectedWarehouseId"
-                                            class="fa fa-check"
-                                            aria-hidden="true"
-                                        />
-                                    </button>
-                                </div>
-                            </t>
-                        </div>
                         </div>
                     </div>
 
@@ -325,6 +295,35 @@
                         </button>
                     </div>
 
+                    <!-- Warehouse bar: same component as the workbench home -->
+                    <div class="o_wb_wh_wrap">
+                        <div class="o_wb_wh_bar" role="button" tabindex="0" t-on-click="onToggleWarehouseMenu">
+                            <span class="o_wb_wh_name" t-out="state.warehouseLabel" />
+                            <span class="o_wb_wh_chevron">▾</span>
+                            <span class="o_wb_wh_user" t-out="state.user.name + ' · ' + state.user.time" />
+                        </div>
+                        <t t-if="state.warehouseMenuOpen">
+                            <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
+                            <div class="o_wb_wh_menu">
+                                <button
+                                    type="button"
+                                    class="o_wb_wh_option"
+                                    t-foreach="warehouses"
+                                    t-as="warehouse"
+                                    t-key="warehouse.id"
+                                    t-on-click="() => this.onSelectWarehouse(warehouse.id)"
+                                >
+                                    <span t-out="warehouse.name" />
+                                    <i
+                                        t-if="warehouse.id === state.selectedWarehouseId"
+                                        class="fa fa-check"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                        </t>
+                    </div>
+
                     <!-- Secondary filter -->
                     <div class="o_wb_filter_head">
                         <div class="o_wb_filter_title" t-out="filterTitle" />
@@ -354,17 +353,39 @@
                         t-ref="filtersStrip"
                         t-on-scroll="() => this.updateStripOverflow()"
                     >
-                        <button
-                            type="button"
-                            t-foreach="facets"
-                            t-as="facet"
-                            t-key="facet.key"
-                            t-att-class="'o_wb_filter o_wb_filter_' + facet.color + (state.filterValue === facet.key ? ' is-active' : '')"
-                            t-on-click="() => this.onSelectFilter(facet)"
-                        >
-                            <span class="o_wb_filter_lbl" t-out="facet.label" />
-                            <span class="o_wb_filter_num" t-out="facet.count" />
-                        </button>
+                        <!-- Status page: operation types use the same card as
+                             the workbench home (code band + name + count). -->
+                        <t t-if="state.listKind === 'status'">
+                            <button
+                                type="button"
+                                t-foreach="facets"
+                                t-as="facet"
+                                t-key="facet.key"
+                                t-att-class="'o_wb_type o_wb_type_filter' + (state.filterValue === facet.key ? ' is-active' : '')"
+                                t-on-click="() => this.onSelectFilter(facet)"
+                            >
+                                <span
+                                    t-att-class="'o_wb_type_band o_wb_type_band_' + (facet.code ? facet.color : 'all')"
+                                    t-out="facet.code or 'ALL'"
+                                />
+                                <span class="o_wb_type_name" t-out="facet.label" />
+                                <span class="o_wb_type_count" t-out="facet.count" />
+                            </button>
+                        </t>
+                        <t t-else="">
+                            <!-- Type page: native status filters keep the colour tiles. -->
+                            <button
+                                type="button"
+                                t-foreach="facets"
+                                t-as="facet"
+                                t-key="facet.key"
+                                t-att-class="'o_wb_filter o_wb_filter_' + facet.color + (state.filterValue === facet.key ? ' is-active' : '')"
+                                t-on-click="() => this.onSelectFilter(facet)"
+                            >
+                                <span class="o_wb_filter_lbl" t-out="facet.label" />
+                                <span class="o_wb_filter_num" t-out="facet.count" />
+                            </button>
+                        </t>
                     </div>
 
                     <!-- Rows -->
@@ -408,36 +429,6 @@
                             <h1 class="o_wb_title">库存盘点</h1>
                             <div class="o_wb_subtitle">按产品 / 库位 / 批次扫码盘点</div>
                         </div>
-                        <div class="o_wb_wh_wrap">
-                            <button
-                                type="button"
-                                class="o_wb_wh_short"
-                                t-on-click="onToggleWarehouseMenu"
-                            >
-                                <span t-out="state.warehouseLabel" />
-                                <span class="o_wb_wh_chevron">▾</span>
-                            </button>
-                            <t t-if="state.warehouseMenuOpen">
-                                <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
-                                <div class="o_wb_wh_menu o_wb_wh_menu_right">
-                                    <button
-                                        type="button"
-                                        class="o_wb_wh_option"
-                                        t-foreach="warehouses"
-                                        t-as="warehouse"
-                                        t-key="warehouse.id"
-                                        t-on-click="() => this.onSelectWarehouse(warehouse.id)"
-                                    >
-                                        <span t-out="warehouse.name" />
-                                        <i
-                                            t-if="warehouse.id === state.selectedWarehouseId"
-                                            class="fa fa-check"
-                                            aria-hidden="true"
-                                        />
-                                    </button>
-                                </div>
-                            </t>
-                        </div>
                     </div>
 
                     <div class="o_wb_scanrow">
@@ -470,6 +461,35 @@
                                 <t t-call="stock_barcodes_picking.CameraIcon" />
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Warehouse bar: same component as the workbench home -->
+                    <div class="o_wb_wh_wrap">
+                        <div class="o_wb_wh_bar" role="button" tabindex="0" t-on-click="onToggleWarehouseMenu">
+                            <span class="o_wb_wh_name" t-out="state.warehouseLabel" />
+                            <span class="o_wb_wh_chevron">▾</span>
+                            <span class="o_wb_wh_user" t-out="state.user.name + ' · ' + state.user.time" />
+                        </div>
+                        <t t-if="state.warehouseMenuOpen">
+                            <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
+                            <div class="o_wb_wh_menu">
+                                <button
+                                    type="button"
+                                    class="o_wb_wh_option"
+                                    t-foreach="warehouses"
+                                    t-as="warehouse"
+                                    t-key="warehouse.id"
+                                    t-on-click="() => this.onSelectWarehouse(warehouse.id)"
+                                >
+                                    <span t-out="warehouse.name" />
+                                    <i
+                                        t-if="warehouse.id === state.selectedWarehouseId"
+                                        class="fa fa-check"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                        </t>
                     </div>
 
                     <div class="o_wb_inv_filter" t-if="state.inventoryFilterLabel">
