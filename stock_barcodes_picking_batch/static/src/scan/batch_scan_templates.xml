@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2026 OpenViking
+     License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). -->
+<templates xml:space="preserve">
+    <!-- Product card: show the transfer this card belongs to. -->
+    <t
+        t-name="stock_barcodes_picking_batch.PickingScanCard"
+        t-inherit="stock_barcodes_picking.PickingScanCard"
+        t-inherit-mode="extension"
+    >
+        <xpath expr="//div[hasclass('o_scan_prod_box')]" position="after">
+            <div class="o_scan_doc_ref" t-if="row.picking_name">
+                <i class="fa fa-truck" aria-hidden="true" />
+                <span t-out="row.picking_name" />
+            </div>
+        </xpath>
+    </t>
+
+    <!-- Scan page: add the "加单" entry to the more menu. -->
+    <t
+        t-name="stock_barcodes_picking_batch.PickingScanApp"
+        t-inherit="stock_barcodes_picking.PickingScanApp"
+        t-inherit-mode="extension"
+    >
+        <xpath expr="//div[hasclass('o_scan_more_menu')]/button[1]" position="before">
+            <button
+                t-if="state.batch_id"
+                type="button"
+                t-on-click="() => this.onBatchAddPickings()"
+            >加单</button>
+        </xpath>
+    </t>
+</templates>

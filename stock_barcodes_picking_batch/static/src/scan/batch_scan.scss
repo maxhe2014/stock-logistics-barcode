@@ -1,0 +1,17 @@
+// Batch scan page — small extensions on top of the picking scan app.
+
+.o_picking_scan_app {
+    .o_scan_doc_ref {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 2px;
+        font-size: 9px;
+        line-height: 1.2;
+        font-weight: 800;
+        color: var(--scan-ink-2);
+    }
+    .o_scan_doc_ref .fa {
+        font-size: 10px;
+    }
+}

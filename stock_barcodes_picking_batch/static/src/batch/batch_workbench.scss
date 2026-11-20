@@ -1,0 +1,103 @@
+// Batch transfer workbench — reuses the scan workbench theme tokens
+// (--wb-*) defined by stock_barcodes_picking.
+
+.o_scan_workbench.o_batch_app {
+    // Workbench card for the batch entry point.
+    .o_wb_type_band_batch {
+        background: var(--wb-blue);
+        color: #FFFFFF;
+    }
+
+    // ---------- batch rows ----------
+    .o_batch_row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .o_batch_row.is-selected {
+        border-color: var(--wb-orange);
+    }
+    .o_batch_main {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .o_batch_name {
+        font-size: 13px;
+        line-height: 1.2;
+        font-weight: 900;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .o_batch_meta {
+        margin-top: 4px;
+        font-size: 9px;
+        line-height: 1.2;
+        font-weight: 700;
+        color: var(--wb-ink-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .o_batch_meta_sub {
+        margin-top: 3px;
+    }
+    .o_batch_wt .fa {
+        margin-right: 3px;
+    }
+    .o_batch_side {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+    }
+    .o_batch_date {
+        font-size: 9px;
+        line-height: 1.2;
+        font-weight: 800;
+        color: var(--wb-ink-2);
+        white-space: nowrap;
+    }
+    .o_batch_star {
+        flex: 0 0 auto;
+        width: 14px;
+        font-size: 12px;
+        color: var(--wb-ink-2);
+        text-align: center;
+    }
+    .o_batch_star.is-on {
+        color: var(--wb-orange);
+    }
+    .o_batch_check {
+        font-size: 16px;
+        line-height: 1;
+        color: var(--wb-ink-2);
+    }
+    .o_batch_check.is-on {
+        color: var(--wb-ink);
+    }
+
+    // ---------- selection page ----------
+    .o_batch_group_title {
+        margin-top: 12px;
+        font-size: 11px;
+        font-weight: 900;
+        color: var(--wb-ink-2);
+        letter-spacing: 0.5px;
+    }
+    .o_batch_selection_hint {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        background: var(--wb-card);
+        border: 2px solid var(--wb-border);
+        box-shadow: 4px 4px 0 var(--wb-shadow);
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--wb-ink);
+    }
+}

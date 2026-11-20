@@ -1,0 +1,10 @@
+// Batch workbench — dark theme overrides (web.assets_web_dark).
+
+.o_scan_workbench.o_batch_app {
+    // "All" status card: dark page background + light text, like the design.
+    .o_wb_stat_all {
+        background: var(--wb-page);
+        color: var(--wb-ink);
+        border-color: var(--wb-ink);
+    }
+}

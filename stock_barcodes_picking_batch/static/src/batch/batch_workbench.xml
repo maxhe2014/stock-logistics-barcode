@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2026 OpenViking
+     License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). -->
+<templates xml:space="preserve">
+    <t t-name="stock_barcodes_picking_batch.BatchWorkbench">
+        <div class="o_scan_workbench o_batch_app">
+            <div class="o_wb_page">
+                <!-- ================= Batch list ================= -->
+                <t t-if="state.view === 'list'">
+                    <div class="o_wb_head o_wb_head_list">
+                        <div class="o_wb_head_text">
+                            <h1 class="o_wb_title">批量调拨</h1>
+                            <div class="o_wb_subtitle">批量调拨 · 作业入口</div>
+                        </div>
+                        <button
+                            type="button"
+                            class="o_wb_new"
+                            title="新建批量"
+                            t-on-click="onCreateView"
+                        >+</button>
+                    </div>
+
+                    <div class="o_wb_scanrow">
+                        <button type="button" class="o_wb_key" title="返回" t-on-click="onBack">
+                            <img
+                                class="o_wb_icon_back"
+                                src="/stock_barcodes_picking/static/src/img/icon_back.svg"
+                                alt=""
+                            />
+                        </button>
+                        <div class="o_wb_input_wrap">
+                            <input
+                                class="o_wb_input"
+                                type="text"
+                                placeholder="扫码或输入条码..."
+                                t-model="state.scanValue"
+                                t-on-keydown="onScanKeydown"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            class="o_wb_key o_wb_camera"
+                            title="相机扫码"
+                            t-on-click="onCamera"
+                        >
+                            <img
+                                class="o_wb_icon_camera"
+                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                alt=""
+                            />
+                        </button>
+                    </div>
+
+                    <div class="o_wb_section o_wb_section_status">
+                        <span class="o_wb_section_title">状态</span>
+                    </div>
+                    <div class="o_wb_stats">
+                        <button
+                            type="button"
+                            class="o_wb_stat"
+                            t-foreach="state.facets"
+                            t-as="facet"
+                            t-key="facet.key"
+                            t-att-class="'o_wb_stat o_wb_stat_' + facet.stat_color + (state.stateFilter === facet.key ? ' is-active' : '')"
+                            t-on-click="() => this.onSelectStateFilter(facet)"
+                        >
+                            <span class="o_wb_stat_num" t-out="facet.count" />
+                            <span class="o_wb_stat_lbl" t-out="facet.label" />
+                        </button>
+                    </div>
+
+                    <div class="o_wb_rows o_batch_rows">
+                        <button
+                            type="button"
+                            class="o_wb_row o_batch_row"
+                            t-foreach="batchRows"
+                            t-as="batch"
+                            t-key="batch.id"
+                            t-on-click="() => this.onOpenBatch(batch)"
+                        >
+                            <div class="o_batch_main">
+                                <div class="o_batch_name" t-out="batch.name" />
+                                <div class="o_batch_meta">
+                                    <t t-out="batch.detail_count" /> 明细行
+                                </div>
+                                <div class="o_batch_meta o_batch_meta_sub">
+                                    <span class="o_batch_wt">
+                                        <i class="fa fa-truck" aria-hidden="true" />
+                                        <t t-out="batch.warehouse" />: <t t-out="batch.operation_type" />
+                                    </span>
+                                    <t t-if="batch.partner"> · <t t-out="batch.partner" /></t>
+                                </div>
+                            </div>
+                            <div class="o_batch_side">
+                                <span
+                                    t-att-class="'o_wb_badge o_wb_badge_' + this.batchStateColor(batch.state)"
+                                    t-out="this.batchStateLabel(batch.state)"
+                                />
+                                <span class="o_batch_date" t-out="batch.datetime_label" />
+                            </div>
+                        </button>
+                        <div class="o_wb_empty" t-if="!batchRows.length">暂无批量调拨</div>
+                    </div>
+
+                    <div class="o_wb_pager o_wb_pager_bottom">
+                        <span t-out="pageLabel" />
+                        <button
+                            type="button"
+                            class="o_wb_pager_btn"
+                            t-att-disabled="canPrev ? null : 'disabled'"
+                            title="上一页"
+                            t-on-click="onPrevPage"
+                        >‹</button>
+                        <button
+                            type="button"
+                            class="o_wb_pager_btn"
+                            t-att-disabled="canNext ? null : 'disabled'"
+                            title="下一页"
+                            t-on-click="onNextPage"
+                        >›</button>
+                    </div>
+                    <div class="o_wb_hint">点击单据查看详情或直接扫码</div>
+                </t>
+
+                <!-- ================= Operation type selection ================= -->
+                <t t-elif="state.view === 'types'">
+                    <div class="o_wb_head o_wb_head_list">
+                        <div class="o_wb_head_text">
+                            <h1 class="o_wb_title">作业类型选择</h1>
+                            <div class="o_wb_subtitle">新建批量调拨 &gt; 作业类型选择</div>
+                        </div>
+                    </div>
+                    <div class="o_wb_scanrow">
+                        <button type="button" class="o_wb_key" title="返回" t-on-click="onBack">
+                            <img
+                                class="o_wb_icon_back"
+                                src="/stock_barcodes_picking/static/src/img/icon_back.svg"
+                                alt=""
+                            />
+                        </button>
+                        <div class="o_batch_selection_hint">请选择单据类型</div>
+                    </div>
+
+                    <div class="o_wb_section">
+                        <span class="o_wb_section_title">作业类型</span>
+                    </div>
+                    <div class="o_wb_types">
+                        <button
+                            type="button"
+                            class="o_wb_type"
+                            t-foreach="state.types"
+                            t-as="type"
+                            t-key="type.id"
+                            t-on-click="() => this.onSelectType(type)"
+                        >
+                            <span
+                                t-att-class="'o_wb_type_band o_wb_type_band_' + type.color"
+                                t-out="type.name"
+                            />
+                            <span class="o_wb_type_en" t-out="type.subtitle" />
+                            <span class="o_wb_type_count" t-out="type.count" />
+                        </button>
+                        <div class="o_wb_empty" t-if="!state.types.length">暂无作业类型</div>
+                    </div>
+                    <div class="o_wb_hint">请选择单据类型</div>
+                </t>
+
+                <!-- ================= Picking selection / add ================= -->
+                <t t-else="">
+                    <div class="o_wb_head o_wb_head_list">
+                        <div class="o_wb_head_text">
+                            <h1 class="o_wb_title" t-if="addMode">
+                                加单 · <t t-out="state.batch.name" />
+                            </h1>
+                            <h1 class="o_wb_title" t-else="">单据选择</h1>
+                            <div class="o_wb_subtitle" t-if="addMode">
+                                勾选待办单据，加入当前批次
+                            </div>
+                            <div class="o_wb_subtitle" t-else="">
+                                新建批量调拨 &gt; 作业类型选择 &gt; 单据选择
+                            </div>
+                        </div>
+                    </div>
+                    <div class="o_wb_scanrow">
+                        <button type="button" class="o_wb_key" title="返回" t-on-click="onBack">
+                            <img
+                                class="o_wb_icon_back"
+                                src="/stock_barcodes_picking/static/src/img/icon_back.svg"
+                                alt=""
+                            />
+                        </button>
+                        <div class="o_batch_selection_hint">
+                            <t t-if="!addMode"><t t-out="pickTitle" /> · </t>
+                            已选 <t t-out="selectedCount" /> 张单据
+                        </div>
+                    </div>
+
+                    <div class="o_batch_group_title" t-if="!addMode">
+                        <t t-out="pickTitle" />
+                    </div>
+
+                    <div class="o_wb_rows o_batch_rows">
+                        <button
+                            type="button"
+                            class="o_wb_row o_batch_row"
+                            t-foreach="pickRows"
+                            t-as="candidate"
+                            t-key="candidate.id"
+                            t-att-class="'o_wb_row o_batch_row' + (this.isSelected(candidate) ? ' is-selected' : '')"
+                            t-on-click="() => this.onToggleCandidate(candidate)"
+                        >
+                            <i
+                                t-att-class="'fa o_batch_star ' + (candidate.starred ? 'fa-star is-on' : 'fa-star-o')"
+                                aria-hidden="true"
+                            />
+                            <div class="o_batch_main">
+                                <div class="o_batch_name" t-out="candidate.name" />
+                                <div class="o_batch_meta">
+                                    <span t-out="candidate.partner" />
+                                    <t t-if="candidate.origin"> · <span t-out="candidate.origin" /></t>
+                                </div>
+                            </div>
+                            <div class="o_batch_side">
+                                <span
+                                    t-att-class="'o_wb_badge o_wb_badge_' + this.statusColor(candidate.status_key)"
+                                    t-out="this.statusLabel(candidate.status_key)"
+                                />
+                                <span class="o_batch_date" t-out="candidate.date" />
+                                <i
+                                    t-att-class="'fa o_batch_check ' + (this.isSelected(candidate) ? 'fa-check-square-o is-on' : 'fa-square-o')"
+                                    aria-hidden="true"
+                                />
+                            </div>
+                        </button>
+                        <div class="o_wb_empty" t-if="!state.candidates.length">
+                            当前没有可加入批量的待办单据
+                        </div>
+                    </div>
+
+                    <div class="o_wb_pager o_wb_pager_bottom" t-if="state.candidates.length">
+                        <span t-out="pickPageLabel" />
+                        <button
+                            type="button"
+                            class="o_wb_pager_btn"
+                            t-att-disabled="canPickPrev ? null : 'disabled'"
+                            title="上一页"
+                            t-on-click="onPrevPickPage"
+                        >‹</button>
+                        <button
+                            type="button"
+                            class="o_wb_pager_btn"
+                            t-att-disabled="canPickNext ? null : 'disabled'"
+                            title="下一页"
+                            t-on-click="onNextPickPage"
+                        >›</button>
+                    </div>
+
+                    <div class="o_wb_inv_actions">
+                        <button
+                            type="button"
+                            class="o_wb_inv_apply"
+                            t-att-disabled="!selectedCount ? 'disabled' : null"
+                            t-on-click="onSubmitCandidates"
+                        >
+                            <t t-if="addMode">加入批次</t>
+                            <t t-else="">确认</t>
+                            (<t t-out="selectedCount" />)
+                        </button>
+                    </div>
+                    <div class="o_wb_hint">
+                        <t t-if="addMode">选择要加入当前批次的单据，点击确认加入</t>
+                        <t t-else="">选择要添加到批量拣货的单据，点击确认完成创建</t>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>
