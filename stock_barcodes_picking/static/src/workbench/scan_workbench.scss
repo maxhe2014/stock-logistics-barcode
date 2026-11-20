@@ -111,10 +111,6 @@
         box-shadow: 4px 4px 0 var(--wb-shadow);
         color: var(--wb-ink);
     }
-    .o_wb_camera {
-        background: var(--wb-yellow);
-        color: var(--wb-on-accent);
-    }
     .o_wb_key:active:not(:disabled) {
         transform: translate(4px, 4px);
         box-shadow: none;
@@ -168,6 +164,27 @@
         width: 17.6px;
         height: 17.6px;
         display: block;
+    }
+    .o_wb_cam_inline {
+        flex: 0 0 auto;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        color: var(--wb-ink);
+    }
+    .o_wb_cam_inline:active {
+        transform: none;
+        box-shadow: none;
+    }
+    .o_wb_cam_inline .o_wb_icon_camera {
+        width: 16px;
+        height: 16px;
     }
     .o_wb_icon_funnel {
         width: 16px;

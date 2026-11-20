@@ -181,6 +181,7 @@ class StockBarcodesWorkbench(models.Model):
             "total": len(pickings),
             "done": len(pickings.filtered(lambda p: p.state == "done")),
             "can_add": batch.state in BATCH_ACTIVE_STATES,
+            "warehouse": batch.picking_type_id.warehouse_id.name or "",
         }
 
     # ------------------------------------------------------------------

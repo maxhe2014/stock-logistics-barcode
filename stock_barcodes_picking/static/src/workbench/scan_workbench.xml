@@ -65,7 +65,7 @@
                         </div>
                     </div>
 
-                    <!-- Scan row: back + input + camera (gear hidden, Q25) -->
+                    <!-- Scan row: back + input (camera inside, gear hidden, Q25) -->
                     <div class="o_wb_scanrow">
                         <button type="button" class="o_wb_key" t-on-click="onBack" title="返回">
                             <img
@@ -87,19 +87,19 @@
                                 t-model="state.scanValue"
                                 t-on-keydown="onScanKeydown"
                             />
+                            <button
+                                type="button"
+                                class="o_wb_cam_inline"
+                                title="相机扫码"
+                                t-on-click="onCamera"
+                            >
+                                <img
+                                    class="o_wb_icon_camera"
+                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                    alt=""
+                                />
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            class="o_wb_key o_wb_camera"
-                            title="相机扫码"
-                            t-on-click="onCamera"
-                        >
-                            <img
-                                class="o_wb_icon_camera"
-                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                alt=""
-                            />
-                        </button>
                     </div>
 
                     <!-- Warehouse bar -->
@@ -274,7 +274,7 @@
                         </div>
                     </div>
 
-                    <!-- Scan row: back + input + camera + funnel -->
+                    <!-- Scan row: back + input (camera inside) + funnel -->
                     <div class="o_wb_scanrow">
                         <button type="button" class="o_wb_key" t-on-click="onBack" title="返回">
                             <img
@@ -296,19 +296,19 @@
                                 t-model="state.scanValue"
                                 t-on-keydown="onScanKeydown"
                             />
+                            <button
+                                type="button"
+                                class="o_wb_cam_inline"
+                                title="相机扫码"
+                                t-on-click="onCamera"
+                            >
+                                <img
+                                    class="o_wb_icon_camera"
+                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                    alt=""
+                                />
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            class="o_wb_key o_wb_camera"
-                            title="相机扫码"
-                            t-on-click="onCamera"
-                        >
-                            <img
-                                class="o_wb_icon_camera"
-                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                alt=""
-                            />
-                        </button>
                         <button type="button" class="o_wb_key" title="筛选" t-on-click="onFunnel">
                             <svg class="o_wb_icon_funnel" viewBox="0 0 16 16" aria-hidden="true">
                                 <path

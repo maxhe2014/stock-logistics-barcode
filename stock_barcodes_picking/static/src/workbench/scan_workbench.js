@@ -433,9 +433,6 @@ export class ScanWorkbench extends Component {
     onSelectFilter(facet) {
         this.state.filterValue = String(facet.key);
         this.state.page = 1;
-        if (!facet.count) {
-            this.notification.add("当前无单据", { type: "warning" });
-        }
         this._loadList();
     }
 

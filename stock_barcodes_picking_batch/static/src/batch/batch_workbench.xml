@@ -5,6 +5,11 @@
     <t t-name="stock_barcodes_picking_batch.BatchWorkbench">
         <div class="o_scan_workbench o_batch_app">
             <div class="o_wb_page">
+                <!-- Unified brand strip (Pixso page 4 headers). -->
+                <div class="o_wb_brand">
+                    <span class="o_wb_brand_chip">BY ODOO</span>
+                </div>
+
                 <!-- ================= Batch list ================= -->
                 <t t-if="state.view === 'list'">
                     <div class="o_wb_head o_wb_head_list">
@@ -12,12 +17,6 @@
                             <h1 class="o_wb_title">批量调拨</h1>
                             <div class="o_wb_subtitle">批量调拨 · 作业入口</div>
                         </div>
-                        <button
-                            type="button"
-                            class="o_wb_new"
-                            title="新建批量"
-                            t-on-click="onCreateView"
-                        >+</button>
                     </div>
 
                     <div class="o_wb_scanrow">
@@ -29,6 +28,11 @@
                             />
                         </button>
                         <div class="o_wb_input_wrap">
+                            <img
+                                class="o_wb_icon_barcode"
+                                src="/stock_barcodes_picking/static/src/img/icon_barcode.svg"
+                                alt=""
+                            />
                             <input
                                 class="o_wb_input"
                                 type="text"
@@ -36,19 +40,62 @@
                                 t-model="state.scanValue"
                                 t-on-keydown="onScanKeydown"
                             />
+                            <button
+                                type="button"
+                                class="o_wb_cam_inline"
+                                title="相机扫码"
+                                t-on-click="onCamera"
+                            >
+                                <img
+                                    class="o_wb_icon_camera"
+                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                    alt=""
+                                />
+                            </button>
                         </div>
                         <button
                             type="button"
-                            class="o_wb_key o_wb_camera"
-                            title="相机扫码"
-                            t-on-click="onCamera"
+                            class="o_wb_new"
+                            title="新建批量"
+                            t-on-click="onCreateView"
+                        >+</button>
+                    </div>
+
+                    <!-- Warehouse bar (switchable on the list page) -->
+                    <div class="o_wb_wh_wrap">
+                        <div
+                            class="o_wb_wh_bar"
+                            role="button"
+                            tabindex="0"
+                            t-on-click="onToggleWarehouseMenu"
                         >
-                            <img
-                                class="o_wb_icon_camera"
-                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                alt=""
+                            <span class="o_wb_wh_name" t-out="state.warehouseLabel" />
+                            <span class="o_wb_wh_chevron">▾</span>
+                            <span
+                                class="o_wb_wh_user"
+                                t-out="state.user.name + ' · ' + state.user.time"
                             />
-                        </button>
+                        </div>
+                        <t t-if="state.warehouseMenuOpen">
+                            <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
+                            <div class="o_wb_wh_menu">
+                                <button
+                                    type="button"
+                                    class="o_wb_wh_option"
+                                    t-foreach="state.warehouses"
+                                    t-as="warehouse"
+                                    t-key="warehouse.id"
+                                    t-on-click="() => this.onSelectWarehouse(warehouse.id)"
+                                >
+                                    <span t-out="warehouse.name" />
+                                    <i
+                                        t-if="warehouse.id === state.selectedWarehouseId"
+                                        class="fa fa-check"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                        </t>
                     </div>
 
                     <div class="o_wb_section o_wb_section_status">
@@ -126,7 +173,7 @@
                 <t t-elif="state.view === 'types'">
                     <div class="o_wb_head o_wb_head_list">
                         <div class="o_wb_head_text">
-                            <h1 class="o_wb_title">作业类型选择</h1>
+                            <h1 class="o_wb_title">新建批量调拨</h1>
                             <div class="o_wb_subtitle">新建批量调拨 &gt; 作业类型选择</div>
                         </div>
                     </div>
@@ -138,7 +185,37 @@
                                 alt=""
                             />
                         </button>
-                        <div class="o_batch_selection_hint">请选择单据类型</div>
+                        <div class="o_wb_input_wrap">
+                            <img
+                                class="o_wb_icon_barcode"
+                                src="/stock_barcodes_picking/static/src/img/icon_barcode.svg"
+                                alt=""
+                            />
+                            <input
+                                class="o_wb_input"
+                                type="text"
+                                placeholder="扫码或输入条码..."
+                                disabled="disabled"
+                            />
+                            <button type="button" class="o_wb_cam_inline" disabled="disabled">
+                                <img
+                                    class="o_wb_icon_camera"
+                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                    alt=""
+                                />
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Warehouse bar: locked once the create flow starts -->
+                    <div class="o_wb_wh_wrap o_wb_wh_locked">
+                        <div class="o_wb_wh_bar">
+                            <span class="o_wb_wh_name" t-out="state.warehouseLabel" />
+                            <span
+                                class="o_wb_wh_user"
+                                t-out="state.user.name + ' · ' + state.user.time"
+                            />
+                        </div>
                     </div>
 
                     <div class="o_wb_section">
@@ -172,7 +249,7 @@
                             <h1 class="o_wb_title" t-if="addMode">
                                 加单 · <t t-out="state.batch.name" />
                             </h1>
-                            <h1 class="o_wb_title" t-else="">单据选择</h1>
+                            <h1 class="o_wb_title" t-else="">新建批量调拨</h1>
                             <div class="o_wb_subtitle" t-if="addMode">
                                 勾选待办单据，加入当前批次
                             </div>
@@ -189,9 +266,39 @@
                                 alt=""
                             />
                         </button>
+                        <div class="o_wb_input_wrap">
+                            <img
+                                class="o_wb_icon_barcode"
+                                src="/stock_barcodes_picking/static/src/img/icon_barcode.svg"
+                                alt=""
+                            />
+                            <input
+                                class="o_wb_input"
+                                type="text"
+                                placeholder="扫码或输入条码..."
+                                disabled="disabled"
+                            />
+                            <button type="button" class="o_wb_cam_inline" disabled="disabled">
+                                <img
+                                    class="o_wb_icon_camera"
+                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                    alt=""
+                                />
+                            </button>
+                        </div>
                         <div class="o_batch_selection_hint">
-                            <t t-if="!addMode"><t t-out="pickTitle" /> · </t>
                             已选 <t t-out="selectedCount" /> 张单据
+                        </div>
+                    </div>
+
+                    <!-- Warehouse bar: locked on the picking selection page -->
+                    <div class="o_wb_wh_wrap o_wb_wh_locked">
+                        <div class="o_wb_wh_bar">
+                            <span class="o_wb_wh_name" t-out="state.warehouseLabel" />
+                            <span
+                                class="o_wb_wh_user"
+                                t-out="state.user.name + ' · ' + state.user.time"
+                            />
                         </div>
                     </div>
 

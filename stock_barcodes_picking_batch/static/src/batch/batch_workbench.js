@@ -51,13 +51,20 @@ export class BatchWorkbench extends Component {
             batch: false,
             selectedIds: [],
             loading: false,
+            warehouses: [],
+            warehouseLabel: "",
+            warehouseMenuOpen: false,
+            warehouseLocked: false,
+            selectedWarehouseId: false,
+            user: { name: "", time: "" },
         });
         onMounted(async () => {
             if (this.addMode) {
                 this.state.view = "pick";
                 await this._loadBatchAndCandidates();
             } else {
-                this._loadList();
+                await this._loadHeader();
+                await this._loadList();
             }
         });
     }
@@ -150,11 +157,29 @@ export class BatchWorkbench extends Component {
 
     // ---------- loading ----------
 
+    async _loadHeader() {
+        try {
+            const data = await this.orm.call(SERVICE, "get_workbench_data", [
+                this.state.selectedWarehouseId || false,
+            ]);
+            this.state.warehouses = data.warehouses || [];
+            this.state.user = data.user || { name: "", time: "" };
+            const selected = data.selected_warehouse;
+            if (selected) {
+                this.state.selectedWarehouseId = selected.id;
+                this.state.warehouseLabel =
+                    `主仓库 ${selected.name}`;
+            }
+        } catch (error) {
+            this._notifyError("加载仓库失败", error);
+        }
+    }
+
     async _loadList() {
         this.state.loading = true;
         try {
             const data = await this.orm.call(SERVICE, "get_batch_list", [
-                false,
+                this.state.selectedWarehouseId || false,
                 this.state.stateFilter,
                 this.state.page,
                 this.state.pageSize,
@@ -177,7 +202,7 @@ export class BatchWorkbench extends Component {
             this.state.types = await this.orm.call(
                 SERVICE,
                 "get_batch_create_types",
-                [false]
+                [this.state.selectedWarehouseId || false]
             );
             const preferred =
                 this.state.types.find((type) => type.count > 0) ||
@@ -204,7 +229,7 @@ export class BatchWorkbench extends Component {
             this.state.candidates = await this.orm.call(
                 SERVICE,
                 "get_batch_candidates",
-                [false, this.state.createTypeId]
+                [this.state.selectedWarehouseId || false, this.state.createTypeId]
             );
             this.state.selectedIds = [];
             this.state.pickPage = 1;
@@ -221,6 +246,10 @@ export class BatchWorkbench extends Component {
             this.state.batch = await this.orm.call(SERVICE, "get_batch_info", [
                 this.batchId,
             ]);
+            this.state.warehouseLocked = true;
+            this.state.warehouseLabel = this.state.batch.warehouse
+                ? `主仓库 ${this.state.batch.warehouse}`
+                : "";
             this.state.candidates = await this.orm.call(
                 SERVICE,
                 "get_add_candidates",
@@ -257,6 +286,8 @@ export class BatchWorkbench extends Component {
         if (this.state.view === "types") {
             this.state.view = "list";
             this.state.selectedIds = [];
+            this.state.warehouseLocked = false;
+            this.state.warehouseMenuOpen = false;
             await this._loadList();
             return;
         }
@@ -266,7 +297,36 @@ export class BatchWorkbench extends Component {
     }
 
     onCreateView() {
+        this.state.warehouseLocked = true;
+        this.state.warehouseMenuOpen = false;
         this._loadTypes();
+    }
+
+    onToggleWarehouseMenu() {
+        if (this.state.warehouseLocked) {
+            return;
+        }
+        this.state.warehouseMenuOpen = !this.state.warehouseMenuOpen;
+    }
+
+    onCloseWarehouseMenu() {
+        this.state.warehouseMenuOpen = false;
+    }
+
+    async onSelectWarehouse(warehouseId) {
+        this.state.warehouseMenuOpen = false;
+        if (warehouseId === this.state.selectedWarehouseId) {
+            return;
+        }
+        this.state.selectedWarehouseId = warehouseId;
+        const warehouse = this.state.warehouses.find(
+            (item) => item.id === warehouseId
+        );
+        this.state.warehouseLabel = warehouse
+            ? `主仓库 ${warehouse.name}`
+            : "";
+        this.state.page = 1;
+        await this._loadList();
     }
 
     async onSelectType(type) {
@@ -395,7 +455,7 @@ export class BatchWorkbench extends Component {
         }
         try {
             const result = await this.orm.call(SERVICE, "create_batch", [
-                false,
+                this.state.selectedWarehouseId || false,
                 this.state.createTypeId,
                 this.state.selectedIds,
             ]);

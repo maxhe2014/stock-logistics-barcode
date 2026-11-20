@@ -84,17 +84,17 @@
                         t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
                         t-on-keydown="onManualScanEnter"
                     />
+                    <button
+                        type="button"
+                        class="o_scan_cam_inline"
+                        t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
+                        t-on-click="onCameraScan"
+                        aria-label="扫码"
+                        title="扫码"
+                    >
+                        <img class="o_scan_camera_icon" src="/stock_barcodes_picking/static/src/img/icon_camera.svg" alt=""/>
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    class="o_scan_key o_picking_scan_camera"
-                    t-att-disabled="state.scanning or isQuantityEditing or state.visible_switch_selector or state.visible_force_add or state.unclaim_choices.length ? 'disabled' : ''"
-                    t-on-click="onCameraScan"
-                    aria-label="扫码"
-                    title="扫码"
-                >
-                    <img class="o_scan_camera_icon" src="/stock_barcodes_picking/static/src/img/icon_camera.svg" alt=""/>
-                </button>
                 <CogMenu t-if="state.picking_id" t-props="cogMenuProps"/>
             </div>
 

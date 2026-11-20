@@ -8,6 +8,22 @@
         color: #FFFFFF;
     }
 
+    // ---------- unified header ----------
+    .o_wb_scanrow .o_wb_new {
+        width: 38px;
+        height: 38px;
+    }
+    .o_wb_wh_locked .o_wb_wh_bar {
+        cursor: default;
+    }
+    .o_wb_input_wrap .o_wb_input[disabled] {
+        opacity: 1;
+        color: var(--wb-ink-2);
+    }
+    .o_wb_cam_inline[disabled] {
+        opacity: 0.5;
+    }
+
     // ---------- batch rows ----------
     .o_batch_row {
         display: flex;
