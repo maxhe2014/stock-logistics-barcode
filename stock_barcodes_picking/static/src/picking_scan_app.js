@@ -242,6 +242,15 @@ export class PickingScanApp extends Component {
         // restored before loadState → _getActionParams reads it.
         onMounted(() => {
             window.addEventListener("popstate", this._onPopState, { capture: true });
+            // A bfcache restore after the browser back button keeps dead
+            // timers/bus state and can freeze this fullscreen action.
+            this._onPageShow = (event) => {
+                if (event.persisted) {
+                    window.location.reload();
+                }
+            };
+            window.addEventListener("pageshow", this._onPageShow);
+            document.body.classList.remove("o_apps_menu_opened");
             // Pull-to-refresh is bound on the component root (the gesture
             // may start on the list, the hint bar or any empty area) and
             // directly in JS so touchmove is explicitly non-passive and
@@ -265,6 +274,7 @@ export class PickingScanApp extends Component {
         });
         onWillUnmount(() => {
             window.removeEventListener("popstate", this._onPopState, { capture: true });
+            window.removeEventListener("pageshow", this._onPageShow);
             const root = this.el;
             if (root) {
                 root.removeEventListener("touchstart", this._onPtrTouchStart);

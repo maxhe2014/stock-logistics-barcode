@@ -16,7 +16,9 @@
     --wb-green: #00D97E;
     --wb-orange: #FF6B2C;
     --wb-blue: #4361EE;
-    --wb-red: #C03636;
+    --wb-red: #DB3847;
+    --wb-teal: #1DA1B7;
+    --wb-amber: #FFAB00;
     --wb-border: #111111;
     --wb-shadow: #111111;
     --wb-on-accent: #111111;
@@ -160,11 +162,6 @@
         flex: 0 0 auto;
         display: block;
     }
-    .o_wb_icon_camera {
-        width: 17.6px;
-        height: 17.6px;
-        display: block;
-    }
     .o_wb_cam_inline {
         flex: 0 0 auto;
         width: 20px;
@@ -182,9 +179,10 @@
         transform: none;
         box-shadow: none;
     }
-    .o_wb_cam_inline .o_wb_icon_camera {
+    .o_wb_cam_inline .o_scan_camera_svg {
         width: 16px;
         height: 16px;
+        display: block;
     }
     .o_wb_icon_funnel {
         width: 16px;
@@ -214,6 +212,18 @@
     .o_wb_new:active {
         transform: translate(3px, 3px);
         box-shadow: none;
+    }
+    .o_wb_head_action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+    }
+    .o_wb_home_grid {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
     }
     .o_wb_wh_wrap {
         position: relative;
@@ -344,10 +354,18 @@
     }
     .o_wb_stat_all {
         background: var(--wb-ink);
-        color: var(--wb-card);
+        color: var(--wb-page);
     }
     .o_wb_stat_blue {
         background: var(--wb-blue);
+    }
+    .o_wb_stat_teal {
+        background: var(--wb-teal);
+        color: #FFFFFF;
+    }
+    .o_wb_stat_amber {
+        background: var(--wb-amber);
+        color: var(--wb-on-accent);
     }
     .o_wb_stat_green {
         background: var(--wb-green);
@@ -454,11 +472,14 @@
     }
     .o_wb_type_band {
         display: block;
-        padding: 5px 8px;
+        padding: 7px 10px;
         border-bottom: 2px solid var(--wb-border);
-        font-size: 12px;
-        line-height: 1.2;
+        // The band carries the short code (OUT / PC / IN ...), as in the
+        // design; the Chinese name sits below it.
+        font-size: 22px;
+        line-height: 1.1;
         font-weight: 900;
+        letter-spacing: 0.5px;
         color: var(--wb-on-accent);
         white-space: nowrap;
         overflow: hidden;
@@ -466,9 +487,11 @@
     }
     .o_wb_type_band_out {
         background: var(--wb-green);
+        color: var(--wb-on-accent);
     }
     .o_wb_type_band_pc {
         background: var(--wb-divider);
+        color: #FFFFFF;
     }
     .o_wb_type_band_in {
         background: var(--wb-blue);
@@ -476,12 +499,30 @@
     }
     .o_wb_type_band_sfp {
         background: var(--wb-pink);
+        color: #FFFFFF;
     }
     .o_wb_type_band_int {
         background: var(--wb-yellow);
+        color: var(--wb-on-accent);
     }
     .o_wb_type_band_ia {
         background: var(--wb-orange);
+        color: #FFFFFF;
+    }
+    .o_wb_type_band_batch {
+        background: var(--wb-red);
+        color: #FFFFFF;
+    }
+    .o_wb_type_name {
+        display: block;
+        padding: 6px 8px 26px;
+        font-size: 13px;
+        line-height: 1.2;
+        font-weight: 900;
+        color: var(--wb-ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .o_wb_type_en {
         display: block;
@@ -521,6 +562,7 @@
         margin-top: 4px;
     }
     .o_wb_row {
+        position: relative;
         display: block;
         width: 100%;
         margin: 0;
@@ -537,6 +579,39 @@
         transform: translate(4px, 4px);
         box-shadow: none;
         border-color: var(--wb-orange);
+    }
+    // 3px type stripe drawn INSIDE the black card border (the border keeps
+    // its own colour), matching the type band colours.
+    .o_wb_row::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--wb-divider);
+        pointer-events: none;
+    }
+    .o_wb_row_type_out::before {
+        background: var(--wb-green);
+    }
+    .o_wb_row_type_pc::before {
+        background: var(--wb-divider);
+    }
+    .o_wb_row_type_in::before {
+        background: var(--wb-blue);
+    }
+    .o_wb_row_type_sfp::before {
+        background: var(--wb-pink);
+    }
+    .o_wb_row_type_int::before {
+        background: var(--wb-yellow);
+    }
+    .o_wb_row_type_ia::before {
+        background: var(--wb-orange);
+    }
+    .o_wb_row_type_batch::before {
+        background: var(--wb-red);
     }
     .o_wb_row_top {
         display: flex;

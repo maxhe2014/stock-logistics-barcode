@@ -72,6 +72,8 @@ export class ScanWorkbench extends Component {
             listKey: "all",
             filterValue: "all",
             stats: [],
+            homeStats: [],
+            webResponsive: false,
             types: [],
             recent: [],
             rows: [],
@@ -88,19 +90,39 @@ export class ScanWorkbench extends Component {
             statsNav: { overflow: false, left: false, right: false },
             filtersNav: { overflow: false, left: false, right: false },
         });
+        // Going home and pressing the browser back button can restore this
+        // fullscreen action from the back-forward cache with dead timers /
+        // bus connections, which looks like a frozen page. Force a clean
+        // reload in that case.
+        this._onPageShow = (event) => {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        };
+        window.addEventListener("pageshow", this._onPageShow);
+        document.body.classList.remove("o_apps_menu_opened");
         onMounted(() => {
             this.updateStripOverflow();
             browser.addEventListener("resize", this._onResize);
             this._loadWorkbench();
         });
         onPatched(() => this.updateStripOverflow());
-        onWillUnmount(() => browser.removeEventListener("resize", this._onResize));
+        onWillUnmount(() => {
+            window.removeEventListener("pageshow", this._onPageShow);
+            browser.removeEventListener("resize", this._onResize);
+        });
     }
 
     // ---------- getters ----------
 
     get stats() {
         return this.state.stats;
+    }
+
+    get homeStats() {
+        return this.state.homeStats.length
+            ? this.state.homeStats
+            : this.state.stats.slice(0, 4);
     }
 
     get types() {
@@ -261,6 +283,8 @@ export class ScanWorkbench extends Component {
         }
         this.state.user = data.user || { name: "", time: "" };
         this.state.stats = data.stats || [];
+        this.state.homeStats = data.home_stats || [];
+        this.state.webResponsive = Boolean(data.web_responsive);
         this.state.types = data.types || [];
         this.state.recent = data.recent || [];
     }
@@ -349,6 +373,37 @@ export class ScanWorkbench extends Component {
         this.state.facets = [];
         this.state.total = 0;
         this._loadList();
+    }
+
+    async onRefreshWorkbench() {
+        await this._loadWorkbench();
+    }
+
+    /**
+     * Back to the function-selection (apps) screen.
+     *
+     * Web Responsive opens its apps grid at /odoo when the user preference
+     * "redirect to home" is on, so make sure it is enabled first. On the
+     * community stack we try to open the apps dropdown instead.
+     */
+    async onGoHome() {
+        if (this.state.webResponsive) {
+            try {
+                await this.orm.call(SERVICE, "set_redirect_home", []);
+            } catch (error) {
+                // Keep going: /odoo still loads the user home action.
+            }
+            window.location.href = "/odoo";
+            return;
+        }
+        const appButton = document.querySelector(
+            ".o_navbar_apps_menu button, .o_menu_toggle, .o_navbar .o_menu_toggle"
+        );
+        if (appButton) {
+            appButton.click();
+            return;
+        }
+        window.location.href = "/odoo";
     }
 
     onBack() {

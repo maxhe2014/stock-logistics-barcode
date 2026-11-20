@@ -13,7 +13,7 @@
 <templates id="template" xml:space="preserve">
     <t t-name="stock_barcodes_picking.ScanWorkbenchRow">
         <div
-            t-att-class="'o_wb_row' + (row.id === state.selectedRowId ? ' is-selected' : '')"
+            t-att-class="'o_wb_row o_wb_row_type_' + (row.type_color || 'int') + (row.id === state.selectedRowId ? ' is-selected' : '')"
             role="button"
             tabindex="0"
             t-on-click="() => this.onOpenPicking(row)"
@@ -63,16 +63,27 @@
                             <h1 class="o_wb_title">扫码工作台</h1>
                             <div class="o_wb_subtitle">库存扫码 · 作业入口</div>
                         </div>
+                        <div class="o_wb_head_actions">
+                            <button
+                                type="button"
+                                class="o_wb_new o_wb_head_action"
+                                title="刷新"
+                                t-on-click="onRefreshWorkbench"
+                            >
+                                <i class="fa fa-refresh" aria-hidden="true" />
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Scan row: back + input (camera inside, gear hidden, Q25) -->
+                    <!-- Scan row: apps (home) + input (camera inside), Q25 -->
                     <div class="o_wb_scanrow">
-                        <button type="button" class="o_wb_key" t-on-click="onBack" title="返回">
-                            <img
-                                class="o_wb_icon_back"
-                                src="/stock_barcodes_picking/static/src/img/icon_back.svg"
-                                alt=""
-                            />
+                        <button
+                            type="button"
+                            class="o_wb_key o_wb_home_grid"
+                            t-on-click="onGoHome"
+                            title="返回主页"
+                        >
+                            <i class="fa fa-th" aria-hidden="true" />
                         </button>
                         <div class="o_wb_input_wrap">
                             <img
@@ -93,11 +104,7 @@
                                 title="相机扫码"
                                 t-on-click="onCamera"
                             >
-                                <img
-                                    class="o_wb_icon_camera"
-                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                    alt=""
-                                />
+                                <t t-call="stock_barcodes_picking.CameraIcon" />
                             </button>
                         </div>
                     </div>
@@ -162,10 +169,10 @@
                     >
                         <button
                             type="button"
-                            t-foreach="stats"
+                            t-foreach="homeStats"
                             t-as="stat"
                             t-key="stat.key"
-                            t-att-class="'o_wb_stat o_wb_stat_' + stat.color"
+                            t-att-class="'o_wb_stat o_wb_stat_' + (stat.stat_color || stat.color)"
                             t-on-click="() => this.onOpenList('status', stat.key)"
                         >
                             <span class="o_wb_stat_num" t-out="stat.count" />
@@ -188,9 +195,9 @@
                         >
                             <span
                                 t-att-class="'o_wb_type_band o_wb_type_band_' + type.color"
-                                t-out="type.name"
+                                t-out="type.code"
                             />
-                            <span class="o_wb_type_en" t-out="type.subtitle" />
+                            <span class="o_wb_type_name" t-out="type.name" />
                             <span class="o_wb_type_count" t-out="type.count" />
                         </button>
                     </div>
@@ -302,11 +309,7 @@
                                 title="相机扫码"
                                 t-on-click="onCamera"
                             >
-                                <img
-                                    class="o_wb_icon_camera"
-                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                    alt=""
-                                />
+                                <t t-call="stock_barcodes_picking.CameraIcon" />
                             </button>
                         </div>
                         <button type="button" class="o_wb_key" title="筛选" t-on-click="onFunnel">
@@ -458,19 +461,15 @@
                                 t-model="state.scanValue"
                                 t-on-keydown="onScanKeydown"
                             />
+                            <button
+                                type="button"
+                                class="o_wb_cam_inline"
+                                title="相机扫码"
+                                t-on-click="onCamera"
+                            >
+                                <t t-call="stock_barcodes_picking.CameraIcon" />
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            class="o_wb_key o_wb_camera"
-                            title="相机扫码"
-                            t-on-click="onCamera"
-                        >
-                            <img
-                                class="o_wb_icon_camera"
-                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                alt=""
-                            />
-                        </button>
                     </div>
 
                     <div class="o_wb_inv_filter" t-if="state.inventoryFilterLabel">

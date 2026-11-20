@@ -2,12 +2,6 @@
 // (--wb-*) defined by stock_barcodes_picking.
 
 .o_scan_workbench.o_batch_app {
-    // Workbench card for the batch entry point.
-    .o_wb_type_band_batch {
-        background: var(--wb-blue);
-        color: #FFFFFF;
-    }
-
     // ---------- unified header ----------
     .o_wb_scanrow .o_wb_new {
         width: 38px;

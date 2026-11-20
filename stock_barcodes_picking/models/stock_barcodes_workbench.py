@@ -230,6 +230,13 @@ class StockBarcodesWorkbench(models.Model):
         raise UserError(_("Unknown status filter: %s", key))
 
     @api.model
+    def set_redirect_home(self):
+        """Land on the Web Responsive apps screen when going home."""
+        if "is_redirect_home" in self.env["res.users"]._fields:
+            self.env.user.sudo().write({"is_redirect_home": True})
+        return True
+
+    @api.model
     def _count(self, domain):
         return self.env["stock.picking"].search_count(domain)
 
@@ -274,12 +281,16 @@ class StockBarcodesWorkbench(models.Model):
     @api.model
     def _type_payload(self, picking_type, count=0):
         title, subtitle, color = self._type_meta(picking_type)
+        code = (picking_type.sequence_code or "").upper()
+        if not code:
+            code = subtitle.split()[0] if subtitle else color.upper()
         return {
             "id": picking_type.id,
             "key": str(picking_type.id),
             "name": title,
             "display_name": picking_type.name,
             "subtitle": subtitle,
+            "code": code,
             "color": color,
             "count": count,
         }
@@ -310,11 +321,19 @@ class StockBarcodesWorkbench(models.Model):
             or picking.location_id.display_name
             or ""
         )
+        _title, _subtitle, type_color = self._type_meta(
+            picking.picking_type_id
+        )
         return {
             "id": picking.id,
             "name": picking.name,
             "state": picking.state,
             "status_key": self._picking_status_key(picking),
+            "type_color": type_color,
+            "type_code": (
+                (picking.picking_type_id.sequence_code or "").upper()
+                or type_color.upper()
+            ),
             "origin": picking.origin or "",
             "partner": partner,
             "date": date_label,
@@ -364,11 +383,37 @@ class StockBarcodesWorkbench(models.Model):
                 "name": ia_title,
                 "display_name": ia_title,
                 "subtitle": ia_subtitle,
+                "code": "IA",
                 "color": ia_color,
                 "count": self._inventory_pending_count(warehouse),
                 "virtual": True,
             }
         )
+
+        # Home strip: all statuses stay available (horizontal scroll), but
+        # the four headline cards come first on mobile.
+        stats_by_key = {stat["key"]: stat for stat in stats}
+        home_stats = []
+        for key, stat_color in (
+            ("all", "all"),
+            ("ready", "teal"),
+            ("done_today", "green"),
+            ("ongoing", "amber"),
+            ("draft", "gray"),
+            ("confirmed", "orange"),
+            ("waiting_other", "orange"),
+            ("overdue", "pink"),
+            ("cancel", "red"),
+        ):
+            stat = stats_by_key[key]
+            home_stats.append(
+                {
+                    "key": key,
+                    "label": stat["label"],
+                    "count": stat["count"],
+                    "stat_color": stat_color,
+                }
+            )
 
         now = fields.Datetime.context_timestamp(self, fields.Datetime.now())
         return {
@@ -380,6 +425,12 @@ class StockBarcodesWorkbench(models.Model):
                 {"id": warehouse.id, "name": warehouse.name} if warehouse else False
             ),
             "stats": stats,
+            "home_stats": home_stats,
+            "web_responsive": bool(
+                self.env["ir.module.module"].search_count(
+                    [("name", "=", "web_responsive"), ("state", "=", "installed")]
+                )
+            ),
             "types": type_payload,
             "recent": [
                 self._serialize_picking(picking)

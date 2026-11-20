@@ -1,7 +1,7 @@
 // Copyright 2026 OpenViking
 // License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-import { Component, onMounted, useState } from "@odoo/owl";
+import { Component, onMounted, onWillUnmount, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { useService } from "@web/core/utils/hooks";
@@ -57,6 +57,18 @@ export class BatchWorkbench extends Component {
             warehouseLocked: false,
             selectedWarehouseId: false,
             user: { name: "", time: "" },
+        });
+        // See the picking workbench: a bfcache restore after the browser
+        // back button would keep a dead UI; reload instead.
+        this._onPageShow = (event) => {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        };
+        window.addEventListener("pageshow", this._onPageShow);
+        document.body.classList.remove("o_apps_menu_opened");
+        onWillUnmount(() => {
+            window.removeEventListener("pageshow", this._onPageShow);
         });
         onMounted(async () => {
             if (this.addMode) {
@@ -291,8 +303,11 @@ export class BatchWorkbench extends Component {
             await this._loadList();
             return;
         }
+        // Replace this controller with the workbench instead of pushing a
+        // new one; pushing grew the URL stack (.../767/777/767/777...).
         await this.actionService.doAction(
-            "stock_barcodes_picking.action_scan_workbench"
+            "stock_barcodes_picking.action_scan_workbench",
+            { stackPosition: "replaceCurrentAction" }
         );
     }
 

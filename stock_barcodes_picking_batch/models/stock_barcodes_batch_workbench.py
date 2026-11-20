@@ -103,6 +103,7 @@ class StockBarcodesWorkbench(models.Model):
                 "name": "批量调拨",
                 "display_name": "批量调拨",
                 "subtitle": "BATCH TRANSFERS",
+                "code": "BATCH",
                 "color": "batch",
                 "count": len(active_batches),
                 "virtual": True,

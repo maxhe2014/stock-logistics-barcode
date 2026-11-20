@@ -36,32 +36,6 @@
     // Same content column as the scan workbench (.o_wb_page max-width).
     --scan-page-max: 1000px;
 
-    // Keep every section on the workbench's centered page column on
-    // tablet-landscape / desktop instead of stretching across the screen.
-    > .o_scan_brand,
-    > .o_scan_topbar,
-    > .o_scan_progress,
-    > .o_scan_scanrow,
-    > .o_picking_scan_rows {
-        width: 100%;
-        max-width: var(--scan-page-max);
-        margin-left: auto;
-        margin-right: auto;
-    }
-    > .o_scan_hintbar,
-    > .o_scan_confirm_bar,
-    > .o_scan_pull_indicator {
-        max-width: calc(var(--scan-page-max) - 32px);
-        margin-left: auto;
-        margin-right: auto;
-    }
-    // The footer keeps its full-width dark bar, but its content is aligned
-    // to the same page column.
-    > .o_scan_footer {
-        padding-left: #{'max(16px, calc((100% - var(--scan-page-max)) / 2 + 16px))'};
-        padding-right: #{'max(16px, calc((100% - var(--scan-page-max)) / 2 + 16px))'};
-    }
-
     background: var(--scan-page);
     color: var(--scan-ink);
     overflow: hidden;
@@ -133,6 +107,8 @@
     }
     .o_scan_doc_btn {
         flex: 0 0 auto;
+        cursor: pointer;
+        border-radius: 0;
         width: fit-content;
         max-width: calc(100% - 100px);
         min-width: 0;
@@ -357,9 +333,10 @@
             opacity: 0.5;
             cursor: default;
         }
-        .o_scan_camera_icon {
+        .o_scan_camera_svg {
             width: 16px;
             height: 16px;
+            display: block;
         }
     }
 
@@ -1332,6 +1309,38 @@
         color: var(--scan-ink);
         font-size: 14px;
         font-weight: 700;
+    }
+
+    // ---------- page column (workbench width) ----------
+    // MUST stay at the end of this block: the component rules above use
+    // shorthand `margin` / `padding`, which would otherwise override the
+    // auto margins / side paddings below (same specificity, later wins).
+    > .o_scan_brand,
+    > .o_scan_topbar,
+    > .o_scan_progress,
+    > .o_scan_scanrow,
+    > .o_scan_section_title,
+    > .o_picking_scan_rows {
+        width: 100%;
+        max-width: var(--scan-page-max);
+        margin-left: auto;
+        margin-right: auto;
+    }
+    > .o_scan_hintbar,
+    > .o_scan_confirm_bar,
+    > .o_scan_pull_indicator {
+        // width:100% is required: auto side margins alone stop flex items
+        // from stretching and they shrink to their content width.
+        width: 100%;
+        max-width: calc(var(--scan-page-max) - 32px);
+        margin-left: auto;
+        margin-right: auto;
+    }
+    // The footer keeps its full-width dark bar, but its content is aligned
+    // to the same page column.
+    > .o_scan_footer {
+        padding-left: #{'max(16px, calc((100% - var(--scan-page-max)) / 2 + 16px))'};
+        padding-right: #{'max(16px, calc((100% - var(--scan-page-max)) / 2 + 16px))'};
     }
 }
 

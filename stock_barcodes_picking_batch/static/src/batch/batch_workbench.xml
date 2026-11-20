@@ -46,11 +46,7 @@
                                 title="相机扫码"
                                 t-on-click="onCamera"
                             >
-                                <img
-                                    class="o_wb_icon_camera"
-                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                    alt=""
-                                />
+                                <t t-call="stock_barcodes_picking.CameraIcon" />
                             </button>
                         </div>
                         <button
@@ -198,11 +194,7 @@
                                 disabled="disabled"
                             />
                             <button type="button" class="o_wb_cam_inline" disabled="disabled">
-                                <img
-                                    class="o_wb_icon_camera"
-                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                    alt=""
-                                />
+                                <t t-call="stock_barcodes_picking.CameraIcon" />
                             </button>
                         </div>
                     </div>
@@ -232,9 +224,9 @@
                         >
                             <span
                                 t-att-class="'o_wb_type_band o_wb_type_band_' + type.color"
-                                t-out="type.name"
+                                t-out="type.code"
                             />
-                            <span class="o_wb_type_en" t-out="type.subtitle" />
+                            <span class="o_wb_type_name" t-out="type.name" />
                             <span class="o_wb_type_count" t-out="type.count" />
                         </button>
                         <div class="o_wb_empty" t-if="!state.types.length">暂无作业类型</div>
@@ -279,11 +271,7 @@
                                 disabled="disabled"
                             />
                             <button type="button" class="o_wb_cam_inline" disabled="disabled">
-                                <img
-                                    class="o_wb_icon_camera"
-                                    src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
-                                    alt=""
-                                />
+                                <t t-call="stock_barcodes_picking.CameraIcon" />
                             </button>
                         </div>
                         <div class="o_batch_selection_hint">
