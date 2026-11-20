@@ -1,0 +1,33 @@
+// Scan workbench — dark theme overrides.
+// Loaded only in web.assets_web_dark (Odoo color_scheme = dark).
+// Values come from the Pixso variable set "扫码页主题 / 暗色模式".
+
+.o_scan_workbench {
+    --wb-page: #0B1017;
+    --wb-card: #161E29;
+    --wb-ink: #E6EDF7;
+    --wb-ink-2: #9AA7B8;
+    --wb-divider: #5A6878;
+    --wb-yellow: #C8FF3D;
+    --wb-pink: #FF4D97;
+    --wb-green: #00E5A0;
+    --wb-orange: #FF8A3D;
+    --wb-blue: #4D7CFF;
+    --wb-red: #C03636;
+    --wb-border: #E6EDF7;
+    --wb-shadow: #E6EDF7;
+    --wb-on-accent: #0B1017;
+    --wb-muted: #7C8798;
+
+    // Black glyphs (back / barcode) sit on a dark card and need to be light.
+    .o_wb_icon_back,
+    .o_wb_icon_barcode {
+        filter: invert(1);
+    }
+
+    // "All" filter uses the light ink as background; its text must flip.
+    .o_wb_filter_all {
+        background: var(--wb-ink);
+        color: var(--wb-page);
+    }
+}

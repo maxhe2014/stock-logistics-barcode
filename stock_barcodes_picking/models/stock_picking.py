@@ -33,15 +33,18 @@ class StockPicking(models.Model):
         """Open the barcode scan client action from list/kanban views.
 
         Two entry shapes:
-        - Header button (0 selected): scan-first mode — ``picking_id``
-          left empty; the operator scans a transfer name to select a
-          picking.
+        - Header button (0 selected): open the scan workbench so the
+          operator can pick a transfer by status / operation type.
         - Row/card button (1 selected): per-picking mode — ``picking_id``
           set to the row's picking, scan the source location next.
 
         Returns an ``ir.actions.client`` pointing at the OWL
         ``PickingScanApp`` component (fullscreen).
         """
+        if not self:
+            return self.env["ir.actions.actions"]._for_xml_id(
+                "stock_barcodes_picking.action_scan_workbench"
+            )
         picking_id = self.id if len(self) == 1 else False
         wiz = self.env["wiz.stock.barcodes.picking"].create(
             {"picking_id": picking_id}

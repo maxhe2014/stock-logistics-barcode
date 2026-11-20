@@ -1,0 +1,543 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright 2026 OpenViking
+  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+
+  Static UI for the scan workbench (phase P1):
+    - entry page  : Pixso frame 52:5192 "扫码工作台"
+    - list pages  : frame 52:8364 (from status) / 52:8352 (from operation type)
+
+  Mock data lives in scan_workbench.js. Backend data, permissions and the
+  inventory count page are implemented in P2–P4.
+-->
+<templates id="template" xml:space="preserve">
+    <t t-name="stock_barcodes_picking.ScanWorkbenchRow">
+        <div
+            t-att-class="'o_wb_row' + (row.id === state.selectedRowId ? ' is-selected' : '')"
+            role="button"
+            tabindex="0"
+            t-on-click="() => this.onOpenPicking(row)"
+        >
+            <div class="o_wb_row_top">
+                <button
+                    type="button"
+                    t-att-class="'o_wb_star' + (row.starred ? ' is-on' : '')"
+                    title="收藏"
+                    t-on-click.stop="() => this.onToggleStar(row)"
+                >
+                    <i t-att-class="'fa ' + (row.starred ? 'fa-star' : 'fa-star-o')" aria-hidden="true" />
+                </button>
+                <span class="o_wb_row_name" t-out="row.name" />
+                <span
+                    t-att-class="'o_wb_badge o_wb_badge_' + this.statusColor(row.status_key)"
+                    t-out="this.statusLabel(row.status_key)"
+                />
+            </div>
+            <div class="o_wb_row_bottom">
+                <span class="o_wb_meta">
+                    <i class="fa fa-copy" aria-hidden="true" />
+                    <span t-out="row.origin" />
+                </span>
+                <span class="o_wb_meta">
+                    <i class="fa fa-user-o" aria-hidden="true" />
+                    <span t-out="row.partner" />
+                </span>
+                <span class="o_wb_row_date" t-out="row.date" />
+            </div>
+        </div>
+    </t>
+
+    <t t-name="stock_barcodes_picking.ScanWorkbench">
+        <div class="o_scan_workbench d-flex flex-column h-100">
+            <div class="o_wb_page">
+
+                <!-- Brand strip -->
+                <div class="o_wb_brand">
+                    <span class="o_wb_brand_chip">BY ODOO</span>
+                </div>
+
+                <!-- ================= Workbench ================= -->
+                <t t-if="state.view === 'workbench'">
+                    <div class="o_wb_head">
+                        <div class="o_wb_head_text">
+                            <h1 class="o_wb_title">扫码工作台</h1>
+                            <div class="o_wb_subtitle">库存扫码 · 作业入口</div>
+                        </div>
+                    </div>
+
+                    <!-- Scan row: back + input + camera (gear hidden, Q25) -->
+                    <div class="o_wb_scanrow">
+                        <button type="button" class="o_wb_key" t-on-click="onBack" title="返回">
+                            <img
+                                class="o_wb_icon_back"
+                                src="/stock_barcodes_picking/static/src/img/icon_back.svg"
+                                alt=""
+                            />
+                        </button>
+                        <div class="o_wb_input_wrap">
+                            <img
+                                class="o_wb_icon_barcode"
+                                src="/stock_barcodes_picking/static/src/img/icon_barcode.svg"
+                                alt=""
+                            />
+                            <input
+                                class="o_wb_input"
+                                type="text"
+                                placeholder="扫码或输入条码..."
+                                t-model="state.scanValue"
+                                t-on-keydown="onScanKeydown"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            class="o_wb_key o_wb_camera"
+                            title="相机扫码"
+                            t-on-click="onCamera"
+                        >
+                            <img
+                                class="o_wb_icon_camera"
+                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                alt=""
+                            />
+                        </button>
+                    </div>
+
+                    <!-- Warehouse bar -->
+                    <div class="o_wb_wh_wrap">
+                        <div class="o_wb_wh_bar" role="button" tabindex="0" t-on-click="onToggleWarehouseMenu">
+                            <span class="o_wb_wh_name" t-out="state.warehouseLabel" />
+                            <span class="o_wb_wh_chevron">▾</span>
+                            <span class="o_wb_wh_user" t-out="state.user.name + ' · ' + state.user.time" />
+                        </div>
+                        <t t-if="state.warehouseMenuOpen">
+                            <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
+                            <div class="o_wb_wh_menu">
+                                <button
+                                    type="button"
+                                    class="o_wb_wh_option"
+                                    t-foreach="warehouses"
+                                    t-as="warehouse"
+                                    t-key="warehouse.id"
+                                    t-on-click="() => this.onSelectWarehouse(warehouse.id)"
+                                >
+                                    <span t-out="warehouse.name" />
+                                    <i
+                                        t-if="warehouse.id === state.selectedWarehouseId"
+                                        class="fa fa-check"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Status cards -->
+                    <div class="o_wb_section o_wb_section_status">
+                        <span class="o_wb_section_title">状态</span>
+                        <div class="o_wb_strip_nav" t-if="state.statsNav.overflow">
+                            <button
+                                type="button"
+                                class="o_wb_strip_btn"
+                                t-att-disabled="state.statsNav.left ? null : 'disabled'"
+                                title="向左"
+                                t-on-click="() => this.scrollStrip('statsStrip', -1)"
+                            >
+                                <i class="fa fa-chevron-left" aria-hidden="true" />
+                            </button>
+                            <button
+                                type="button"
+                                class="o_wb_strip_btn"
+                                t-att-disabled="state.statsNav.right ? null : 'disabled'"
+                                title="向右"
+                                t-on-click="() => this.scrollStrip('statsStrip', 1)"
+                            >
+                                <i class="fa fa-chevron-right" aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        class="o_wb_stats"
+                        t-ref="statsStrip"
+                        t-on-scroll="() => this.updateStripOverflow()"
+                    >
+                        <button
+                            type="button"
+                            t-foreach="stats"
+                            t-as="stat"
+                            t-key="stat.key"
+                            t-att-class="'o_wb_stat o_wb_stat_' + stat.color"
+                            t-on-click="() => this.onOpenList('status', stat.key)"
+                        >
+                            <span class="o_wb_stat_num" t-out="stat.count" />
+                            <span class="o_wb_stat_lbl" t-out="stat.label" />
+                        </button>
+                    </div>
+
+                    <!-- Operation types -->
+                    <div class="o_wb_section">
+                        <span class="o_wb_section_title">作业类型</span>
+                    </div>
+                    <div class="o_wb_types">
+                        <button
+                            type="button"
+                            class="o_wb_type"
+                            t-foreach="types"
+                            t-as="type"
+                            t-key="type.key"
+                            t-on-click="() => this.onOpenList('type', type.key, type.action)"
+                        >
+                            <span
+                                t-att-class="'o_wb_type_band o_wb_type_band_' + type.color"
+                                t-out="type.name"
+                            />
+                            <span class="o_wb_type_en" t-out="type.subtitle" />
+                            <span class="o_wb_type_count" t-out="type.count" />
+                        </button>
+                    </div>
+
+                    <!-- Recent picks -->
+                    <div class="o_wb_section o_wb_section_recent">
+                        <span class="o_wb_section_title">最近作业</span>
+                        <div class="o_wb_pager o_wb_pager_small">
+                            <span t-out="recentPageLabel" />
+                            <button type="button" class="o_wb_pager_btn" disabled="disabled" title="上一页">
+                                <i class="fa fa-chevron-left" aria-hidden="true" />
+                            </button>
+                            <button type="button" class="o_wb_pager_btn" title="下一页">
+                                <i class="fa fa-chevron-right" aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+                    <div class="o_wb_rows">
+                        <t t-foreach="recentRows" t-as="row" t-key="row.id">
+                            <t t-call="stock_barcodes_picking.ScanWorkbenchRow" />
+                        </t>
+                        <div class="o_wb_empty" t-if="!recentRows.length">暂无最近作业</div>
+                    </div>
+                    <div class="o_wb_pager o_wb_pager_bottom">
+                        <span t-out="recentPageLabel" />
+                        <button type="button" class="o_wb_pager_btn" disabled="disabled" title="上一页">
+                            <i class="fa fa-chevron-left" aria-hidden="true" />
+                        </button>
+                        <button type="button" class="o_wb_pager_btn" title="下一页">
+                            <i class="fa fa-chevron-right" aria-hidden="true" />
+                        </button>
+                    </div>
+                    <div class="o_wb_hint">扫描单据号 / 产品条码 / 库位码</div>
+                </t>
+
+                <!-- ================= List page ================= -->
+                <t t-elif="state.view === 'list'">
+                    <div class="o_wb_head o_wb_head_list">
+                        <div class="o_wb_head_text">
+                            <h1 class="o_wb_title" t-out="listTitle" />
+                            <div class="o_wb_subtitle" t-out="listSubtitle" />
+                        </div>
+                        <div class="o_wb_head_actions">
+                            <button
+                                type="button"
+                                class="o_wb_new"
+                                t-if="state.listKind === 'type'"
+                                title="新建调拨（扫产品追加明细）"
+                                t-on-click="onNewPicking"
+                            >+</button>
+                            <div class="o_wb_wh_wrap">
+                            <button
+                                type="button"
+                                class="o_wb_wh_short"
+                                t-on-click="onToggleWarehouseMenu"
+                            >
+                                <span t-out="state.warehouseLabel" />
+                                <span class="o_wb_wh_chevron">▾</span>
+                            </button>
+                            <t t-if="state.warehouseMenuOpen">
+                                <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
+                                <div class="o_wb_wh_menu o_wb_wh_menu_right">
+                                    <button
+                                        type="button"
+                                        class="o_wb_wh_option"
+                                        t-foreach="warehouses"
+                                        t-as="warehouse"
+                                        t-key="warehouse.id"
+                                        t-on-click="() => this.onSelectWarehouse(warehouse.id)"
+                                    >
+                                        <span t-out="warehouse.name" />
+                                        <i
+                                            t-if="warehouse.id === state.selectedWarehouseId"
+                                            class="fa fa-check"
+                                            aria-hidden="true"
+                                        />
+                                    </button>
+                                </div>
+                            </t>
+                        </div>
+                        </div>
+                    </div>
+
+                    <!-- Scan row: back + input + camera + funnel -->
+                    <div class="o_wb_scanrow">
+                        <button type="button" class="o_wb_key" t-on-click="onBack" title="返回">
+                            <img
+                                class="o_wb_icon_back"
+                                src="/stock_barcodes_picking/static/src/img/icon_back.svg"
+                                alt=""
+                            />
+                        </button>
+                        <div class="o_wb_input_wrap">
+                            <img
+                                class="o_wb_icon_barcode"
+                                src="/stock_barcodes_picking/static/src/img/icon_barcode.svg"
+                                alt=""
+                            />
+                            <input
+                                class="o_wb_input"
+                                type="text"
+                                placeholder="扫码或输入条码..."
+                                t-model="state.scanValue"
+                                t-on-keydown="onScanKeydown"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            class="o_wb_key o_wb_camera"
+                            title="相机扫码"
+                            t-on-click="onCamera"
+                        >
+                            <img
+                                class="o_wb_icon_camera"
+                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                alt=""
+                            />
+                        </button>
+                        <button type="button" class="o_wb_key" title="筛选" t-on-click="onFunnel">
+                            <svg class="o_wb_icon_funnel" viewBox="0 0 16 16" aria-hidden="true">
+                                <path
+                                    d="M1.5 2.5h13L9.5 9v4.2l-3 1.2V9L1.5 2.5z"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.6"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Secondary filter -->
+                    <div class="o_wb_filter_head">
+                        <div class="o_wb_filter_title" t-out="filterTitle" />
+                        <div class="o_wb_strip_nav" t-if="state.filtersNav.overflow">
+                            <button
+                                type="button"
+                                class="o_wb_strip_btn"
+                                t-att-disabled="state.filtersNav.left ? null : 'disabled'"
+                                title="向左"
+                                t-on-click="() => this.scrollStrip('filtersStrip', -1)"
+                            >
+                                <i class="fa fa-chevron-left" aria-hidden="true" />
+                            </button>
+                            <button
+                                type="button"
+                                class="o_wb_strip_btn"
+                                t-att-disabled="state.filtersNav.right ? null : 'disabled'"
+                                title="向右"
+                                t-on-click="() => this.scrollStrip('filtersStrip', 1)"
+                            >
+                                <i class="fa fa-chevron-right" aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        class="o_wb_filters"
+                        t-ref="filtersStrip"
+                        t-on-scroll="() => this.updateStripOverflow()"
+                    >
+                        <button
+                            type="button"
+                            t-foreach="facets"
+                            t-as="facet"
+                            t-key="facet.key"
+                            t-att-class="'o_wb_filter o_wb_filter_' + facet.color + (state.filterValue === facet.key ? ' is-active' : '')"
+                            t-on-click="() => this.onSelectFilter(facet)"
+                        >
+                            <span class="o_wb_filter_lbl" t-out="facet.label" />
+                            <span class="o_wb_filter_num" t-out="facet.count" />
+                        </button>
+                    </div>
+
+                    <!-- Rows -->
+                    <div class="o_wb_rows">
+                        <t t-if="filteredRows.length">
+                            <t t-foreach="filteredRows" t-as="row" t-key="row.id">
+                                <t t-call="stock_barcodes_picking.ScanWorkbenchRow" />
+                            </t>
+                        </t>
+                        <div class="o_wb_empty" t-else="">当前无单据</div>
+                    </div>
+
+                    <div class="o_wb_pager o_wb_pager_bottom">
+                        <span t-out="pageLabel" />
+                        <button
+                            type="button"
+                            class="o_wb_pager_btn"
+                            t-att-disabled="canPrev ? null : 'disabled'"
+                            t-on-click="onPrevPage"
+                            title="上一页"
+                        >
+                            <i class="fa fa-chevron-left" aria-hidden="true" />
+                        </button>
+                        <button
+                            type="button"
+                            class="o_wb_pager_btn"
+                            t-att-disabled="canNext ? null : 'disabled'"
+                            t-on-click="onNextPage"
+                            title="下一页"
+                        >
+                            <i class="fa fa-chevron-right" aria-hidden="true" />
+                        </button>
+                    </div>
+                    <div class="o_wb_hint">点击单据查看详情或直接扫码</div>
+                </t>
+
+                <!-- ================= Inventory count (IA) ================= -->
+                <t t-else="">
+                    <div class="o_wb_head o_wb_head_list">
+                        <div class="o_wb_head_text">
+                            <h1 class="o_wb_title">库存盘点</h1>
+                            <div class="o_wb_subtitle">按产品 / 库位 / 批次扫码盘点</div>
+                        </div>
+                        <div class="o_wb_wh_wrap">
+                            <button
+                                type="button"
+                                class="o_wb_wh_short"
+                                t-on-click="onToggleWarehouseMenu"
+                            >
+                                <span t-out="state.warehouseLabel" />
+                                <span class="o_wb_wh_chevron">▾</span>
+                            </button>
+                            <t t-if="state.warehouseMenuOpen">
+                                <div class="o_wb_wh_backdrop" t-on-click="onCloseWarehouseMenu" />
+                                <div class="o_wb_wh_menu o_wb_wh_menu_right">
+                                    <button
+                                        type="button"
+                                        class="o_wb_wh_option"
+                                        t-foreach="warehouses"
+                                        t-as="warehouse"
+                                        t-key="warehouse.id"
+                                        t-on-click="() => this.onSelectWarehouse(warehouse.id)"
+                                    >
+                                        <span t-out="warehouse.name" />
+                                        <i
+                                            t-if="warehouse.id === state.selectedWarehouseId"
+                                            class="fa fa-check"
+                                            aria-hidden="true"
+                                        />
+                                    </button>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div class="o_wb_scanrow">
+                        <button type="button" class="o_wb_key" t-on-click="onBack" title="返回">
+                            <img
+                                class="o_wb_icon_back"
+                                src="/stock_barcodes_picking/static/src/img/icon_back.svg"
+                                alt=""
+                            />
+                        </button>
+                        <div class="o_wb_input_wrap">
+                            <img
+                                class="o_wb_icon_barcode"
+                                src="/stock_barcodes_picking/static/src/img/icon_barcode.svg"
+                                alt=""
+                            />
+                            <input
+                                class="o_wb_input"
+                                type="text"
+                                placeholder="扫码或输入条码..."
+                                t-model="state.scanValue"
+                                t-on-keydown="onScanKeydown"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            class="o_wb_key o_wb_camera"
+                            title="相机扫码"
+                            t-on-click="onCamera"
+                        >
+                            <img
+                                class="o_wb_icon_camera"
+                                src="/stock_barcodes_picking/static/src/img/icon_camera.svg"
+                                alt=""
+                            />
+                        </button>
+                    </div>
+
+                    <div class="o_wb_inv_filter" t-if="state.inventoryFilterLabel">
+                        <span>筛选：</span>
+                        <span t-out="state.inventoryFilterLabel" />
+                        <button
+                            type="button"
+                            class="o_wb_inv_clear"
+                            t-on-click="onClearInventoryFilter"
+                        >显示全部</button>
+                    </div>
+
+                    <div class="o_wb_inv_head">
+                        <span>产品 / 库位</span>
+                        <span>账面</span>
+                        <span>实盘</span>
+                        <span>差异</span>
+                    </div>
+                    <div class="o_wb_inv_rows">
+                        <t t-foreach="inventoryRows" t-as="quant" t-key="quant.id">
+                            <div class="o_wb_inv_row">
+                                <div class="o_wb_inv_main">
+                                    <div class="o_wb_inv_product" t-out="quant.product" />
+                                    <div class="o_wb_inv_meta">
+                                        <span t-out="quant.location" />
+                                        <t t-if="quant.lot"> · <span t-out="quant.lot" /></t>
+                                    </div>
+                                </div>
+                                <div class="o_wb_inv_sys">
+                                    <span class="o_wb_inv_num" t-out="quant.quantity" />
+                                    <span class="o_wb_inv_uom" t-out="quant.uom" />
+                                </div>
+                                <div class="o_wb_inv_input_wrap">
+                                    <input
+                                        class="o_wb_inv_input"
+                                        type="number"
+                                        inputmode="decimal"
+                                        placeholder="—"
+                                        t-att-value="quant.editValue"
+                                        t-on-input="(ev) => this.onInventoryQtyInput(quant, ev)"
+                                    />
+                                </div>
+                                <span
+                                    t-att-class="'o_wb_inv_diff' + (quant.diff > 0 ? ' is-plus' : quant.diff &lt; 0 ? ' is-minus' : '')"
+                                    t-out="quant.diffLabel"
+                                />
+                            </div>
+                        </t>
+                        <div class="o_wb_empty" t-if="!inventoryRows.length">暂无待盘点库存</div>
+                    </div>
+
+                    <div class="o_wb_inv_actions">
+                        <button
+                            type="button"
+                            class="o_wb_inv_apply"
+                            t-att-disabled="!inventoryDirtyCount || state.inventoryApplying ? 'disabled' : null"
+                            t-on-click="onApplyInventory"
+                        >
+                            <t t-if="state.inventoryApplying">应用中…</t>
+                            <t t-else="">
+                                应用盘点<t t-if="inventoryDirtyCount"> (<t t-out="inventoryDirtyCount" />)</t>
+                            </t>
+                        </button>
+                    </div>
+                    <div class="o_wb_hint">扫描产品条码 / 批次号 / 库位码录入实盘数量</div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

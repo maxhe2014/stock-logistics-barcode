@@ -105,6 +105,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         string="Force Add",
         help="Show the 'Force Add' button to move a product not in the picking",
     )
+    allow_new_products = fields.Boolean(
+        help="Created from the workbench '+' action: the picking starts empty, "
+             "so every scanned product (tracked or not) may create a new move.",
+    )
     cross_order_pending = fields.Boolean(
         help="A serial scan was blocked because another transfer still "
              "reserves it; the operator may confirm to pick it anyway.",
@@ -1560,17 +1564,33 @@ class WizStockBarcodesPicking(models.TransientModel):
           - ``warn``: preview it and wait for the footer confirmation;
           - ``forbid``: keep the explicit "not part of this transfer" error.
         Tracked products still require a lot/serial scan to know what is
-        being received, so they always keep the error here.
+        being received; they are allowed only for empty pickings created
+        from the workbench (``allow_new_products``).
         """
         self.ensure_one()
         if product.tracking != "none":
+            if not self.allow_new_products:
+                self._set_message(
+                    "error",
+                    self.env._(
+                        "Product %(name)s is not part of this transfer",
+                        name=product.name,
+                    ),
+                )
+                return True
+            # Empty picking created from the workbench: the lot/serial
+            # identifies the product, and _scan_new_product_lot creates the
+            # move once the lot is scanned.
+            self.product_id = product
+            self.product_uom_id = product.uom_id
+            self.lot_id = False
+            self.lot_name = False
+            self.product_qty = 1.0
+            self.active_move_id = False
             self._set_message(
-                "error",
-                self.env._(
-                    "Product %(name)s is not part of this transfer",
-                    name=product.name,
-                ),
+                "info", self.env._("Product: %s. Scan lot.", product.name)
             )
+            self.step = self._step_index("lot")
             return True
         if self._get_new_product_policy() == "forbid":
             self._set_message(
@@ -1623,6 +1643,26 @@ class WizStockBarcodesPicking(models.TransientModel):
             self._set_message("more_match", self.env._("Multiple lots found"))
             return True
         lot = lots
+        if self.allow_new_products and not self.picking_id.move_ids.filtered(
+            lambda m: m.product_id == lot.product_id and m.state != "cancel"
+        ):
+            # Empty transfer from the workbench: there is no move to write on,
+            # so create it from the scanned lot instead of using the generic
+            # confirm path.
+            result = self._scan_new_product_lot(lot, lot.product_id)
+            if self.allow_new_products:
+                # Confirmation may have reserved the same serial again on
+                # another source sub-location; keep only the picked line.
+                duplicates = self.env["stock.move.line"].search(
+                    [
+                        ("picking_id", "=", self.picking_id.id),
+                        ("product_id", "=", lot.product_id.id),
+                        ("lot_id", "=", lot.id),
+                        ("picked", "=", False),
+                    ]
+                )
+                duplicates.unlink()
+            return result
         self.lot_id = lot
         self.lot_name = lot.name
         self.product_id = lot.product_id
@@ -2642,6 +2682,8 @@ class WizStockBarcodesPicking(models.TransientModel):
     def _get_new_product_policy(self):
         """Return how lots/serials of products outside the transfer are handled."""
         self.ensure_one()
+        if self.allow_new_products:
+            return "allow"
         return (
             self.picking_id.picking_type_id.barcode_new_product_policy
             or "forbid"
@@ -2723,6 +2765,22 @@ class WizStockBarcodesPicking(models.TransientModel):
         ).action_confirm(lot_quants=lot_quants)
         if not result:
             return False
+        if self.allow_new_products:
+            if self.picking_id.state == "draft":
+                # The picking was empty when created from the workbench; now
+                # that it has a move it can be confirmed like a regular one.
+                self.picking_id.action_confirm()
+            # Confirming the new move may reserve the same lot again; keep
+            # only the line the operator just picked.
+            self.picking_id.invalidate_recordset(["move_line_ids", "move_ids"])
+            duplicates = self.picking_id.move_line_ids.filtered(
+                lambda line: (
+                    not line.picked
+                    and line.product_id == product
+                    and line.lot_id == lot
+                )
+            )
+            duplicates.unlink()
         self._set_message(
             "success",
             self.env._(
@@ -3053,7 +3111,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         """
         if not self._check_selector_resolved():
             return False
-        if self.picking_state == "draft":
+        if self.picking_state == "draft" and not self.allow_new_products:
             self._set_message(
                 "error", self.env._("Transfer is draft, confirm it before scanning")
             )
@@ -3259,6 +3317,23 @@ class WizStockBarcodesPicking(models.TransientModel):
                 and (not self.lot_id or l.lot_id == self.lot_id)
             )
         )
+        # A freshly confirmed move (empty transfer created from the
+        # workbench) may already reserve the scanned serial on another
+        # source sub-location. Reuse that unpicked line instead of creating
+        # a second one for the same serial.
+        if (
+            not existing_lines
+            and self.product_id.tracking == "serial"
+            and self.lot_id
+        ):
+            existing_lines = all_lines.filtered(
+                lambda l: (
+                    l.product_id == self.product_id
+                    and not l.result_package_id
+                    and not l.picked
+                    and l.lot_id == self.lot_id
+                )
+            )
         # For serial-tracked products on receptions, Odoo pre-creates
         # placeholder lines (one per unit) with quantity set but no lot
         # and picked=False. When scanning a serial, no line matches by
@@ -3873,6 +3948,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         # the same product (otherwise _action_confirm merges them and the
         # newly-created record is unlinked, breaking active_move_id).
         move._action_confirm(merge=False)
+        if self.allow_new_products:
+            # Empty transfer from the workbench: drop the automatic
+            # reservation of the scanned lot so the picked line created by
+            # _process_stock_move_line is the only one.
+            move._do_unreserve()
         # Refresh the cached move collection for the following line write.
         self.picking_id.invalidate_recordset(["move_ids"])
         return move
@@ -3923,6 +4003,10 @@ class WizStockBarcodesPicking(models.TransientModel):
         move_dic = self._process_stock_move_line()
         if move_dic:
             self.visible_force_add = False
+            if self.picking_id.state == "draft":
+                # Empty transfer created from the workbench: confirm it now
+                # that the forced move exists.
+                self.picking_id.action_confirm()
             # _clean_values calls _set_message_step which overwrites
             # custom messages, so set success AFTER it. It also resets
             # product_qty, hence the captured ``added_qty``.

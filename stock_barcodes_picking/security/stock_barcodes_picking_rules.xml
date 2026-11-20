@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Copyright 2026 OpenViking
+  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+
+  Recent transfers are private to each user: every rule below restricts the
+  model to records owned by the current user.
+-->
+<odoo>
+    <record id="rule_stock_barcodes_picking_recent_own" model="ir.rule">
+        <field name="name">Scan Workbench Recent: own records</field>
+        <field name="model_id" ref="model_stock_barcodes_picking_recent" />
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('stock.group_stock_user'))]" />
+    </record>
+</odoo>

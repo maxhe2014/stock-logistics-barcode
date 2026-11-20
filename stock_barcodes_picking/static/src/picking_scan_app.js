@@ -193,6 +193,15 @@ export class PickingScanApp extends Component {
         );
 
         onWillStart(async () => {
+            if (!this.wizId) {
+                // Direct visits to the scan action (old bookmarks, action 690
+                // without params) go to the scan workbench instead of showing
+                // an empty scan shell.
+                await this.actionService.doAction(
+                    "stock_barcodes_picking.action_scan_workbench"
+                );
+                return;
+            }
             await this._refreshState();
         });
 

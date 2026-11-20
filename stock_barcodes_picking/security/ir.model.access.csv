@@ -1,2 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_wiz_stock_barcodes_picking,wiz.stock.barcodes.picking,model_wiz_stock_barcodes_picking,stock.group_stock_user,1,1,1,1
+access_stock_barcodes_workbench,stock.barcodes.workbench,model_stock_barcodes_workbench,stock.group_stock_user,1,1,0,0
+access_stock_barcodes_picking_recent,stock.barcodes.picking.recent,model_stock_barcodes_picking_recent,stock.group_stock_user,1,1,1,1
