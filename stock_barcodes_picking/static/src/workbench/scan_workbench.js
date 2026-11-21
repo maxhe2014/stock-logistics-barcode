@@ -318,6 +318,12 @@ export class ScanWorkbench extends Component {
         const message =
             (error && (error.data && error.data.message || error.message)) ||
             String(error);
+        // Navigating away destroys this component; an in-flight load that
+        // resolves afterwards is expected to fail this way and must not pop
+        // an error toast on the page we just opened.
+        if (String(message).includes("Component is destroyed")) {
+            return;
+        }
         this.notification.add(`${prefix}：${message}`, { type: "danger" });
     }
 
@@ -411,8 +417,10 @@ export class ScanWorkbench extends Component {
                 this.state.selectedWarehouseId || false,
                 typeId,
             ]);
+            // doAction unmounts this workbench, so nothing may touch state or
+            // call the ORM afterwards (Odoo rejects it with "Component is
+            // destroyed"). The list reloads by itself when we navigate back.
             await this.actionService.doAction(action);
-            await this._loadList();
         } catch (error) {
             this._notifyError("新建调拨失败", error);
         }
