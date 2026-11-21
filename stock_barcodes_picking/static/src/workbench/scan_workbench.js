@@ -31,6 +31,18 @@ import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog
 
 const SERVICE = "stock.barcodes.workbench";
 const DEFAULT_PAGE_SIZE = 80;
+// sessionStorage key holding the exact workbench list coordinates so a
+// browser-back from the fullscreen scan action can restore the list the
+// operator came from. The scan action is a separate client action; going back
+// reloads this one from the URL, which carries only the action id, so runtime
+// state (listKind / filter / page / warehouse) must survive in storage.
+const WB_RETURN_KEY = "stock_barcodes_wb_return";
+const WB_RETURN_TTL = 30 * 60 * 1000;
+// Marker on a synthetic history entry that stands for the "list" screen.
+// The list is only an internal state.view of this action (not its own Odoo
+// action), so without its own history entry a system/browser back from the
+// list would pop the whole workbench action and land on the apps menu.
+const WB_LIST_SENTINEL = "__wbListSentinel";
 
 const STATUS_META = {
     all: { label: "所有", color: "all" },
@@ -101,15 +113,45 @@ export class ScanWorkbench extends Component {
         };
         window.addEventListener("pageshow", this._onPageShow);
         document.body.classList.remove("o_apps_menu_opened");
+        // Restore the list view when returning from the fullscreen scan action.
+        // The back navigation reloads this action from the URL, so we replay
+        // the list coordinates captured in _rememberListForReturn() instead of
+        // landing on a fresh workbench home.
+        this._restoreListFromReturn();
+        // The list view owns a synthetic history entry (see _pushListSentinel).
+        // When a system/browser back lands on the plain workbench entry while
+        // we are still showing the list, fall back to the home view instead of
+        // letting the next back pop the whole action into the apps menu.
+        this._onWbPopState = () => {
+            let sentinel = false;
+            try {
+                sentinel = !!(browser.history.state || {})[WB_LIST_SENTINEL];
+            } catch {
+                sentinel = false;
+            }
+            if (!sentinel && this.state.view === "list") {
+                this.state.view = "workbench";
+                this.state.warehouseMenuOpen = false;
+            }
+        };
+        browser.addEventListener("popstate", this._onWbPopState);
         onMounted(() => {
             this.updateStripOverflow();
             browser.addEventListener("resize", this._onResize);
-            this._loadWorkbench();
+            if (this.state.view === "list") {
+                // Also load base data (warehouse name / types) so the list
+                // header is complete; _applyWorkbenchData never touches view.
+                this._loadWorkbench();
+                this._loadList();
+            } else {
+                this._loadWorkbench();
+            }
         });
         onPatched(() => this.updateStripOverflow());
         onWillUnmount(() => {
             window.removeEventListener("pageshow", this._onPageShow);
             browser.removeEventListener("resize", this._onResize);
+            browser.removeEventListener("popstate", this._onWbPopState);
         });
     }
 
@@ -259,6 +301,106 @@ export class ScanWorkbench extends Component {
         });
     }
 
+    // ---------- return-from-scan state ----------
+
+    /**
+     * Push one synthetic history entry that represents the list view as its
+     * own layer. The list is only an internal state.view of this action, so
+     * without this a system/browser back from the list would pop the entire
+     * workbench action and land on the apps menu, skipping the home view.
+     *
+     * We reuse the current router URL and nextState (so Odoo still restores
+     * this same action) and just tag the state with a sentinel flag. Back from
+     * a deeper action (scan/form) lands on this entry, where the one-shot
+     * snapshot restores the list; a further back lands on the plain workbench
+     * entry and _onWbPopState switches the view back to home.
+     */
+    _pushListSentinel() {
+        // Idempotent: repeated navigation into the list must not pile up
+        // duplicate history entries.
+        if (this._listSentinelActive()) {
+            return;
+        }
+        try {
+            const cur = browser.history.state || {};
+            browser.history.pushState(
+                { ...cur, [WB_LIST_SENTINEL]: true },
+                "",
+                browser.location.href
+            );
+        } catch {
+            // History API unavailable: degrade to the old behaviour.
+        }
+    }
+
+    /** Whether the current history entry is our list sentinel. */
+    _listSentinelActive() {
+        try {
+            return !!(browser.history.state || {})[WB_LIST_SENTINEL];
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Capture the current list coordinates right before leaving for the
+     * fullscreen scan action. The scan action lives in a different client
+     * action; coming back reloads this workbench from the URL with only the
+     * action id, so these coordinates must live in sessionStorage. Only save
+     * while the list view is actually showing — opening a scan from the home
+     * page (recent card / scan box) must not fake a list to return to.
+     */
+    _rememberListForReturn() {
+        if (this.state.view !== "list") {
+            return;
+        }
+        try {
+            browser.sessionStorage.setItem(
+                WB_RETURN_KEY,
+                JSON.stringify({
+                    view: "list",
+                    listKind: this.state.listKind,
+                    listKey: this.state.listKey,
+                    filterValue: this.state.filterValue,
+                    page: this.state.page,
+                    selectedWarehouseId: this.state.selectedWarehouseId || false,
+                    t: Date.now(),
+                })
+            );
+        } catch {
+            // Private mode / storage full: degrade to the workbench home.
+        }
+    }
+
+    /**
+     * Replay a previously captured list view on mount. Consumes the snapshot
+     * (one-shot) and ignores stale entries so a much later plain visit to the
+     * workbench does not unexpectedly reopen an old list.
+     */
+    _restoreListFromReturn() {
+        let saved = null;
+        try {
+            const raw = browser.sessionStorage.getItem(WB_RETURN_KEY);
+            browser.sessionStorage.removeItem(WB_RETURN_KEY);
+            saved = raw ? JSON.parse(raw) : null;
+        } catch {
+            saved = null;
+        }
+        if (!saved || saved.view !== "list") {
+            return;
+        }
+        if (Date.now() - (saved.t || 0) >= WB_RETURN_TTL) {
+            return;
+        }
+        this.state.view = "list";
+        this.state.listKind = saved.listKind || "status";
+        this.state.listKey = String(saved.listKey ?? "all");
+        this.state.filterValue = saved.filterValue || "all";
+        this.state.page = saved.page || 1;
+        this.state.selectedWarehouseId = saved.selectedWarehouseId || false;
+        this.state.selectedRowId = 0;
+    }
+
     // ---------- loading ----------
 
     async _loadWorkbench() {
@@ -378,6 +520,9 @@ export class ScanWorkbench extends Component {
         this.state.rows = [];
         this.state.facets = [];
         this.state.total = 0;
+        // Give the list its own history layer so a system back returns here
+        // (via the one-shot snapshot) instead of skipping the whole action.
+        this._pushListSentinel();
         this._loadList();
     }
 
@@ -400,10 +545,18 @@ export class ScanWorkbench extends Component {
 
     onBack() {
         const wasInventory = this.state.view === "inventory";
+        const wasList = this.state.view === "list";
         this.state.view = "workbench";
         this.state.warehouseMenuOpen = false;
         if (wasInventory) {
             this._loadWorkbench();
+        }
+        if (wasList && this._listSentinelActive()) {
+            // Consume the synthetic list history entry as well, so the next
+            // system back goes straight to the apps menu instead of replaying
+            // the list layer. The view is already switched above, so the
+            // popstate handler will not flip it a second time.
+            browser.history.back();
         }
     }
 
@@ -515,6 +668,9 @@ export class ScanWorkbench extends Component {
     }
 
     async _openPicking(pickingId, pickingState, pickingName) {
+        // Remember the list we are leaving so a browser-back from the scan
+        // action restores it instead of dumping us on the workbench home.
+        this._rememberListForReturn();
         try {
             await this.orm.call(SERVICE, "mark_recent", [pickingId]);
             if (pickingState === "done" || pickingState === "cancel") {

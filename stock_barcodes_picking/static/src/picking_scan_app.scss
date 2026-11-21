@@ -22,6 +22,10 @@
     // Same content column as the scan workbench (.o_wb_page max-width).
     --scan-page-max: 1000px;
 
+    // Positioning context for absolutely-positioned overlays (more-menu,
+    // backdrop, dialogs) so their offsets are measured against this full-width
+    // app root — the same 100% the footer's page-column gutter uses below.
+    position: relative;
     background: var(--scan-page);
     color: var(--scan-ink);
     overflow: hidden;
@@ -1050,7 +1054,12 @@
     }
     .o_scan_more_menu {
         position: absolute;
-        left: 16px;
+        // Follow the "更多..." button: the footer content is centred into the
+        // --scan-page-max column on desktop via the matching gutter below, so
+        // reuse the exact same formula. On mobile (viewport <= page-max) it
+        // resolves to 16px; on desktop it tracks the button into the centre
+        // instead of staying pinned to the screen's left edge.
+        left: #{'max(16px, calc((100% - var(--scan-page-max)) / 2 + 16px))'};
         // Sits ~10px above the footer, like the design's bottom-anchored sheet.
         bottom: 86px;
         z-index: 20;
