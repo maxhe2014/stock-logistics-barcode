@@ -724,23 +724,6 @@ export class PickingScanApp extends Component {
         });
     }
 
-    /** Jump to the source transfer form so the operator can use the
-     *  native Odoo action menu (gear icon) — print, ZPL labels, scrap,
-     *  cancel, etc. — all of which live on the form/header controller
-     *  and can't be triggered cleanly from this client action. */
-    onOpenPickingActions() {
-        if (!this.state.picking_id) {
-            return;
-        }
-        this.actionService.doAction({
-            res_model: "stock.picking",
-            res_id: this.state.picking_id,
-            views: [[false, "form"]],
-            type: "ir.actions.act_window",
-            target: "current",
-        });
-    }
-
     /** Open product picker → add the selected product to the current
      *  picking (backend creates a new stock.move) → refresh state so the
      *  new card appears on the scan view. */
@@ -764,25 +747,22 @@ export class PickingScanApp extends Component {
                         return;
                     }
                     try {
-                        this.notification.add(
-                            _t("正在添加产品 (id=%(id)s)...", { id: productId }),
-                            { type: "info" }
-                        );
                         const result = await this.orm.call(
                             "wiz.stock.barcodes.picking",
                             "action_add_product_to_picking",
                             [this.wizId],
                             { product_id: productId }
                         );
-                        this.notification.add(
-                            _t("后端返回: %(res)s", { res: String(result) }),
-                            { type: result ? "success" : "warning" }
-                        );
+                        if (!result) {
+                            this.notification.add(_t("添加产品失败"), {
+                                type: "warning",
+                            });
+                            return;
+                        }
                         await this._refreshState();
-                        this.notification.add(
-                            _t("已刷新产品列表"),
-                            { type: "success" }
-                        );
+                        this.notification.add(_t("已添加产品"), {
+                            type: "success",
+                        });
                     } catch (err) {
                         this.notification.add(
                             _t("添加产品失败: %(err)s", {
@@ -790,7 +770,6 @@ export class PickingScanApp extends Component {
                             }),
                             { type: "danger" }
                         );
-                        console.error("onAddProduct error:", err);
                     }
                 },
             },

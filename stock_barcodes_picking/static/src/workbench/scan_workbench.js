@@ -123,13 +123,7 @@ export class ScanWorkbench extends Component {
         // we are still showing the list, fall back to the home view instead of
         // letting the next back pop the whole action into the apps menu.
         this._onWbPopState = () => {
-            let sentinel = false;
-            try {
-                sentinel = !!(browser.history.state || {})[WB_LIST_SENTINEL];
-            } catch {
-                sentinel = false;
-            }
-            if (!sentinel && this.state.view === "list") {
+            if (!this._listSentinelActive() && this.state.view === "list") {
                 this.state.view = "workbench";
                 this.state.warehouseMenuOpen = false;
             }
@@ -250,6 +244,16 @@ export class ScanWorkbench extends Component {
 
     statusLabel(key) {
         return STATUS_META[key] ? STATUS_META[key].label : key;
+    }
+
+    // Row badges describe a picking's native state. A done picking is simply
+    // "已完成" regardless of when it completed; the "今日已完成" wording is
+    // reserved for the today-filtered status card, which stays untouched.
+    rowStatusLabel(key) {
+        if (key === "done_today") {
+            return "已完成";
+        }
+        return this.statusLabel(key);
     }
 
     statusColor(key) {
@@ -539,8 +543,8 @@ export class ScanWorkbench extends Component {
      * navbar is mounted.
      */
     async onGoHome() {
-        sessionStorage.setItem("scan_open_apps_menu", "1");
-        window.location.href = "/odoo";
+        browser.sessionStorage.setItem("scan_open_apps_menu", "1");
+        browser.location.assign("/odoo");
     }
 
     onBack() {

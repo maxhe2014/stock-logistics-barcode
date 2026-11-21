@@ -1,6 +1,7 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
+import ast
 from datetime import datetime, time
 
 import pytz
@@ -108,7 +109,13 @@ class StockBarcodesWorkbench(models.Model):
         return warehouses[:1]
 
     @api.model
-    def _get_workbench_types(self, warehouse):
+    def _candidate_types(self, warehouse):
+        """Every operation type eligible for a warehouse's workbench.
+
+        IA is a virtual entry (no picking type) and is intentionally not part
+        of this recordset. The operator's saved Inventory Overview filter is
+        applied later in ``_get_workbench_types``.
+        """
         if not warehouse:
             return self.env["stock.picking.type"]
         all_types = self.env["stock.picking.type"].search(
@@ -121,17 +128,59 @@ class StockBarcodesWorkbench(models.Model):
         )
         types = known or all_types
         order = {code: index for index, code in enumerate(("OUT", "PC", "IN", "SFP", "INT", "IA"))}
-        types = types.sorted(
+        return types.sorted(
             key=lambda picking_type: (
                 order.get((picking_type.sequence_code or "").upper(), 99),
                 picking_type.sequence,
                 picking_type.id,
             )
         )
-        favorite = types.filtered(
-            lambda picking_type: self.env.user in picking_type.favorite_user_ids
-        )
-        return favorite or types
+
+    @api.model
+    def _saved_overview_domain(self):
+        """Domain of the current user's saved "Inventory Overview" filter.
+
+        The Inventory Overview (stock.stock_picking_type_action) lets an
+        operator save a favourite search filter, e.g. only incoming/outgoing.
+        The scan workbench should honour that same choice instead of keeping
+        a separate setting. Returns ``None`` when there is no usable filter.
+        """
+        action_id = False
+        try:
+            action = self.env.ref("stock.stock_picking_type_action", raise_if_not_found=False)
+            if action:
+                action_id = action.id
+        except ValueError:
+            action_id = False
+        filters = self.env["ir.filters"].get_filters("stock.picking.type", action_id)
+        if not filters:
+            return None
+        # Prefer the default filter the operator starred; fall back to the
+        # first visible one.
+        chosen = next((f for f in filters if f.get("is_default")), filters[0])
+        raw_domain = chosen.get("domain") or "[]"
+        try:
+            domain = ast.literal_eval(raw_domain)
+        except (ValueError, SyntaxError):
+            return None
+        if not isinstance(domain, list) or not domain:
+            return None
+        return domain
+
+    @api.model
+    def _get_workbench_types(self, warehouse):
+        types = self._candidate_types(warehouse)
+        domain = self._saved_overview_domain()
+        if domain:
+            try:
+                filtered = types.filtered_domain(domain)
+            except Exception:
+                filtered = self.env["stock.picking.type"]
+            # Only honour the saved filter when it actually matches something;
+            # a stale/incompatible domain must not empty the workbench.
+            if filtered:
+                return filtered
+        return types
 
     @api.model
     def _inventory_pending_count(self, warehouse):

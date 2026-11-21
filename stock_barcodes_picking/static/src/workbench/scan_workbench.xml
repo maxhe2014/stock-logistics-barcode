@@ -30,7 +30,7 @@
                 <span class="o_wb_row_name" t-out="row.name" />
                 <span
                     t-att-class="'o_wb_badge o_wb_badge_' + this.statusColor(row.status_key)"
-                    t-out="this.statusLabel(row.status_key)"
+                    t-out="this.rowStatusLabel(row.status_key)"
                 />
             </div>
             <div class="o_wb_row_bottom">

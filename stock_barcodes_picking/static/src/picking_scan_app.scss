@@ -539,10 +539,12 @@
             --scan-card-accent: var(--scan-green);
         }
         // Active target: the whole card drops 4px down/right and loses its
-        // hard shadow (design component "状态=按下"); the orange stripe
-        // replaces the status colour.
+        // hard shadow (design component "状态=按下"). Per the Pixso component
+        // set, selection recolours the OUTER frame to the orange frame colour
+        // (容器15 stroke -> $强调/橙). The inner left status stripe (容器26)
+        // keeps its own state colour — it must NOT turn orange.
         &.is-selected {
-            --scan-card-accent: var(--scan-orange);
+            border-color: var(--scan-orange);
             transform: translate(4px, 4px);
             box-shadow: inset 3px 0 0 var(--scan-card-accent);
         }

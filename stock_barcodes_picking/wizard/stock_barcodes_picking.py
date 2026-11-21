@@ -1,5 +1,6 @@
 # Copyright 2026 OpenViking
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+
 from odoo import api, fields, models
 
 from odoo.tools.float_utils import float_compare, float_is_zero
@@ -1513,7 +1514,9 @@ class WizStockBarcodesPicking(models.TransientModel):
         self._compute_qty_available()
         if product.tracking != "none":
             if self._get_lot_scan_policy() == "optional":
-                result = self._pick_reserved_lots(component_moves, 1.0)
+                # Auto-pick only from the selected demand row, matching the
+                # row-scoped write target used by the qty/scan flows.
+                result = self._pick_reserved_lots(self.active_move_id, 1.0)
                 if result:
                     self._clean_values()
                     self._set_message(
@@ -3224,9 +3227,7 @@ class WizStockBarcodesPicking(models.TransientModel):
         operation type allows over-picking; 0 elsewhere.
         """
         self.ensure_one()
-        moves = self.picking_id.move_ids.filtered(
-            lambda m: m.product_id == product and m.state != "cancel"
-        )
+        moves = self._target_moves(product)
         demand = sum(m.product_uom_qty for m in moves)
         picked = sum(
             line.quantity
@@ -3277,6 +3278,38 @@ class WizStockBarcodesPicking(models.TransientModel):
             or "warn"
         )
 
+    def _target_moves(self, product=None):
+        """Moves a scan is allowed to write to (row-scoped picking).
+
+        A picking may contain several moves for the same product (e.g. two
+        sale lines). The scan UI highlights ONE demand row via
+        ``active_move_id``; writes must follow that selection, otherwise the
+        first move of the product silently absorbs every pick and the other
+        rows can never be picked. See TO-DO LIST.md "按需求行写入".
+
+        - With a valid active move (same picking, same product, not done /
+          cancel), return ONLY that move.
+        - Otherwise fall back to all open moves of the product, so callers
+          that do not resolve a selection keep the legacy aggregate behaviour
+          (e.g. the first scan auto-selects a row in ``_scan_product``).
+        """
+        self.ensure_one()
+        if not self.picking_id:
+            return self.env["stock.move"]
+        product = product or self.product_id
+        candidates = self.picking_id.move_ids.filtered(
+            lambda m: m.product_id == product and m.state not in ("done", "cancel")
+        )
+        active = self.active_move_id
+        if (
+            active
+            and active.picking_id == self.picking_id
+            and active.product_id == product
+            and active.state not in ("done", "cancel")
+        ):
+            return active
+        return candidates
+
     def _process_stock_move_line(self):
         """Find matching picking move and update/create move line.
 
@@ -3289,13 +3322,13 @@ class WizStockBarcodesPicking(models.TransientModel):
         move_line_ids.picked. Setting move.picked directly triggers
         _inverse_picked, which marks ALL lines of the move as picked
         (wrong for serial products picked one-by-one).
+
+        Writes are scoped to the active demand row (see ``_target_moves``).
         """
         self.ensure_one()
         if not self.picking_id:
             return False
-        moves = self.picking_id.move_ids.filtered(
-            lambda m: m.product_id == self.product_id and m.state != "cancel"
-        )
+        moves = self._target_moves(self.product_id)
         if not moves:
             self._set_message(
                 "error",
@@ -4222,12 +4255,10 @@ class WizStockBarcodesPicking(models.TransientModel):
                 return False
             return bool(self.action_consume_with_qty(qty))
         scope_ids = set(picked_lines.ids)
-        moves = self.picking_id.move_ids.filtered(
-            lambda candidate: (
-                candidate.product_id == product
-                and candidate.state != "cancel"
-            )
-        )
+        # Scope capacity checks to the same active row the +/- buttons write
+        # to. Without this, a demand row with its own lines would be checked
+        # against the summed demand of every move of the product.
+        moves = self._target_moves(product)
         total_demand = sum(candidate.product_uom_qty for candidate in moves)
         other_picked_qty = sum(
             line.quantity
@@ -4570,18 +4601,11 @@ class WizStockBarcodesPicking(models.TransientModel):
         Called from the scan UI's "Add Product" button when the operator
         wants to pick a product that isn't on the transfer yet (force-add).
         """
-        _log = self.env['ir.logging']._log if hasattr(self.env['ir.logging'], '_log') else None
-        import logging as _logging
-        _logger = _logging.getLogger(__name__)
-        _logger.warning("=== action_add_product_to_picking CALLED: wiz=%s picking=%s product_id=%s qty=%s ===",
-                        self.id, self.picking_id.name, product_id, qty)
         self.ensure_one()
         if not self.picking_id:
-            _logger.warning("action_add_product_to_picking: NO picking_id!")
             return False
         product = self.env["product.product"].browse(product_id)
         if not product.exists():
-            _logger.warning("action_add_product_to_picking: product %s not found!", product_id)
             return False
         # If the product is already on the picking, increase the demand of
         # the first open move instead of refusing — the operator may need to
